@@ -11,3 +11,7 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+
+# Metadatos que genera Windows/OneDrive en cada carpeta sincronizada.
+desktop.ini
+Thumbs.db
