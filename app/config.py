@@ -5,6 +5,10 @@ del archivo .env (que NO se versiona); en Railway, de las variables del
 servicio. Ningún secreto se escribe en el código.
 """
 
+import base64
+import binascii
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,7 +23,89 @@ class Settings(BaseSettings):
     META_WABA_ID: str = ""
     META_GRAPH_VERSION: str = "v25.0"
 
+    # --- Identidad y cifrado (Fase 3, §5.2) ---
+    # Ambos son críticos e irrecuperables. Si el pepper cambia, las
+    # usuarias registradas dejan de ser reconocidas; si se pierde la
+    # clave, los nombres cifrados no se pueden descifrar.
+    PHONE_HASH_PEPPER: str
+    NAME_ENCRYPTION_KEY: str
+
+    # --- Supabase / PostgreSQL ---
+    # Cadena del *session pooler* (puerto 5432). Ver la validación de
+    # más abajo para el motivo.
+    DATABASE_URL: str
+    DB_POOL_MIN: int = 1
+    DB_POOL_MAX: int = 5
+
     LOG_LEVEL: str = "INFO"
+
+    @field_validator("META_VERIFY_TOKEN")
+    @classmethod
+    def _validar_verify_token(cls, valor: str) -> str:
+        if not valor.strip():
+            raise ValueError(
+                "META_VERIFY_TOKEN no puede estar vacío. Es una cadena que "
+                "usted inventa y registra igual en el panel de Meta. "
+                'Genérela con: python -c "import secrets; '
+                'print(secrets.token_urlsafe(32))"'
+            )
+        return valor
+
+    # Las dos validaciones siguientes se ejecutan al arrancar. Es
+    # deliberado que el servicio no levante con una clave mal formada:
+    # el fallo alternativo aparecería al registrar a la primera usuaria,
+    # mucho más tarde y mucho más difícil de diagnosticar.
+
+    @field_validator("PHONE_HASH_PEPPER")
+    @classmethod
+    def _validar_pepper(cls, valor: str) -> str:
+        if len(valor) < 32:
+            raise ValueError(
+                "PHONE_HASH_PEPPER debe tener al menos 32 caracteres. "
+                'Genérelo con: python -c "import secrets; '
+                'print(secrets.token_hex(32))"'
+            )
+        return valor
+
+    @field_validator("NAME_ENCRYPTION_KEY")
+    @classmethod
+    def _validar_clave_cifrado(cls, valor: str) -> str:
+        try:
+            bruta = base64.b64decode(valor, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError(
+                "NAME_ENCRYPTION_KEY debe venir codificada en base64."
+            ) from exc
+
+        if len(bruta) != 32:
+            raise ValueError(
+                f"NAME_ENCRYPTION_KEY debe ser de 32 bytes (AES-256); "
+                f"la recibida tiene {len(bruta)}. Genérela con: "
+                'python -c "import base64,os; '
+                'print(base64.b64encode(os.urandom(32)).decode())"'
+            )
+        return valor
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def _validar_cadena_conexion(cls, valor: str) -> str:
+        # El transaction pooler de Supabase no admite prepared statements,
+        # y asyncpg los usa por defecto. El fallo aparecería en tiempo de
+        # ejecución con un mensaje difícil de relacionar con la causa, así
+        # que se corta aquí.
+        if ":6543" in valor:
+            raise ValueError(
+                "DATABASE_URL apunta al puerto 6543 (transaction pooler), "
+                "que no admite prepared statements y rompe asyncpg. Use el "
+                "session pooler: Supabase -> Connect -> Session pooler "
+                "(pooler.supabase.com:5432)."
+            )
+        if not valor.startswith(("postgresql://", "postgres://")):
+            raise ValueError(
+                "DATABASE_URL debe ser una cadena de conexión de "
+                "PostgreSQL (postgresql://...)."
+            )
+        return valor
 
 
 settings = Settings()
