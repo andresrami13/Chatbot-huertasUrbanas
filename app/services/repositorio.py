@@ -9,8 +9,8 @@ tal como llega de Meta, y calculan la huella internamente. Quien las
 llama nunca manipula huellas ni ve datos cifrados. El número no se
 almacena ni se registra en bitácora en ningún momento.
 
-Estado actual: solo `usuario`. Las funciones de huerta y cultivo llegan
-con el flujo de registro (CU3).
+Estado actual: `usuario` y el catálogo `barrio`. Las funciones de huerta y
+cultivo llegan con el flujo de registro (CU3).
 """
 
 import logging
@@ -29,6 +29,15 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class Barrio:
+    """Una fila del catálogo de barrios (ADR-0002)."""
+
+    id: int
+    codigo: str
+    nombre: str
+
+
+@dataclass(frozen=True)
 class Usuaria:
     """Una usuaria ya identificada, con el nombre ya descifrado.
 
@@ -38,6 +47,32 @@ class Usuaria:
     id: UUID
     nombre: str | None
     consentimiento_en: datetime
+
+
+async def listar_barrios() -> list[Barrio]:
+    """Devuelve los barrios activos del catálogo, en orden alfabético.
+
+    Es la fuente del enum de la extracción: el prompt y el esquema de la
+    salida estructurada se generan leyendo esta tabla, nunca con la lista
+    escrita a mano (ADR-0002). Añadir un barrio es un INSERT y el extractor
+    lo recoge sin tocar código.
+
+    No lleva filtro por usuario_id porque el catálogo no es de nadie: es la
+    única tabla del sistema sin dueño.
+    """
+    filas = await obtener_pool().fetch(
+        """
+        select id, codigo, nombre
+          from barrio
+         where activo
+         order by nombre
+        """
+    )
+
+    return [
+        Barrio(id=fila["id"], codigo=fila["codigo"], nombre=fila["nombre"])
+        for fila in filas
+    ]
 
 
 async def buscar_usuaria(telefono: str) -> Usuaria | None:

@@ -34,6 +34,8 @@ Todavía no hay inteligencia artificial conectada.
 | Vectorización | `app/services/embeddings.py` | Probado contra la API real |
 | Descarga de multimedia | `app/services/media.py` | Probado en producción |
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
+| Extracción de entidades | `app/services/extraccion.py` | Probada, **sin conectar al flujo** |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Solo `extraccion_v1.md` |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -146,9 +148,32 @@ quedó el `telefono_hash`, nunca el número.
    - Temperatura 0.0 para transcribir. **CLAUDE.md §8 no recoge este
      parámetro** porque la tabla es anterior a la entrada por voz; hay que
      añadirlo al documento de grado.
-4. **Extracción de entidades.** Prompt `extraccion_v1.md` en
-   `app/agent/prompts/`, salida estructurada a temperatura 0.1, con el enum
-   de barrios **generado leyendo la tabla `barrio`**, no escrito a mano.
+4. **Extracción de entidades.** Hecha y **probada contra la base y la API
+   reales** el 30/07/2026 (`python -m scripts.spike_extraccion`, que no
+   escribe nada).
+   - `app/agent/prompts/extraccion_v1.md`, cargado por
+     `app/agent/plantillas.py`. **Al editar un prompt, cuidado con las
+     llaves literales:** los huecos se rellenan con `str.format` y una `{`
+     sin duplicar rompe la carga.
+   - Salida estructurada con `response_schema`, temperatura 0.1 fija.
+   - El enum de barrios se genera con `listar_barrios()` leyendo la tabla
+     (ADR-0002). El esquema obliga al modelo a devolver un código válido,
+     así que no hace falta validar contra el catálogo después.
+   - **La fecha de hoy se inyecta en el prompt.** Sin ella el modelo no
+     puede resolver "en marzo" ni "hace dos meses", y acertaría el año por
+     casualidad. Ninguna fase lo contemplaba.
+   - Los siete casos de prueba salieron bien, incluidos los tres que
+     importan: una pregunta ("¿al tomate qué le echo?") **no** produce
+     cultivos; "cebolla larga" y "papa criolla" se conservan literales sin
+     recortarse a "cebolla" y "papa"; y "los tres sectores" dictado por voz
+     cae en el código `los_3_sectores`.
+   - **Nada se persiste**: la función solo devuelve. El guardado es del
+     paso 5, tras la confirmación (CLAUDE.md §4.7).
+   - Punto menor para calibrar en la Fase 7: "sembré en abril **me
+     parece**" se marca como fecha precisa, porque el prompt manda mirar si
+     nombra un mes. El titubeo de la usuaria podría justificar marcarla
+     imprecisa. Es de bajo riesgo, porque la confirmación del CU3 le
+     muestra la fecha de todos modos.
 5. **Flujo de registro de huerta (CU3).** Extraer → mostrar → confirmar con
    botones → persistir. Con esto cierra la Fase 5.
 6. **Antes del punto 5**, resolver los puntos abiertos de
