@@ -12,13 +12,17 @@ En el editor SQL de Supabase, **en este orden**:
 | [`001_esquema.sql`](001_esquema.sql) | Extensión `pgvector`, las 8 tablas, índices y disparadores |
 | [`002_catalogo_barrios.sql`](002_catalogo_barrios.sql) | Siembra de los 7 barrios de la UPZ 84 más `otro` |
 | [`003_rls.sql`](003_rls.sql) | Activación de RLS y retirada de privilegios públicos |
+| [`004_idempotencia.sql`](004_idempotencia.sql) | Tabla de idempotencia del webhook ([ADR-0005](../docs/adr/0005-procesamiento-asincrono-e-idempotencia.md)) |
+| [`005_registro_pendiente.sql`](005_registro_pendiente.sql) | Borrador del CU3 a la espera de confirmación ([ADR-0008](../docs/adr/0008-borrador-de-registro-y-una-huerta-por-usuaria.md)) |
 
-Los tres son idempotentes: reejecutarlos no duplica nada.
+Los cinco son idempotentes: reejecutarlos no duplica nada.
 
 ## Modelo
 
-Ocho tablas: las siete entidades de la Fase 3 más el catálogo `barrio`
-que introduce el [ADR-0002](../docs/adr/0002-catalogo-de-barrios.md).
+Diez tablas: las siete entidades de la Fase 3, el catálogo `barrio` del
+[ADR-0002](../docs/adr/0002-catalogo-de-barrios.md), la idempotencia del
+[ADR-0005](../docs/adr/0005-procesamiento-asincrono-e-idempotencia.md) y el
+borrador del [ADR-0008](../docs/adr/0008-borrador-de-registro-y-una-huerta-por-usuaria.md).
 
 ```
 barrio ──1:N──> huerta <──N:1── usuario ──1:N──> mensaje
@@ -37,7 +41,11 @@ Decisiones que el esquema materializa:
   `huerta_id` ([ADR-0004](../docs/adr/0004-cultivo-y-fragmento-comunitario.md)).
 - **El barrio no se indexa para la recuperación**: no filtra la búsqueda,
   solo atribuye ([ADR-0001](../docs/adr/0001-barrio-no-filtra-recuperacion.md)).
-- **Sin tabla de idempotencia**: sigue en memoria en el despachador
+- **Idempotencia con dos estados y sin dueño.** `idempotencia_webhook` se
+  escribe **antes** de la compuerta del CU1, así que no puede contener dato
+  personal alguno: guarda el HMAC del `wamid` —que en claro lleva dentro el
+  teléfono del remitente— y no tiene `usuario_id`. Junto con `barrio`, es la
+  única tabla sin dueño, y es deliberado
   ([ADR-0005](../docs/adr/0005-procesamiento-asincrono-e-idempotencia.md)).
 - **La existencia de una fila en `usuario` ES el consentimiento**. No hay
   columna booleana: el CU1 prohíbe persistir nada antes de autorizar, y
@@ -58,7 +66,7 @@ la búsqueda vectorial y cifrarla rompería la recuperación (Fase 3, §5.2).
 
 ## Sobre el RLS
 
-Está activo en las ocho tablas y **sin políticas permisivas**, lo que en
+Está activo en las diez tablas y **sin políticas permisivas**, lo que en
 PostgreSQL equivale a denegar todo. No es un olvido.
 
 El backend usa la clave de *service role*, que omite el RLS por diseño.
@@ -69,14 +77,17 @@ describirse en el documento de grado.
 
 ## Puntos a verificar al implementar
 
-1. **Dimensión del embedding.** Las columnas son `vector(768)`, para
-   `gemini-embedding-001` con `output_dimensionality=768`. Confirmar el
-   parámetro contra la documentación vigente antes de la ingesta. No
-   mezclar embeddings de modelos distintos: habría que re-vectorizar todo.
-2. **Normalización del vector truncado.** Al pedir menos de las 3072
-   dimensiones nativas, el vector puede venir sin normalizar, lo que
-   afecta a la similitud coseno. Verificarlo en la documentación oficial
-   durante la Fase 6 y normalizar en la aplicación si hace falta.
+1. **Dimensión del embedding.** ~~Confirmar el parámetro.~~ **Verificado.**
+   Las columnas son `vector(768)` y `output_dimensionality=768` funciona con
+   `gemini-embedding-001`. No mezclar embeddings de modelos distintos:
+   habría que re-vectorizar todo, y por eso el modelo no es configurable
+   ([ADR-0007](../docs/adr/0007-modelo-de-embeddings-fijo-en-codigo.md)).
+2. **Normalización del vector truncado.** ~~Verificarlo.~~ **Verificado:
+   llega sin normalizar**, con norma medida 0.594, y
+   `app/services/embeddings.py` lo normaliza en L2. Matiz importante para
+   la redacción: **no afecta a la similitud coseno**, porque el operador
+   `<=>` divide por la norma. Importa para poder usar `<#>` y para no
+   mezclar vectores de normas distintas en la misma columna.
 3. **Distancia contra similitud.** El operador `<=>` de pgvector devuelve
    **distancia** coseno. El umbral de 0.7 de la Fase 4, §7, es de
    *similitud*, así que se escribe `embedding <=> consulta <= 0.3`.

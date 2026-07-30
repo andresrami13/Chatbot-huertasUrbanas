@@ -23,6 +23,11 @@ lógica.
 BOTON_ACEPTO = "consentimiento_acepto"
 BOTON_NO_ACEPTO = "consentimiento_no_acepto"
 
+# CU3. El segundo y último momento binario del diseño (Fase 2, §1): no hay
+# más botones que estos cuatro en todo el sistema.
+BOTON_REGISTRO_CONFIRMO = "registro_confirmo"
+BOTON_REGISTRO_DESCARTO = "registro_descarto"
+
 
 # CU5. Sirve de bienvenida y de ayuda: la Fase 2 define un solo texto para
 # ambos casos. Los ejemplos están en lenguaje natural, para enseñar cómo
@@ -61,6 +66,44 @@ AUDIO_NO_ENTENDIDO = """Perdone, no logré entender la nota de voz.
 ¿Me la puede repetir? Ayuda hablar cerquita del celular y sin ruido alrededor.
 
 Si prefiere, también me lo puede escribir."""
+
+
+# --- CU3, registro de la huerta ---------------------------------------
+# El resumen que va antes de los botones lo compone `registro.py` con los
+# datos extraídos, no un modelo: tiene que decir exactamente lo que se va a
+# guardar. Aquí están solo las partes fijas.
+
+# El barrio es obligatorio en la base y sin él no se puede crear la huerta.
+# Se pregunta en lenguaje natural, sin lista de opciones: un menú de ocho
+# barrios es justo la barrera que el diseño evita (Fase 2, §1).
+REGISTRO_FALTA_BARRIO = """Anoté lo que me contó de su huerta.
+
+Para guardarlo me falta el barrio. ¿En qué barrio queda su huerta?"""
+
+
+REGISTRO_GUARDADO = """Listo, ya quedó guardado.
+
+Cuando siembre algo nuevo me cuenta y lo agrego."""
+
+
+# No se le pide explicación ni se repregunta: es su decisión.
+REGISTRO_DESCARTADO = """Listo, no guardé nada.
+
+Si quiere lo intentamos otra vez, cuénteme de nuevo."""
+
+
+# El borrador caducó o se perdió: la usuaria pulsó un botón de un mensaje
+# viejo. Se le dice sin tecnicismos y se le ofrece la salida.
+REGISTRO_SIN_BORRADOR = """Perdone, ya no tengo a la mano lo que iba a guardar.
+
+¿Me cuenta otra vez qué tiene sembrado?"""
+
+
+# Fallo al escribir en la base. Importa que quede claro que NO se guardó,
+# para que no crea que sus datos están cuando no lo están.
+REGISTRO_FALLO = """Perdone, no pude guardar la información en este momento.
+
+No se guardó nada. ¿Lo intentamos de nuevo en un rato?"""
 
 
 # ADR-0003: una sola respuesta, sin volver a insistir. La puerta queda

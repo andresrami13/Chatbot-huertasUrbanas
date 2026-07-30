@@ -1,7 +1,7 @@
 # Estado del proyecto
 
-Última actualización: 2026-07-29. **Fase 5 — Configuración de infraestructura
-y procesamiento base.**
+Última actualización: 2026-07-30. **Fase 5 terminada.** Siguiente: Fase 6 —
+agente orquestador con function calling, ingesta y RAG.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
@@ -11,9 +11,11 @@ Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
 
 ## Resumen en una línea
 
-El bot recibe mensajes de WhatsApp, aplica la compuerta de consentimiento y
-registra a la usuaria. **El CU1 está terminado y funcionando en producción.**
-Todavía no hay inteligencia artificial conectada.
+El bot recibe mensajes escritos y hablados, aplica la compuerta de
+consentimiento, transcribe las notas de voz, extrae los datos de la huerta y
+los guarda tras confirmación. **La Fase 5 está terminada: CU1, CU3 y CU5
+funcionando.** Falta el agente con function calling y el RAG (CU2 y CU4),
+que son la Fase 6.
 
 ---
 
@@ -22,7 +24,8 @@ Todavía no hay inteligencia artificial conectada.
 | Pieza | Archivo | Estado |
 |---|---|---|
 | Webhook con verificación de firma HMAC | `app/api/webhook.py`, `app/core/signature.py` | Funcionando |
-| Despachador asíncrono con idempotencia por `wamid` | `app/services/dispatcher.py` | Funcionando, control **en memoria** |
+| Despachador asíncrono | `app/services/dispatcher.py` | Funcionando |
+| Idempotencia con dos estados | `db/004_idempotencia.sql`, `repositorio.py` | En Supabase, probada |
 | Esquema de base de datos | `db/*.sql` | Aplicado en Supabase |
 | Identidad (HMAC) y cifrado (AES-GCM) | `app/core/identidad.py` | Probado |
 | Conexión a PostgreSQL | `app/core/basedatos.py` | Pool con `asyncpg` |
@@ -34,7 +37,8 @@ Todavía no hay inteligencia artificial conectada.
 | Vectorización | `app/services/embeddings.py` | Probado contra la API real |
 | Descarga de multimedia | `app/services/media.py` | Probado en producción |
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
-| Extracción de entidades | `app/services/extraccion.py` | Probada, **sin conectar al flujo** |
+| Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
+| Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
 | Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Solo `extraccion_v1.md` |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
@@ -57,12 +61,21 @@ quedó el `telefono_hash`, nunca el número.
 
 ## Lo que NO funciona todavía (esperado)
 
-- Un mensaje como "sembré tomate en marzo" de una usuaria ya autorizada **no
-  recibe respuesta**. El despachador lo registra en bitácora y espera al
-  agente. Ahora también vale para las notas de voz: se transcriben, pero la
-  transcripción se queda esperando al agente igual que el texto escrito.
-- El saludo y la ayuda de una usuaria ya autorizada se resuelven por palabras
-  clave, de forma provisional, hasta que exista el agente.
+- **Una consulta agroecológica no recibe respuesta** ("¿qué le echo al tomate
+  para los bichos?"). Es el CU2 y necesita el RAG de la Fase 6. El
+  despachador lo anota en bitácora y calla.
+- **El CU4 no existe**: no se puede preguntar qué siembran otras huertas.
+- **No hay agente.** La intención se resuelve de forma provisional: saludo y
+  ayuda por palabras clave, y cualquier otro mensaje se trata como posible
+  registro de huerta. En la Fase 6 esa decisión pasa al function calling.
+  Consecuencia visible hoy: un mensaje que mezcle consulta y dato —"a mi
+  tomate le salieron bichos"— puede ofrecer guardar el tomate en vez de
+  responder la duda.
+- **El fragmento comunitario no se genera** al confirmar un registro
+  (ADR-0004). Hasta que se haga, en la Fase 6, una huerta guardada no
+  aparecerá en el CU4. Hay un TODO en `guardar_huerta`.
+- No se guarda el historial de conversación en `mensaje`: es la memoria del
+  agente, Fase 6.
 
 ---
 
@@ -174,13 +187,52 @@ quedó el `telefono_hash`, nunca el número.
      nombra un mes. El titubeo de la usuaria podría justificar marcarla
      imprecisa. Es de bajo riesgo, porque la confirmación del CU3 le
      muestra la fecha de todos modos.
-5. **Flujo de registro de huerta (CU3).** Extraer → mostrar → confirmar con
-   botones → persistir. Con esto cierra la Fase 5.
-6. **Antes del punto 5**, resolver los puntos abiertos de
-   [ADR-0005](adr/0005-procesamiento-asincrono-e-idempotencia.md): la
-   idempotencia sigue en memoria y el `wamid` se marca *antes* de procesar.
-   A partir del CU3, un fallo a mitad de camino significa un registro de
-   huerta perdido en silencio.
+5. **Flujo de registro de huerta (CU3).** Hecho y **probado de punta a punta**
+   el 30/07/2026 contra la base y la API reales, con una usuaria temporal que
+   se borró después. **Con esto cierra la Fase 5.**
+   `app/services/registro.py`, `db/005_registro_pendiente.sql`, decisiones en
+   [ADR-0008](adr/0008-borrador-de-registro-y-una-huerta-por-usuaria.md).
+   - **El borrador espera en la base**, no en memoria: un redeploy la dejaría
+     pulsando "Sí, guardar" sin efecto. Caduca a las 24 horas.
+   - Matiz que hay que enunciar con precisión en la tesis: **el dato extraído
+     se persiste antes de la confirmación; el registro de la huerta, no.** El
+     borrador no se comparte, no entra al RAG y caduca.
+   - **El resumen lo compone el código, no el modelo.** Ella confirma lo que
+     se va a guardar, así que el texto tiene que reflejarlo con exactitud.
+   - **Se reutiliza la huerta que ya tenga** en lugar de crear otra.
+   - **Los cultivos se acumulan al fusionar**, que es lo que permite "sembré
+     lechuga" + "en El Regalo" en dos mensajes sin perder la lechuga.
+   - **Sin barrio no hay botones**: la columna es obligatoria, así que se
+     pregunta en lenguaje natural y el borrador espera. Sin menú de barrios.
+   - La marca de imprecisión se le muestra: "marzo de 2026 (más o menos)".
+   - Probado: resumen sin guardar nada, confirmación que persiste, falta de
+     barrio, fusión, descarte, y botón pulsado sobre un borrador ya caducado.
+6. ~~**Antes del punto 5**, resolver los puntos abiertos del ADR-0005.~~
+   **Hecho el 30/07/2026: los cuatro cerrados.**
+   [ADR-0005](adr/0005-procesamiento-asincrono-e-idempotencia.md) ya no
+   tiene puntos abiertos.
+   - Tabla `idempotencia_webhook` (`db/004_idempotencia.sql`), **aplicada en
+     Supabase**. Sin `usuario_id` y con el HMAC del `wamid`, no el `wamid`:
+     se escribe antes de la compuerta, así que no puede llevar dato
+     personal.
+   - Dos estados. `procesado` se marca **solo al terminar bien**; si el
+     trabajo falla, la fila se queda en `recibido` y el reintento de Meta lo
+     recupera al vencer el plazo de 5 minutos.
+   - El reclamo es **una sola sentencia** `INSERT ... ON CONFLICT DO UPDATE
+     ... WHERE`. Separar consulta y escritura abriría una carrera entre dos
+     entregas del mismo mensaje.
+   - Descarte **por antigüedad** (7 días), nunca en bloque. Limpieza al
+     arrancar.
+   - Los cuatro casos probados contra la base real: mensaje nuevo, duplicado
+     real, entrega mientras se procesa, e intento anterior muerto (que **se
+     vuelve a tomar**). Más la limpieza y el diagnóstico de atascados.
+   - **Límite que queda, y hay que declararlo así en la tesis:** la garantía
+     es *al menos una vez*, no exactamente una. Si el proceso muere entre el
+     final del trabajo y el marcado, el mensaje se reprocesa y la usuaria
+     recibe una respuesta repetida. Es preferible a perder un registro de
+     huerta. Y si Meta agota sus reintentos el mensaje se pierde, pero **ya
+     no en silencio**: queda la fila en `recibido` y el servicio avisa al
+     arrancar.
 
 Después de la Fase 5 viene la **Fase 6**: agente orquestador con function
 calling, ingesta de fuentes oficiales y RAG (CU2 y CU4).

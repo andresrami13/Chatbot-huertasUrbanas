@@ -15,6 +15,7 @@ from app.config import settings
 from app.core.basedatos import abrir_pool, cerrar_pool, comprobar_conexion
 from app.services.repositorio import (
     contar_mensajes_atascados,
+    limpiar_borradores,
     limpiar_idempotencia,
 )
 
@@ -35,6 +36,7 @@ async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     # despachador porque no tiene nada que ver con atender un mensaje.
     try:
         await limpiar_idempotencia()
+        await limpiar_borradores()
 
         # Los mensajes que se tomaron y nunca terminaron delatan un
         # procesamiento interrumpido, casi siempre un redeploy a mitad de

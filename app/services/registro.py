@@ -1,0 +1,232 @@
+"""Flujo de registro de la huerta (CU3).
+
+Extraer -> mostrar -> confirmar con botones -> persistir. Los cuatro pasos,
+en ese orden, y **nada se guarda en `huerta` antes del botón**
+(CLAUDE.md §4.7).
+
+El resumen que se le muestra lo compone este módulo con los datos
+extraídos, **sin pasar por el modelo**. Es deliberado: la usuaria confirma
+lo que va a quedar guardado, así que el texto tiene que reflejarlo con
+exactitud. Un resumen redactado por un modelo podría suavizar, omitir o
+añadir, y ella estaría autorizando algo distinto de lo que vio.
+
+Entre el resumen y el botón hay dos mensajes de WhatsApp, y la respuesta de
+un botón solo trae su identificador. Lo extraído espera en
+`registro_pendiente`, no en memoria (ADR-0008).
+"""
+
+import logging
+from datetime import date
+from uuid import UUID
+
+from app import textos
+from app.services.extraccion import CultivoExtraido, HuertaExtraida
+from app.services.repositorio import (
+    borrar_borrador,
+    guardar_borrador,
+    guardar_huerta,
+    obtener_borrador,
+)
+from app.services.whatsapp import enviar_botones, enviar_texto
+
+logger = logging.getLogger(__name__)
+
+# Sin locale: `calendar.month_name` depende de la configuración del sistema
+# y en Railway saldría en inglés.
+_MESES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def _serializar(extraida: HuertaExtraida) -> dict:
+    """Convierte la extracción en el jsonb del borrador."""
+    return {
+        "nombre_huerta": extraida.nombre_huerta,
+        "barrio_codigo": extraida.barrio_codigo,
+        "cultivos": [
+            {
+                "especie": cultivo.especie,
+                "anio": cultivo.anio,
+                "mes": cultivo.mes,
+                "fecha_imprecisa": cultivo.fecha_imprecisa,
+            }
+            for cultivo in extraida.cultivos
+        ],
+    }
+
+
+def _deserializar(datos: dict) -> HuertaExtraida:
+    """Reconstruye la extracción desde el jsonb del borrador."""
+    return HuertaExtraida(
+        nombre_huerta=datos.get("nombre_huerta"),
+        barrio_codigo=datos.get("barrio_codigo"),
+        cultivos=[
+            CultivoExtraido(
+                especie=c["especie"],
+                anio=c.get("anio"),
+                mes=c.get("mes"),
+                fecha_imprecisa=c.get("fecha_imprecisa", True),
+            )
+            for c in datos.get("cultivos") or []
+        ],
+    )
+
+
+def fusionar(previa: HuertaExtraida, nueva: HuertaExtraida) -> HuertaExtraida:
+    """Combina un borrador anterior con lo que la usuaria acaba de decir.
+
+    Hace falta porque la conversación llega a trozos: "sembré tomate" y,
+    cuando se le pregunta el barrio, "en Holanda". Sin fusionar, la segunda
+    frase perdería el tomate.
+
+    Criterios:
+
+    - El dato nuevo gana; el que falta en el nuevo se conserva del anterior.
+      Nunca se borra algo que ya se sabía porque esta frase no lo repita.
+    - Los cultivos **se acumulan**, evitando repetir la misma especie. Es lo
+      que corresponde a cómo se habla: "también sembré lechuga" añade, no
+      sustituye. Y si se colara algo indeseado, ella lo ve en el resumen y
+      puede descartar el registro completo.
+    """
+    especies_previas = {c.especie.lower() for c in nueva.cultivos}
+    cultivos = list(nueva.cultivos) + [
+        c for c in previa.cultivos if c.especie.lower() not in especies_previas
+    ]
+
+    return HuertaExtraida(
+        nombre_huerta=nueva.nombre_huerta or previa.nombre_huerta,
+        barrio_codigo=nueva.barrio_codigo or previa.barrio_codigo,
+        cultivos=cultivos,
+    )
+
+
+def _describir_fecha(cultivo: CultivoExtraido) -> str:
+    """La fecha en palabras, marcando lo que se aproximó.
+
+    La marca de imprecisión de la Fase 4, Tabla 3, se le muestra a la
+    usuaria en lugar de esconderla: es la ocasión de que corrija una fecha
+    que el modelo estimó.
+    """
+    fecha = cultivo.fecha_siembra()
+
+    if fecha is None:
+        return "sin fecha"
+
+    texto = f"{_MESES[fecha.month - 1]} de {fecha.year}"
+    return f"{texto} (más o menos)" if cultivo.fecha_imprecisa else texto
+
+
+def componer_resumen(extraida: HuertaExtraida, nombre_barrio: str) -> str:
+    """El texto que se le muestra antes de los botones.
+
+    Frases cortas y trato de usted (CLAUDE.md §11). Se cierra con una
+    pregunta para que quede claro que hace falta su respuesta.
+    """
+    lineas = ["Esto es lo que entendí:", ""]
+
+    if extraida.nombre_huerta:
+        lineas.append(f"Huerta: {extraida.nombre_huerta}")
+    lineas.append(f"Barrio: {nombre_barrio}")
+
+    if extraida.cultivos:
+        lineas.append("")
+        lineas.append("Sembrado:")
+        for cultivo in extraida.cultivos:
+            lineas.append(f"- {cultivo.especie}, {_describir_fecha(cultivo)}")
+
+    lineas.append("")
+    lineas.append("¿Lo guardo así?")
+
+    return "\n".join(lineas)
+
+
+async def proponer_registro(
+    numero: str,
+    usuario_id: UUID,
+    extraida: HuertaExtraida,
+    nombres_barrios: dict[str, str],
+) -> None:
+    """Guarda el borrador y le pide confirmación a la usuaria.
+
+    Si falta el barrio no ofrece los botones: sin barrio no se puede crear
+    la huerta, porque la columna es obligatoria. Pregunta por él y deja el
+    borrador esperando, de modo que la respuesta se fusione con lo ya
+    entendido.
+    """
+    previa = await obtener_borrador(usuario_id)
+    if previa is not None:
+        extraida = fusionar(_deserializar(previa), extraida)
+
+    await guardar_borrador(usuario_id, _serializar(extraida))
+
+    if extraida.barrio_codigo is None:
+        logger.info("Registro propuesto sin barrio | usuario_id=%s", usuario_id)
+        await enviar_texto(numero, textos.REGISTRO_FALTA_BARRIO)
+        return
+
+    nombre_barrio = nombres_barrios.get(
+        extraida.barrio_codigo, extraida.barrio_codigo
+    )
+
+    logger.info(
+        "Registro propuesto | usuario_id=%s | cultivos=%d",
+        usuario_id,
+        len(extraida.cultivos),
+    )
+
+    await enviar_botones(
+        numero,
+        componer_resumen(extraida, nombre_barrio),
+        [
+            (textos.BOTON_REGISTRO_CONFIRMO, "Sí, guardar"),
+            (textos.BOTON_REGISTRO_DESCARTO, "No"),
+        ],
+    )
+
+
+async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
+    """Persiste el borrador. Es el único punto que escribe en `huerta`."""
+    datos = await obtener_borrador(usuario_id)
+
+    if datos is None:
+        # Caducó, o pulsó el botón de un mensaje viejo ya resuelto.
+        logger.info("Confirmación sin borrador vigente | usuario_id=%s", usuario_id)
+        await enviar_texto(numero, textos.REGISTRO_SIN_BORRADOR)
+        return
+
+    extraida = _deserializar(datos)
+
+    if extraida.barrio_codigo is None:
+        # No debería llegar aquí: sin barrio no se ofrecen los botones.
+        logger.warning("Confirmación sin barrio | usuario_id=%s", usuario_id)
+        await enviar_texto(numero, textos.REGISTRO_FALTA_BARRIO)
+        return
+
+    cultivos: list[tuple[str, date | None, bool]] = [
+        (c.especie, c.fecha_siembra(), c.fecha_imprecisa) for c in extraida.cultivos
+    ]
+
+    try:
+        await guardar_huerta(
+            usuario_id=usuario_id,
+            barrio_codigo=extraida.barrio_codigo,
+            nombre_huerta=extraida.nombre_huerta,
+            cultivos=cultivos,
+        )
+    except Exception:
+        # El borrador NO se borra: así puede reintentar sin volver a
+        # contarlo todo.
+        logger.exception("Falló el guardado del registro | usuario_id=%s", usuario_id)
+        await enviar_texto(numero, textos.REGISTRO_FALLO)
+        return
+
+    await borrar_borrador(usuario_id)
+    await enviar_texto(numero, textos.REGISTRO_GUARDADO)
+
+
+async def descartar_registro(numero: str, usuario_id: UUID) -> None:
+    """Tira el borrador sin guardar nada."""
+    await borrar_borrador(usuario_id)
+    logger.info("Registro descartado por la usuaria | usuario_id=%s", usuario_id)
+    await enviar_texto(numero, textos.REGISTRO_DESCARTADO)

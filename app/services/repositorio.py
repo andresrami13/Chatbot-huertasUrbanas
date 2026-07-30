@@ -9,14 +9,15 @@ tal como llega de Meta, y calculan la huella internamente. Quien las
 llama nunca manipula huellas ni ve datos cifrados. El número no se
 almacena ni se registra en bitácora en ningún momento.
 
-Estado actual: `usuario`, el catálogo `barrio` y la idempotencia del
-webhook. Las funciones de huerta y cultivo llegan con el flujo de registro
-(CU3).
+Estado actual: `usuario`, el catálogo `barrio`, la idempotencia del webhook
+y el registro del CU3 (`huerta`, `cultivo` y su borrador). Falta lo del
+RAG: `fuente`, las dos colecciones vectoriales y `mensaje`.
 """
 
+import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from app.core.basedatos import obtener_pool
@@ -48,32 +49,6 @@ class Usuaria:
     id: UUID
     nombre: str | None
     consentimiento_en: datetime
-
-
-async def listar_barrios() -> list[Barrio]:
-    """Devuelve los barrios activos del catálogo, en orden alfabético.
-
-    Es la fuente del enum de la extracción: el prompt y el esquema de la
-    salida estructurada se generan leyendo esta tabla, nunca con la lista
-    escrita a mano (ADR-0002). Añadir un barrio es un INSERT y el extractor
-    lo recoge sin tocar código.
-
-    No lleva filtro por usuario_id porque el catálogo no es de nadie: es la
-    única tabla del sistema sin dueño.
-    """
-    filas = await obtener_pool().fetch(
-        """
-        select id, codigo, nombre
-          from barrio
-         where activo
-         order by nombre
-        """
-    )
-
-    return [
-        Barrio(id=fila["id"], codigo=fila["codigo"], nombre=fila["nombre"])
-        for fila in filas
-    ]
 
 
 # --- Idempotencia del webhook (ADR-0005) ------------------------------
@@ -189,6 +164,201 @@ async def contar_mensajes_atascados(minutos: int = 10) -> int:
         """,
         minutos,
     )
+
+
+async def listar_barrios() -> list[Barrio]:
+    """Devuelve los barrios activos del catálogo, en orden alfabético.
+
+    Es la fuente del enum de la extracción: el prompt y el esquema de la
+    salida estructurada se generan leyendo esta tabla, nunca con la lista
+    escrita a mano (ADR-0002). Añadir un barrio es un INSERT y el extractor
+    lo recoge sin tocar código.
+
+    No lleva filtro por usuario_id porque el catálogo no es de nadie: es la
+    única tabla del sistema sin dueño.
+    """
+    filas = await obtener_pool().fetch(
+        """
+        select id, codigo, nombre
+          from barrio
+         where activo
+         order by nombre
+        """
+    )
+
+    return [
+        Barrio(id=fila["id"], codigo=fila["codigo"], nombre=fila["nombre"])
+        for fila in filas
+    ]
+
+
+# --- Borrador de registro (CU3, ADR-0008) -----------------------------
+# Un borrador abandonado caduca. Un día es de sobra: si la usuaria no
+# confirmó en 24 horas, lo más probable es que ya no recuerde qué iba a
+# confirmar, y mostrarle luego un resumen viejo sería peor que olvidarlo.
+_CADUCIDAD_BORRADOR_HORAS = 24
+
+
+async def guardar_borrador(usuario_id: UUID, datos: dict) -> None:
+    """Guarda o reemplaza el borrador pendiente de confirmación."""
+    await obtener_pool().execute(
+        """
+        insert into registro_pendiente (usuario_id, datos)
+             values ($1, $2::jsonb)
+        on conflict (usuario_id) do update
+                set datos = excluded.datos, creado_en = now()
+        """,
+        usuario_id,
+        json.dumps(datos),
+    )
+
+
+async def obtener_borrador(usuario_id: UUID) -> dict | None:
+    """Devuelve el borrador vigente, o None si no hay o ya caducó.
+
+    Filtra por antigüedad en la propia consulta: un borrador caducado es
+    como si no existiera, y así no hace falta acordarse de comprobarlo en
+    cada sitio que lo lea.
+    """
+    fila = await obtener_pool().fetchrow(
+        """
+        select datos
+          from registro_pendiente
+         where usuario_id = $1
+           and creado_en > now() - make_interval(hours => $2)
+        """,
+        usuario_id,
+        _CADUCIDAD_BORRADOR_HORAS,
+    )
+
+    return json.loads(fila["datos"]) if fila else None
+
+
+async def borrar_borrador(usuario_id: UUID) -> None:
+    """Descarta el borrador, se haya guardado o no."""
+    await obtener_pool().execute(
+        "delete from registro_pendiente where usuario_id = $1", usuario_id
+    )
+
+
+async def limpiar_borradores() -> int:
+    """Borra los borradores caducados. Se invoca al arrancar."""
+    resultado = await obtener_pool().execute(
+        """
+        delete from registro_pendiente
+         where creado_en < now() - make_interval(hours => $1)
+        """,
+        _CADUCIDAD_BORRADOR_HORAS,
+    )
+
+    borrados = int(resultado.rsplit(" ", 1)[-1]) if resultado else 0
+    if borrados:
+        logger.info("Borradores caducados borrados=%d", borrados)
+
+    return borrados
+
+
+# --- Huerta y cultivos (CU3) ------------------------------------------
+
+
+async def guardar_huerta(
+    usuario_id: UUID,
+    barrio_codigo: str,
+    nombre_huerta: str | None,
+    cultivos: list[tuple[str, date | None, bool]],
+) -> UUID:
+    """Persiste el registro confirmado y devuelve el id de la huerta.
+
+    Todo en una transacción: una huerta creada sin sus cultivos, o cultivos
+    a medias, dejaría el dato peor que no haberlo guardado.
+
+    **Reutiliza la huerta que ya tenga la usuaria** en lugar de crear otra
+    (ADR-0008). El esquema admite varias por usuaria, pero el perfil real es
+    una líder con una huerta: crear una nueva cada vez que menciona un
+    cultivo le fragmentaría los datos y rompería la atribución del CU4, que
+    es por huerta.
+
+    `cultivos` son ternas (especie, fecha o None, fecha_imprecisa).
+    """
+    pool = obtener_pool()
+
+    async with pool.acquire() as conexion:
+        async with conexion.transaction():
+            barrio_id = await conexion.fetchval(
+                "select id from barrio where codigo = $1 and activo", barrio_codigo
+            )
+            if barrio_id is None:
+                # El enum de la extracción sale de esta misma tabla, así que
+                # esto solo puede pasar si el barrio se desactivó entre la
+                # extracción y la confirmación.
+                raise ValueError(f"Barrio desconocido o inactivo: {barrio_codigo!r}")
+
+            # Capa 1 del modelo de seguridad: acotado por usuario_id.
+            huerta_id = await conexion.fetchval(
+                """
+                select id from huerta
+                 where usuario_id = $1
+                 order by creado_en
+                 limit 1
+                """,
+                usuario_id,
+            )
+
+            if huerta_id is None:
+                huerta_id = await conexion.fetchval(
+                    """
+                    insert into huerta (usuario_id, barrio_id, nombre_huerta)
+                         values ($1, $2, $3)
+                      returning id
+                    """,
+                    usuario_id,
+                    barrio_id,
+                    nombre_huerta,
+                )
+                creada = True
+            else:
+                # coalesce: un dato nuevo completa el que faltara, pero un
+                # null de esta extracción no borra lo que ya se sabía.
+                await conexion.execute(
+                    """
+                    update huerta
+                       set barrio_id     = $2,
+                           nombre_huerta = coalesce($3, nombre_huerta)
+                     where id = $1
+                    """,
+                    huerta_id,
+                    barrio_id,
+                    nombre_huerta,
+                )
+                creada = False
+
+            for especie, fecha, imprecisa in cultivos:
+                await conexion.execute(
+                    """
+                    insert into cultivo
+                           (huerta_id, especie, fecha_siembra_aprox,
+                            fecha_imprecisa)
+                         values ($1, $2, $3, $4)
+                    """,
+                    huerta_id,
+                    especie,
+                    fecha,
+                    imprecisa,
+                )
+
+    logger.info(
+        "Registro guardado | usuario_id=%s | huerta_id=%s | nueva=%s | "
+        "cultivos=%d",
+        usuario_id,
+        huerta_id,
+        creada,
+        len(cultivos),
+    )
+
+    # TODO (Fase 6, ADR-0004): regenerar el fragmento_comunitario de esta
+    # huerta —texto y embedding— para que el CU4 la incluya.
+
+    return huerta_id
 
 
 async def buscar_usuaria(telefono: str) -> Usuaria | None:

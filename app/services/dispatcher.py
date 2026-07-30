@@ -16,7 +16,10 @@ Orden interno, y el orden importa: identificar el mensaje -> compuerta de
 consentimiento -> normalización de la entrada -> intención. La
 transcripción va **después** de la compuerta a propósito (ADR-0006).
 
-Pendiente de conectar: el agente orquestador.
+Pendiente de conectar: el agente orquestador. Hasta que exista, la
+intención se resuelve de forma provisional —saludo y ayuda por palabras
+clave, y cualquier otro mensaje como posible registro de huerta—. En la
+Fase 6 esa decisión pasa al function calling (Fase 2, §4).
 """
 
 import logging
@@ -24,8 +27,18 @@ import logging
 from app import textos
 from app.core.identidad import huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta, es_saludo_o_ayuda
+from app.services.extraccion import extraer_huerta
 from app.services.normalizacion import transcribir_audio
-from app.services.repositorio import marcar_procesado, reclamar_wamid
+from app.services.registro import (
+    confirmar_registro,
+    descartar_registro,
+    proponer_registro,
+)
+from app.services.repositorio import (
+    listar_barrios,
+    marcar_procesado,
+    reclamar_wamid,
+)
 from app.services.whatsapp import enviar_texto
 
 logger = logging.getLogger(__name__)
@@ -147,6 +160,17 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
             await enviar_texto(numero, textos.AUDIO_NO_ENTENDIDO)
             return
 
+    # Botones del registro (CU3). Van antes de cualquier interpretación:
+    # una pulsación no es un mensaje que haya que entender, es una respuesta
+    # a algo que ya se le preguntó.
+    if boton_id == textos.BOTON_REGISTRO_CONFIRMO:
+        await confirmar_registro(numero, usuaria.id)
+        return
+
+    if boton_id == textos.BOTON_REGISTRO_DESCARTO:
+        await descartar_registro(numero, usuaria.id)
+        return
+
     # Provisional: mientras no exista el agente, el saludo y la ayuda se
     # resuelven por palabras clave. Cuando entre el agente, esta decisión
     # pasa a ser suya por function calling (Fase 2, §4).
@@ -157,12 +181,31 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
         await enviar_texto(numero, textos.BIENVENIDA)
         return
 
+    if not texto:
+        logger.info("Mensaje sin texto que interpretar | ref=%s", ref)
+        return
+
+    # Registro de la huerta (CU3). Provisional en un punto: mientras no
+    # exista el agente, todo mensaje libre se trata como un posible registro.
+    # Cuando entre el function calling será él quien decida entre registrar,
+    # consultar orientación o consultar a la comunidad (Fase 2, §4).
+    extraida = await extraer_huerta(texto)
+
+    if extraida.tiene_datos:
+        barrios = await listar_barrios()
+        await proponer_registro(
+            numero,
+            usuaria.id,
+            extraida,
+            {barrio.codigo: barrio.nombre for barrio in barrios},
+        )
+        return
+
+    # No había nada que registrar y no es un saludo: es una consulta, y
+    # hasta la Fase 6 no hay con qué responderla.
     logger.info(
-        "Mensaje de usuaria autorizada, a la espera del agente | "
+        "Mensaje sin datos de huerta, a la espera del agente | "
         "usuario_id=%s | ref=%s",
         usuaria.id,
         ref,
     )
-
-    # TODO (pasos siguientes): agente orquestador (function calling) ->
-    # respuesta por WhatsApp.
