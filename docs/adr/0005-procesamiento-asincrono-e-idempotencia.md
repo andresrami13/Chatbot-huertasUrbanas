@@ -44,12 +44,27 @@ Ninguno bloquea la Fase 5 mientras el despachador solo escriba en bitácora.
 **Todos deben resolverse antes de implementar el flujo del CU3**, porque a
 partir de ahí un mensaje perdido es un registro de huerta perdido.
 
-1. **Conflicto con la compuerta de consentimiento.** Persistir el `wamid`
+1. **Conflicto con la compuerta de consentimiento.** ~~Persistir el `wamid`
    al recibirlo es tratamiento de datos de alguien que quizá no ha
-   autorizado, y el CU1 lo prohíbe. *En stand by por decisión del autor.*
-   Propuesta a evaluar: almacenar el `wamid` desacoplado de todo
+   autorizado, y el CU1 lo prohíbe.~~ **Resuelto el 30/07/2026.**
+
+   La propuesta que figuraba aquí —almacenar el `wamid` "desacoplado de todo
    identificador de remitente, de modo que la tabla no permita reconstruir
-   quién escribió.
+   quién escribió"— **era inviable, y por un motivo que no se había
+   advertido: el `wamid` contiene el número de teléfono del remitente**, en
+   ASCII, recuperable con un `base64 -d`. Es él mismo un identificador de
+   remitente, así que desacoplarlo de otros no servía de nada: una tabla de
+   `wamid` en claro es una tabla de teléfonos.
+
+   La solución adoptada es guardar un **HMAC-SHA256 del `wamid`** con el
+   pepper que ya existe (`huella_wamid`, en
+   [`app/core/identidad.py`](../../app/core/identidad.py)). La comparación
+   exacta que la idempotencia necesita funciona igual sobre la huella, la
+   tabla deja de ser reconstruible, y el conflicto con la compuerta
+   desaparece: lo que se persiste ya no es un dato personal.
+
+   Aplicado también a la bitácora, que registraba el `wamid` completo, y al
+   conjunto en memoria. Queda por hacer solo la tabla.
 2. **El `wamid` se marca antes de procesarlo.** Si el procesamiento falla a
    mitad, el reintento de Meta se descarta como duplicado y el mensaje se
    pierde en silencio. Debe pasar a dos estados: `recibido` al entrar,

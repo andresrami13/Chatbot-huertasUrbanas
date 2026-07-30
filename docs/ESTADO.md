@@ -32,8 +32,8 @@ Todavía no hay inteligencia artificial conectada.
 | Textos fijos (CU5) | `app/textos.py` | Sin pasar por el modelo |
 | Cliente de Gemini | `app/core/gemini.py` | Creado; sin llamada real todavía |
 | Vectorización | `app/services/embeddings.py` | Probado contra la API real |
-| Descarga de multimedia | `app/services/media.py` | **Sin probar con audio real** |
-| Transcripción | `app/services/normalizacion.py` | **Sin probar con audio real** |
+| Descarga de multimedia | `app/services/media.py` | Probado en producción |
+| Transcripción | `app/services/normalizacion.py` | Probado en producción |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -111,12 +111,24 @@ quedó el `telefono_hash`, nunca el número.
    - **`gemini-2.5-flash` se retira el 16/10/2026**, probablemente antes de
      la Fase 8. El modelo generativo por defecto es `gemini-3.6-flash`, de
      la serie 3.
-3. **Servicio de normalización.** Escrito: `app/services/media.py` y
-   `app/services/normalizacion.py`, conectados en el despachador.
-   **Falta la prueba con una nota de voz real** —es el paso que cierra este
-   punto—: mande un audio al número de pruebas, copie el `media_id` de la
-   bitácora de Railway y ejecute
-   `python -m scripts.spike_transcripcion <media_id>`.
+3. **Servicio de normalización.** Hecho y **probado en producción** el
+   30/07/2026 con una nota de voz real desde un celular: descarga, mime
+   `audio/ogg`, 15 515 bytes, transcripción de 69 caracteres y entrega al
+   punto donde espera el agente. El camino completo funciona.
+   - **Riesgo del códec Opus: cerrado.** Gemini **aceptó** el audio de
+     WhatsApp tal cual, sin conversión. No hace falta ffmpeg ni ninguna
+     dependencia del sistema en Railway. Era el riesgo abierto del paso 3.
+   - El `mime_type` llegó ya normalizado a `audio/ogg`: quitar el
+     `; codecs=opus` funcionó.
+   - El `User-Agent` de la descarga funcionó: `lookaside.fbsbx.com`
+     respondió 200.
+   - **Tiempos medidos, que respaldan el ADR-0005:** el webhook devolvió
+     200 de inmediato y el pipeline tardó **4,3 s** (1,7 s de descarga,
+     2,5 s de Gemini). Confirma que procesar dentro de la petición
+     provocaría reintentos de Meta. Es evidencia citable en la tesis, y sin
+     agente todavía: con function calling y RAG será bastante más.
+   - Para leer la transcripción literal, `python -m
+     scripts.spike_transcripcion <media_id>` (el `media_id` dura 7 días).
    - La descarga son **dos peticiones y las dos llevan el token**. La URL
      que devuelve la primera caduca a los **5 minutos**; el `media_id`, a
      los 7 días.
@@ -148,7 +160,53 @@ quedó el `telefono_hash`, nunca el número.
 Después de la Fase 5 viene la **Fase 6**: agente orquestador con function
 calling, ingesta de fuentes oficiales y RAG (CU2 y CU4).
 
+**Aviso para la Fase 6, visto en la bitácora:** el SDK registra `AFC is
+enabled with max remote calls: 10`. AFC es *automatic function calling*, y
+viene activado por defecto: en cuanto el agente tenga herramientas, el SDK
+**ejecutará las funciones por su cuenta** en un bucle. Eso choca de frente
+con la decisión de confirmar antes de guardar (CLAUDE.md §4.7): el modelo
+llamaría a `registrar_huerta` sin pasar por los botones de confirmación.
+Habrá que desactivarlo (`AutomaticFunctionCallingConfig(disable=True)`) y
+orquestar las llamadas a mano. Hoy es inocuo porque la transcripción no
+declara herramientas.
+
 ---
+
+## El `wamid` lleva el teléfono dentro — corregido el 30/07/2026
+
+**Hallazgo.** El `wamid` contiene el número de teléfono del remitente, en
+ASCII, recuperable con un solo `base64 -d`. Comprobado sobre un `wamid` real
+de la bitácora: dentro aparecen los 12 dígitos del celular y, aparte, el
+identificador hexadecimal del mensaje. Vale igual para el `wamid` de los
+mensajes que envía el bot, que lleva el número del destinatario.
+
+Durante unas horas la bitácora de Railway guardó el número de quien
+escribiera. **Los registros anteriores al 30/07/2026 siguen conteniéndolo**;
+si Railway permite purgarlos, conviene hacerlo.
+
+**Corregido así:**
+
+- `huella_wamid` (HMAC-SHA256 con el pepper) para almacenar y comparar.
+- `referencia_wamid`, prefijo de 16 caracteres de esa huella, para la
+  bitácora. Es prefijo de la huella y **no** un recorte del `wamid`:
+  recortar el valor original seguiría exponiendo el número, que va al
+  principio. Como es prefijo, una línea de bitácora se podrá cruzar con la
+  fila de la tabla de idempotencia.
+- La idempotencia en memoria guarda ya huellas, no `wamid`. Importa porque
+  el duplicado se descarta **antes** de la compuerta, así que ese conjunto
+  incluye a quien no ha autorizado.
+- CLAUDE.md §11 corregido: decía que se registrara el `wamid`.
+- Comprobado con la bitácora capturada: no aparece el número, ni en claro ni
+  en base64, ni el `wamid` completo, ni el contenido del mensaje.
+
+**Lo que se pierde:** buscar un mensaje en el panel de Meta, que exige el
+`wamid` completo. Se compensa con la marca de tiempo.
+
+**Resuelve el punto abierto 1 del [ADR-0005](adr/0005-procesamiento-asincrono-e-idempotencia.md).**
+Su propuesta —guardar el `wamid` "desacoplado de todo identificador de
+remitente"— era inviable: el `wamid` **es** un identificador del remitente, y
+una tabla de `wamid` en claro sería una tabla de teléfonos. La huella sí lo
+consigue.
 
 ## Cosas que conviene no olvidar
 

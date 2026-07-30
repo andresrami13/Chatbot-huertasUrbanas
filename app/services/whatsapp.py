@@ -14,6 +14,7 @@ import logging
 import httpx
 
 from app.config import settings
+from app.core.identidad import referencia_wamid
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,13 @@ async def _enviar(carga: dict) -> str | None:
 
     datos = respuesta.json()
     wamid = (datos.get("messages") or [{}])[0].get("id")
-    logger.info("Mensaje enviado | wamid=%s", wamid)
+
+    # El wamid del mensaje enviado lleva dentro el número del destinatario,
+    # igual que el de los entrantes, así que a la bitácora va la referencia.
+    # El valor completo sí se devuelve: quien llama puede necesitarlo.
+    logger.info(
+        "Mensaje enviado | ref=%s", referencia_wamid(wamid) if wamid else "-"
+    )
     return wamid
 
 

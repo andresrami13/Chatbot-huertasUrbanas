@@ -1,6 +1,6 @@
 """Servicio de identidad y cifrado (Fase 3, Tabla 2 y §5.2).
 
-Resuelve los dos únicos datos personales del sistema:
+Resuelve los datos personales del sistema:
 
 - El **teléfono** nunca se almacena. Se convierte en un HMAC-SHA256 con
   un pepper secreto y se guarda solo esa huella. Es determinista a
@@ -12,6 +12,11 @@ Resuelve los dos únicos datos personales del sistema:
 - El **nombre** se cifra con AES-GCM del lado de la aplicación, de modo
   que la base solo almacena texto cifrado y la clave nunca viaja a
   Supabase ni aparece en sus registros de consultas.
+
+- El **`wamid`** no parece un dato personal, pero lo es: lleva dentro el
+  número de teléfono en ASCII, recuperable con un `base64 -d`. Se
+  comprobó sobre un `wamid` real el 30/07/2026. Por eso nunca se registra
+  ni se almacena en claro, sino a través de `huella_wamid`.
 
 La información agronómica NO pasa por aquí: va en claro porque alimenta
 la búsqueda vectorial y cifrarla rompería la recuperación.
@@ -80,6 +85,51 @@ def calcular_telefono_hash(numero: str) -> str:
         msg=normalizado.encode("utf-8"),
         digestmod=hashlib.sha256,
     ).hexdigest()
+
+
+# Etiqueta de dominio del HMAC. Separa el espacio de los `wamid` del de
+# los teléfonos aunque compartan el pepper: así ninguna huella de un
+# espacio puede coincidir con la del otro.
+_DOMINIO_WAMID = "wamid:"
+
+# Longitud de la referencia que va a la bitácora. 16 caracteres hex bastan
+# para no confundir dos mensajes y caben en una línea de registro.
+_LONGITUD_REFERENCIA = 16
+
+
+def huella_wamid(wamid: str) -> str:
+    """HMAC-SHA256 del `wamid` en hexadecimal (64 caracteres).
+
+    Es la forma en la que el `wamid` puede guardarse o compararse sin
+    arrastrar el teléfono que lleva dentro. Determinista, que es lo que la
+    idempotencia necesita: el mismo `wamid` da siempre la misma huella, así
+    que un reintento de Meta se reconoce igual de bien que con el valor en
+    claro.
+
+    Depende del pepper, con la misma consecuencia que el teléfono: si el
+    pepper cambia, las huellas viejas dejan de coincidir. Para la
+    idempotencia eso solo significa olvidar qué mensajes ya se procesaron.
+    """
+    return hmac.new(
+        key=settings.PHONE_HASH_PEPPER.encode("utf-8"),
+        msg=(_DOMINIO_WAMID + wamid).encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
+
+def referencia_wamid(wamid: str) -> str:
+    """Identificador corto del mensaje, apto para la bitácora.
+
+    Es el prefijo de `huella_wamid`, no un recorte del `wamid`: recortar el
+    valor original seguiría exponiendo el teléfono, que va al principio.
+    Derivarlo de la huella tiene además la ventaja de que una línea de
+    registro se puede cruzar con la fila de la tabla de idempotencia
+    comparando el prefijo.
+
+    Lo que se pierde es poder buscar el mensaje en el panel de Meta, que
+    exige el `wamid` completo. Se compensa con la marca de tiempo.
+    """
+    return huella_wamid(wamid)[:_LONGITUD_REFERENCIA]
 
 
 @lru_cache(maxsize=1)

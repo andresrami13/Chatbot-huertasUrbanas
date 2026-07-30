@@ -211,7 +211,13 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - Los mensajes al usuario van en español colombiano, trato de **usted**, frases
   cortas, sin tecnicismos, máximo 6–8 líneas por mensaje.
 - **Nunca registres en logs** el número de teléfono en claro ni el contenido de
-  los mensajes. Registra metadatos: tipo, `wamid`, longitudes.
+  los mensajes. Registra metadatos: tipo, longitudes y la **referencia** del
+  mensaje (`referencia_wamid`).
+- **El `wamid` no va nunca a la bitácora ni a la base en claro.** Contiene el
+  teléfono del remitente en ASCII, recuperable con un `base64 -d`
+  (comprobado el 30/07/2026). Para registrar usa `referencia_wamid`; para
+  almacenar o comparar, `huella_wamid`. Aplica igual al `wamid` de los
+  mensajes que envías, que lleva el número del destinatario.
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
 - Los prompts viven en `app/agent/prompts/` como archivos versionados
   (`agente_v1.md`, `extraccion_v1.md`, `redaccion_rag_v1.md`), conforme a la

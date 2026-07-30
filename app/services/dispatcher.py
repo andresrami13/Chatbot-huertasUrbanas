@@ -18,6 +18,7 @@ Pendiente de conectar: el agente orquestador.
 import logging
 
 from app import textos
+from app.core.identidad import huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta, es_saludo_o_ayuda
 from app.services.normalizacion import transcribir_audio
 from app.services.whatsapp import enviar_texto
@@ -30,10 +31,16 @@ logger = logging.getLogger(__name__)
 # reintento produciría una respuesta duplicada o un registro de huerta
 # duplicado.
 #
+# Se guardan HUELLAS, no los wamid: el wamid lleva dentro el teléfono del
+# remitente (ver `huella_wamid`). Aquí eso importa especialmente, porque el
+# duplicado se descarta ANTES de la compuerta de consentimiento, así que
+# este conjunto contiene también a quien todavía no ha autorizado.
+#
 # PROVISIONAL: en memoria. Se pierde en cada reinicio del servicio y no
 # sirve si hubiera más de una instancia. Debe migrar a una tabla en
-# Supabase cuando se implemente la persistencia.
-_wamids_procesados: set[str] = set()
+# Supabase cuando se implemente la persistencia, y entonces la huella es
+# ya la forma correcta de guardarlo (ADR-0005, punto abierto 1).
+_huellas_procesadas: set[str] = set()
 _LIMITE_EN_MEMORIA = 5_000
 
 
@@ -47,9 +54,10 @@ async def procesar_evento(payload: dict) -> None:
                 # Acuses de entrega y lectura. No requieren acción, pero
                 # sirven para diagnosticar problemas de envío.
                 for estado in valor.get("statuses", []):
+                    identificador = estado.get("id")
                     logger.info(
-                        "Acuse | wamid=%s | estado=%s",
-                        estado.get("id"),
+                        "Acuse | ref=%s | estado=%s",
+                        referencia_wamid(identificador) if identificador else "-",
                         estado.get("status"),
                     )
 
@@ -69,23 +77,28 @@ async def _procesar_mensaje(mensaje: dict) -> None:
         logger.warning("Mensaje sin wamid; se descarta")
         return
 
-    if wamid in _wamids_procesados:
-        logger.info("Duplicado descartado | wamid=%s", wamid)
+    # Todo lo que salga a la bitácora usa la referencia, nunca el wamid.
+    ref = referencia_wamid(wamid)
+    huella = huella_wamid(wamid)
+
+    if huella in _huellas_procesadas:
+        logger.info("Duplicado descartado | ref=%s", ref)
         return
 
-    if len(_wamids_procesados) >= _LIMITE_EN_MEMORIA:
-        _wamids_procesados.clear()
-    _wamids_procesados.add(wamid)
+    if len(_huellas_procesadas) >= _LIMITE_EN_MEMORIA:
+        _huellas_procesadas.clear()
+    _huellas_procesadas.add(huella)
 
     tipo = mensaje.get("type")
     numero = mensaje.get("from")
 
     # Minimización de datos (Fase 3, capa 6): no se registra el número del
-    # remitente ni el contenido del mensaje en la bitácora.
-    logger.info("Mensaje entrante | tipo=%s | wamid=%s", tipo, wamid)
+    # remitente ni el contenido del mensaje en la bitácora. Tampoco el
+    # wamid, que contiene el número (ver `huella_wamid`).
+    logger.info("Mensaje entrante | tipo=%s | ref=%s", tipo, ref)
 
     if not numero:
-        logger.warning("Mensaje sin remitente; se descarta | wamid=%s", wamid)
+        logger.warning("Mensaje sin remitente; se descarta | ref=%s", ref)
         return
 
     texto: str | None = None
@@ -144,9 +157,9 @@ async def _procesar_mensaje(mensaje: dict) -> None:
 
     logger.info(
         "Mensaje de usuaria autorizada, a la espera del agente | "
-        "usuario_id=%s | wamid=%s",
+        "usuario_id=%s | ref=%s",
         usuaria.id,
-        wamid,
+        ref,
     )
 
     # TODO (pasos siguientes): normalización de la entrada -> agente
