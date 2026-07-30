@@ -13,17 +13,44 @@ from fastapi.responses import JSONResponse
 from app.api.webhook import router as webhook_router
 from app.config import settings
 from app.core.basedatos import abrir_pool, cerrar_pool, comprobar_conexion
+from app.services.repositorio import (
+    contar_mensajes_atascados,
+    limpiar_idempotencia,
+)
 
 logging.basicConfig(
     level=settings.LOG_LEVEL,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     """Abre el pool de conexiones al arrancar y lo cierra al apagar."""
     await abrir_pool()
+
+    # Mantenimiento de la idempotencia (ADR-0005). Va aquí y no en el
+    # despachador porque no tiene nada que ver con atender un mensaje.
+    try:
+        await limpiar_idempotencia()
+
+        # Los mensajes que se tomaron y nunca terminaron delatan un
+        # procesamiento interrumpido, casi siempre un redeploy a mitad de
+        # camino. Antes esa pérdida era invisible.
+        atascados = await contar_mensajes_atascados()
+        if atascados:
+            logger.warning(
+                "Mensajes tomados y sin terminar | cantidad=%d | "
+                "se reprocesarán si Meta los reintenta",
+                atascados,
+            )
+    except Exception:
+        # El mantenimiento no debe impedir que el servicio arranque: sin él
+        # el bot sigue atendiendo, solo se acumulan filas viejas.
+        logger.exception("Falló el mantenimiento de la idempotencia")
+
     try:
         yield
     finally:

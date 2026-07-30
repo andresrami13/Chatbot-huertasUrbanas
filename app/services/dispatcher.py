@@ -1,7 +1,11 @@
 """Despachador asíncrono de eventos de WhatsApp.
 
 Recorre la estructura anidada del payload de Meta, descarta duplicados por
-wamid y deriva cada mensaje al flujo correspondiente.
+huella del wamid y deriva cada mensaje al flujo correspondiente.
+
+La idempotencia vive ya en Supabase, con dos estados, y no en memoria
+(ADR-0005). Aquí solo se reclama y se cierra; la mecánica está en
+`repositorio.reclamar_wamid`.
 
 Orden del flujo general (Fase 2, §5.1): primero la compuerta de
 consentimiento y solo después el resto. Centralizarlo aquí evita
@@ -21,28 +25,10 @@ from app import textos
 from app.core.identidad import huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta, es_saludo_o_ayuda
 from app.services.normalizacion import transcribir_audio
+from app.services.repositorio import marcar_procesado, reclamar_wamid
 from app.services.whatsapp import enviar_texto
 
 logger = logging.getLogger(__name__)
-
-# --- Idempotencia -----------------------------------------------------
-# Meta reintenta la entrega de un webhook si no recibe 200 a tiempo, así
-# que el mismo mensaje puede llegar más de una vez. Sin este control, un
-# reintento produciría una respuesta duplicada o un registro de huerta
-# duplicado.
-#
-# Se guardan HUELLAS, no los wamid: el wamid lleva dentro el teléfono del
-# remitente (ver `huella_wamid`). Aquí eso importa especialmente, porque el
-# duplicado se descarta ANTES de la compuerta de consentimiento, así que
-# este conjunto contiene también a quien todavía no ha autorizado.
-#
-# PROVISIONAL: en memoria. Se pierde en cada reinicio del servicio y no
-# sirve si hubiera más de una instancia. Debe migrar a una tabla en
-# Supabase cuando se implemente la persistencia, y entonces la huella es
-# ya la forma correcta de guardarlo (ADR-0005, punto abierto 1).
-_huellas_procesadas: set[str] = set()
-_LIMITE_EN_MEMORIA = 5_000
-
 
 async def procesar_evento(payload: dict) -> None:
     """Punto de entrada del procesamiento en segundo plano."""
@@ -72,6 +58,13 @@ async def procesar_evento(payload: dict) -> None:
 
 
 async def _procesar_mensaje(mensaje: dict) -> None:
+    """Reclama el mensaje, lo atiende y solo entonces lo cierra.
+
+    El orden es el que exige el ADR-0005: `procesado` se marca **al
+    terminar bien**, nunca al empezar. Si el trabajo falla, la fila se deja
+    en `recibido` y al vencer el plazo el reintento de Meta lo vuelve a
+    tomar, en lugar de descartarlo como duplicado y perderlo en silencio.
+    """
     wamid = mensaje.get("id")
     if not wamid:
         logger.warning("Mensaje sin wamid; se descarta")
@@ -81,14 +74,23 @@ async def _procesar_mensaje(mensaje: dict) -> None:
     ref = referencia_wamid(wamid)
     huella = huella_wamid(wamid)
 
-    if huella in _huellas_procesadas:
-        logger.info("Duplicado descartado | ref=%s", ref)
+    if not await reclamar_wamid(huella):
+        logger.info("Duplicado o ya en curso; se descarta | ref=%s", ref)
         return
 
-    if len(_huellas_procesadas) >= _LIMITE_EN_MEMORIA:
-        _huellas_procesadas.clear()
-    _huellas_procesadas.add(huella)
+    try:
+        await _atender_mensaje(mensaje, ref)
+    except Exception:
+        # Se deja a propósito en 'recibido': es lo que permite recuperarlo.
+        logger.exception("Fallo atendiendo el mensaje | ref=%s", ref)
+        return
 
+    await marcar_procesado(huella)
+
+
+async def _atender_mensaje(mensaje: dict, ref: str) -> None:
+    """El trabajo en sí. Que lance una excepción es aceptable: quien llama
+    la captura y deja el mensaje disponible para el reintento."""
     tipo = mensaje.get("type")
     numero = mensaje.get("from")
 
@@ -162,5 +164,5 @@ async def _procesar_mensaje(mensaje: dict) -> None:
         ref,
     )
 
-    # TODO (pasos siguientes): normalización de la entrada -> agente
-    # orquestador (function calling) -> respuesta por WhatsApp.
+    # TODO (pasos siguientes): agente orquestador (function calling) ->
+    # respuesta por WhatsApp.
