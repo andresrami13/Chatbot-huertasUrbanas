@@ -8,14 +8,18 @@ consentimiento y solo después el resto. Centralizarlo aquí evita
 duplicarlo en cada flujo y cierra la posibilidad de procesar datos de
 alguien que no ha autorizado.
 
-Pendiente de conectar: la normalización de la entrada (transcripción del
-audio) y el agente orquestador.
+Orden interno, y el orden importa: identificar el mensaje -> compuerta de
+consentimiento -> normalización de la entrada -> intención. La
+transcripción va **después** de la compuerta a propósito (ADR-0006).
+
+Pendiente de conectar: el agente orquestador.
 """
 
 import logging
 
 from app import textos
 from app.services.consentimiento import compuerta, es_saludo_o_ayuda
+from app.services.normalizacion import transcribir_audio
 from app.services.whatsapp import enviar_texto
 
 logger = logging.getLogger(__name__)
@@ -86,6 +90,7 @@ async def _procesar_mensaje(mensaje: dict) -> None:
 
     texto: str | None = None
     boton_id: str | None = None
+    media_id_audio: str | None = None
 
     if tipo == "text":
         texto = mensaje.get("text", {}).get("body", "")
@@ -97,27 +102,42 @@ async def _procesar_mensaje(mensaje: dict) -> None:
         logger.info("Botón pulsado | id=%s", boton_id)
 
     elif tipo == "audio":
-        media_id = mensaje.get("audio", {}).get("id")
-        logger.info("Audio recibido | media_id=%s", media_id)
-        # TODO: normalización de la entrada. Hasta que esté, el audio
-        # llega a la compuerta sin texto, así que una usuaria sin
-        # autorizar recibirá la solicitud de permiso —correcto— y una ya
-        # autorizada no obtendrá respuesta todavía.
+        media_id_audio = mensaje.get("audio", {}).get("id")
+        logger.info("Audio recibido | media_id=%s", media_id_audio)
+        # Solo se guarda el identificador. NO se transcribe aquí: hacerlo
+        # antes de la compuerta sería mandar a Gemini el audio de alguien
+        # que quizá no ha autorizado, que es exactamente lo que el
+        # ADR-0006 impide. La transcripción va más abajo.
 
     else:
         logger.info("Tipo de mensaje no soportado aún | tipo=%s", tipo)
 
     # Compuerta de consentimiento. Si devuelve None, ya atendió el
     # mensaje: pidió autorización, la registró o respondió la ayuda.
+    #
+    # El audio llega aquí sin texto, y es correcto: quien no ha autorizado
+    # recibe la solicitud de permiso, sin que su voz salga del backend.
     usuaria = await compuerta(numero, texto, boton_id)
     if usuaria is None:
         return
 
     # A partir de aquí la usuaria ya autorizó.
 
+    # Normalización de la entrada (CLAUDE.md §4.4). Una sola vez, en un
+    # único sitio y antes de interpretar la intención: de aquí en adelante
+    # da igual si el mensaje llegó escrito o hablado.
+    if media_id_audio is not None:
+        texto = await transcribir_audio(media_id_audio)
+        if texto is None:
+            await enviar_texto(numero, textos.AUDIO_NO_ENTENDIDO)
+            return
+
     # Provisional: mientras no exista el agente, el saludo y la ayuda se
     # resuelven por palabras clave. Cuando entre el agente, esta decisión
     # pasa a ser suya por function calling (Fase 2, §4).
+    #
+    # Ahora también alcanza a las notas de voz: un "hola" hablado llega
+    # aquí ya como texto.
     if es_saludo_o_ayuda(texto):
         await enviar_texto(numero, textos.BIENVENIDA)
         return

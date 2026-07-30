@@ -15,6 +15,8 @@ documento queda marcado como pendiente de corrección.
 | [0003](0003-consentimiento-sin-insistencia.md) | Consentimiento sin insistencia ante el rechazo | Aceptada | Fase 2 (CU1) |
 | [0004](0004-cultivo-y-fragmento-comunitario.md) | Se conserva `cultivo`; un fragmento comunitario por huerta | Aceptada (parcial) | Fase 3 |
 | [0005](0005-procesamiento-asincrono-e-idempotencia.md) | Procesamiento asíncrono del webhook e idempotencia por `wamid` | Aceptada, con puntos abiertos | Sin respaldo documental |
+| [0006](0006-saludo-y-ayuda-sin-modelo.md) | El saludo y la ayuda se detectan sin el modelo | Aceptada | Sin respaldo documental |
+| [0007](0007-modelo-de-embeddings-fijo-en-codigo.md) | Se mantiene `gemini-embedding-001`, fijo en código | Aceptada | Fase 3 / Fase 4 |
 
 ## Documentos pendientes de corrección
 
@@ -28,7 +30,11 @@ Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
   personales; la Fase 3 §5.1 lo desmiente.
 - **Fase 3, §2 (C4) y Tabla 2** — no contemplan el procesamiento asíncrono
   ni el despachador (ADR-0005).
-- **Fase 3, §3 y Fase 4, §7** — citan `text-embedding-004`, dado de baja.
+- **Fase 2, CU1 y CU5** — no resuelven cómo se detecta el saludo o la ayuda
+  de alguien que aún no ha autorizado, siendo el CU5 el único caso de uso
+  sin precondición (ADR-0006).
+- **Fase 3, §3 y Fase 4, §7** — citan `text-embedding-004`, dado de baja;
+  se sustituye por `gemini-embedding-001` truncado a 768 (ADR-0007).
 - **Fase 4, Tabla 3** — su justificación del valor cerrado queda anulada
   por ADR-0001 y sustituida por ADR-0002.
 - **Anteproyecto, §7.1** — lista seis barrios; omite Los 3 Sectores

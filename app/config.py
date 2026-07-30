@@ -30,6 +30,21 @@ class Settings(BaseSettings):
     PHONE_HASH_PEPPER: str
     NAME_ENCRYPTION_KEY: str
 
+    # --- Gemini ---
+    GEMINI_API_KEY: str
+
+    # Modelo generativo: agente, extracción de entidades y redacción del
+    # RAG. Configurable a propósito, para poder cambiarlo en Railway sin
+    # desplegar —los modelos de Gemini se retiran con calendario— y para
+    # comparar modelos durante la calibración de la Fase 7.
+    #
+    # El valor de aquí es el que vale si Railway no define nada, así que el
+    # repositorio siempre deja constancia de con qué se probó.
+    #
+    # NO existe una variable equivalente para el modelo de embeddings, y es
+    # deliberado: ver app/core/gemini.py y el ADR-0007.
+    GEMINI_GENERATIVE_MODEL: str = "gemini-3.6-flash"
+
     # --- Supabase / PostgreSQL ---
     # Cadena del *session pooler* (puerto 5432). Ver la validación de
     # más abajo para el motivo.
@@ -85,6 +100,37 @@ class Settings(BaseSettings):
                 'print(base64.b64encode(os.urandom(32)).decode())"'
             )
         return valor
+
+    @field_validator("GEMINI_API_KEY")
+    @classmethod
+    def _validar_clave_gemini(cls, valor: str) -> str:
+        if not valor.strip():
+            raise ValueError(
+                "GEMINI_API_KEY no puede estar vacía. Genere una en "
+                "https://aistudio.google.com/apikey"
+            )
+        return valor
+
+    @field_validator("GEMINI_GENERATIVE_MODEL")
+    @classmethod
+    def _validar_modelo_generativo(cls, valor: str) -> str:
+        limpio = valor.strip()
+        if not limpio:
+            raise ValueError(
+                "GEMINI_GENERATIVE_MODEL no puede estar vacío. Déjelo sin "
+                "definir para usar el valor por defecto."
+            )
+        # Un identificador de embeddings aquí no fallaría al arrancar: el
+        # error saldría en la primera conversación, como una respuesta vacía
+        # difícil de relacionar con la causa.
+        if "embedding" in limpio:
+            raise ValueError(
+                f"GEMINI_GENERATIVE_MODEL apunta a '{limpio}', que es un "
+                "modelo de embeddings, no generativo. El modelo de "
+                "embeddings no se configura por variable de entorno "
+                "(ADR-0007)."
+            )
+        return limpio
 
     @field_validator("DATABASE_URL")
     @classmethod

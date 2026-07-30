@@ -52,6 +52,17 @@ CONSENTIMIENTO_ACEPTADO = """Gracias. Ya puede usar el asistente.
 Cuénteme de su huerta: cómo se llama, en qué barrio queda y qué tiene sembrado. Puede escribirlo o mandarme una nota de voz."""
 
 
+# La nota de voz llegó pero no se pudo convertir en texto: fallo de la
+# descarga, del modelo, o audio sin voz. Se ofrece escribir como salida,
+# nunca como reproche: buena parte de las usuarias manda voz precisamente
+# porque escribir le cuesta.
+AUDIO_NO_ENTENDIDO = """Perdone, no logré entender la nota de voz.
+
+¿Me la puede repetir? Ayuda hablar cerquita del celular y sin ruido alrededor.
+
+Si prefiere, también me lo puede escribir."""
+
+
 # ADR-0003: una sola respuesta, sin volver a insistir. La puerta queda
 # abierta por si cambia de opinión, pero la iniciativa es suya.
 CONSENTIMIENTO_RECHAZADO = """Entiendo, no hay problema.
