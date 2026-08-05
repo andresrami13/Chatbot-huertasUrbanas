@@ -106,6 +106,31 @@ REGISTRO_FALLO = """Perdone, no pude guardar la información en este momento.
 No se guardó nada. ¿Lo intentamos de nuevo en un rato?"""
 
 
+# --- CU2, orientación agroecológica -----------------------------------
+
+# No se recuperó ninguna fuente por encima del umbral. Se responde con este
+# texto fijo y NO se le pregunta al modelo de todos modos: sin respaldo
+# oficial, su conocimiento solo podría ofrecerse advirtiendo que no está
+# verificado (CLAUDE.md §6), y aquí vale más reconocer que no se sabe.
+#
+# Se evita decir "no encontré información", que suena a base de datos. Y se
+# le ofrece reformular, porque muchas veces la pregunta era buena y lo que
+# falló fue el vocabulario.
+ORIENTACION_SIN_RESPALDO = """De eso no le puedo responder con seguridad, y prefiero no decirle algo que no me consta.
+
+¿Me lo cuenta con otras palabras? A veces con más detalle sí le encuentro la respuesta.
+
+También me puede preguntar por riego, abonos, plagas o cuándo cosechar."""
+
+
+# Falló la llamada al modelo. Se distingue del caso anterior a propósito:
+# ahí no había respaldo, aquí el sistema no pudo trabajar, y mezclarlos le
+# haría creer que su pregunta está fuera de alcance cuando no lo está.
+ORIENTACION_NO_DISPONIBLE = """Perdone, en este momento no pude consultar la información.
+
+¿Me vuelve a preguntar en un ratico?"""
+
+
 # ADR-0003: una sola respuesta, sin volver a insistir. La puerta queda
 # abierta por si cambia de opinión, pero la iniciativa es suya.
 CONSENTIMIENTO_RECHAZADO = """Entiendo, no hay problema.

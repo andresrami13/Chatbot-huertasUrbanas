@@ -505,6 +505,73 @@ async def reemplazar_fragmentos_oficiales(
     return len(fragmentos)
 
 
+@dataclass(frozen=True)
+class FragmentoOficial:
+    """Un fragmento recuperado, con la fuente que lo respalda.
+
+    La entidad y el título viajan con el fragmento porque la respuesta del
+    CU2 tiene que citarlos (Fase 2, §5.3). No están en el texto vectorizado
+    a propósito (ADR-0009): se recuperan por la clave foránea.
+    """
+
+    contenido: str
+    similitud: float
+    entidad: str
+    titulo: str
+
+
+async def buscar_fragmentos_oficiales(
+    consulta: list[float],
+    top_k: int,
+    umbral: float,
+) -> list[FragmentoOficial]:
+    """Recupera los fragmentos oficiales más parecidos a la consulta.
+
+    **Cuidado con el operador:** `<=>` de pgvector devuelve *distancia*
+    coseno, no similitud. Una similitud de 0.68 es una distancia de 0.32, y
+    confundirlo invierte el filtro sin dar ningún error: devolvería
+    justamente los fragmentos que no vienen a cuento. Por eso el umbral se
+    convierte una sola vez, aquí, y de puertas afuera del repositorio todo
+    se habla en similitud, que es como lo enuncian la Fase 4 y CLAUDE.md §8.
+
+    El orden es por distancia ascendente, es decir, por similitud
+    descendente: el primero es el más pertinente.
+
+    No lleva filtro por `usuario_id` y es correcto: la colección oficial no
+    es de nadie, como el catálogo de barrios. La capa 1 del modelo de
+    seguridad aplica a los datos de las usuarias, y aquí no hay ninguno.
+    """
+    literal = _a_literal_vector(consulta)
+
+    filas = await obtener_pool().fetch(
+        """
+        select f.contenido,
+               1 - (f.embedding <=> $1::vector) as similitud,
+               s.entidad,
+               s.titulo
+          from fragmento_oficial f
+          join fuente s on s.id = f.fuente_id
+         where f.embedding <=> $1::vector <= $2
+         order by f.embedding <=> $1::vector
+         limit $3
+        """,
+        literal,
+        1 - umbral,
+        top_k,
+    )
+
+    return [
+        FragmentoOficial(
+            contenido=fila["contenido"],
+            similitud=fila["similitud"],
+            entidad=fila["entidad"],
+            titulo=fila["titulo"],
+        )
+        for fila in filas
+    ]
+
+
+
 async def buscar_usuaria(telefono: str) -> Usuaria | None:
     """Busca a la usuaria por su número.
 

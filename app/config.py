@@ -45,6 +45,22 @@ class Settings(BaseSettings):
     # deliberado: ver app/core/gemini.py y el ADR-0007.
     GEMINI_GENERATIVE_MODEL: str = "gemini-3.6-flash"
 
+    # --- Recuperación (RAG) ---
+    # Configurables por el mismo criterio que GEMINI_GENERATIVE_MODEL y por
+    # el contrario que el modelo de embeddings (ADR-0007): cambiarlos no
+    # invalida nada de lo almacenado, y la Fase 4 los declara calibrables
+    # durante las pruebas (CLAUDE.md §8). Poder ajustarlos en Railway sin
+    # desplegar es justo lo que la Fase 7 necesita.
+    #
+    # El valor por defecto vive aquí, no solo en Railway, para que el
+    # repositorio deje constancia de con qué se probó.
+    #
+    # 0.68 y no el 0.70 de la Fase 4: ver ADR-0010. Medido contra el corpus
+    # oficial ya ingerido, 0.70 deja sin respuesta 4 de 12 consultas
+    # legítimas del CU2, incluida la insignia.
+    RAG_UMBRAL_SIMILITUD: float = 0.68
+    RAG_TOP_K: int = 4
+
     # --- Supabase / PostgreSQL ---
     # Cadena del *session pooler* (puerto 5432). Ver la validación de
     # más abajo para el motivo.
@@ -131,6 +147,32 @@ class Settings(BaseSettings):
                 "(ADR-0007)."
             )
         return limpio
+
+    @field_validator("RAG_UMBRAL_SIMILITUD")
+    @classmethod
+    def _validar_umbral(cls, valor: float) -> float:
+        # Un umbral fuera de [0, 1] no tiene sentido como similitud coseno
+        # y aquí no arrancaría el servicio.
+        #
+        # Lo que esta comprobación NO puede atrapar, y conviene no
+        # atribuirle: escribir por error la *distancia* en lugar de la
+        # similitud. La distancia equivalente a 0.68 es 0.32, que está en
+        # rango y pasaría, dejando el CU2 respondiendo justamente con los
+        # fragmentos que no vienen a cuento y sin dar ningún error. Contra
+        # eso solo protege leer el aviso del `.env.example`.
+        if not 0.0 <= valor <= 1.0:
+            raise ValueError(
+                f"RAG_UMBRAL_SIMILITUD debe estar entre 0 y 1; llegó {valor}. "
+                "Es una SIMILITUD coseno, no una distancia."
+            )
+        return valor
+
+    @field_validator("RAG_TOP_K")
+    @classmethod
+    def _validar_top_k(cls, valor: int) -> int:
+        if valor < 1:
+            raise ValueError(f"RAG_TOP_K debe ser al menos 1; llegó {valor}.")
+        return valor
 
     @field_validator("DATABASE_URL")
     @classmethod

@@ -18,6 +18,8 @@ documento queda marcado como pendiente de corrección.
 | [0006](0006-saludo-y-ayuda-sin-modelo.md) | El saludo y la ayuda se detectan sin el modelo | Aceptada | Sin respaldo documental |
 | [0007](0007-modelo-de-embeddings-fijo-en-codigo.md) | Se mantiene `gemini-embedding-001`, fijo en código | Aceptada | Fase 3 / Fase 4 |
 | [0008](0008-borrador-de-registro-y-una-huerta-por-usuaria.md) | Borrador de registro en la base, y una huerta por usuaria | Aceptada | Fase 2 (CU3) |
+| [0009](0009-ingesta-de-fuentes-oficiales.md) | La ingesta de fuentes oficiales es un script local y repetible | Aceptada | Fase 4 (§7) |
+| [0010](0010-umbral-de-similitud-recalibrado.md) | El umbral baja a 0.68, y sin respaldo oficial no se responde | Aceptada | Fase 4 (§7) / Fase 2 (CU2) |
 
 ## Documentos pendientes de corrección
 
@@ -43,3 +45,11 @@ Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
 - **Anteproyecto, §7.2 y §8** — excluyen la entrada por voz, ya incorporada
   al alcance por la Fase 2.
 - **Anteproyecto, §7.2 y §10.2** — dan Railway por gratuito.
+- **Fase 4, §7** — el troceo de 300–500 tokens no dice cómo se cuentan. La
+  aproximación estándar de 4 caracteres por token desvía el resultado lo
+  bastante para sacar la mitad del corpus del intervalo (ADR-0009).
+- **Fase 4, §7** — el umbral pasa de 0.7 a **0.68**. El valor original se
+  respaldó con material sintético; contra el corpus real dejaba sin
+  responder 4 de 12 consultas legítimas del CU2 (ADR-0010).
+- **Fase 2, CU2** — no contempla qué hacer cuando ninguna fuente responde.
+  Se resuelve con texto fijo y no con conocimiento del modelo (ADR-0010).

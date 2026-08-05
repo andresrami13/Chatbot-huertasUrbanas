@@ -1,7 +1,8 @@
 # Estado del proyecto
 
-Última actualización: 2026-07-30. **Fase 5 terminada.** Siguiente: Fase 6 —
-agente orquestador con function calling, ingesta y RAG.
+Última actualización: 2026-08-04. **Fase 5 terminada; Fase 6 a mitad.** La
+ingesta de la primera fuente oficial y el CU2 están hechos. Siguiente: el
+fragmento comunitario (CU4) y el agente con function calling.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
@@ -39,7 +40,10 @@ que son la Fase 6.
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
-| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Solo `extraccion_v1.md` |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | `extraccion_v1.md`, `redaccion_rag_v1.md` |
+| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **81 fragmentos en Supabase** |
+| Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
+| Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado de punta a punta** |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -57,13 +61,11 @@ quedó el `telefono_hash`, nunca el número.
   prueba `+1 555-136-8057`. Webhook registrado, app suscrita al WABA y campo
   `messages` suscrito. **Los tres pasos son independientes**; que el webhook
   verifique no implica que lleguen mensajes.
-- **GitHub:** repositorio **público**. Último commit `237d4d9`. Árbol limpio.
+- **GitHub:** repositorio **público**. `origin/main` al día en `840d824`
+  (comprobado con `git ls-remote` el 04/08/2026).
 
 ## Lo que NO funciona todavía (esperado)
 
-- **Una consulta agroecológica no recibe respuesta** ("¿qué le echo al tomate
-  para los bichos?"). Es el CU2 y necesita el RAG de la Fase 6. El
-  despachador lo anota en bitácora y calla.
 - **El CU4 no existe**: no se puede preguntar qué siembran otras huertas.
 - **No hay agente.** La intención se resuelve de forma provisional: saludo y
   ayuda por palabras clave, y cualquier otro mensaje se trata como posible
@@ -72,8 +74,21 @@ quedó el `telefono_hash`, nunca el número.
   tomate le salieron bichos"— puede ofrecer guardar el tomate en vez de
   responder la duda.
 - **El fragmento comunitario no se genera** al confirmar un registro
-  (ADR-0004). Hasta que se haga, en la Fase 6, una huerta guardada no
-  aparecerá en el CU4. Hay un TODO en `guardar_huerta`.
+  (ADR-0004). Conviene entender por qué importa: el CU4 no responde con un
+  `SELECT` sobre `cultivo`, sino por **similitud vectorial** sobre
+  `fragmento_comunitario`. Así que una huerta registrada hoy queda en la
+  base —`huerta` y `cultivo` correctos— pero **invisible para el CU4**: la
+  búsqueda no tiene nada contra qué comparar. Hay un TODO en
+  `guardar_huerta`.
+  - **Y hace falta una regeneración de las huertas ya existentes.** Cuando
+    la Fase 6 implemente la generación, se disparará solo en las
+    confirmaciones nuevas; las huertas guardadas antes se quedarían sin
+    fragmento para siempre, salvo que su dueña vuelva a registrar algo. Es
+    un script de un solo uso, pero hay que acordarse de él.
+  - Al diseñar el texto del fragmento, tener presente el hallazgo del spike:
+    la plantilla compartida infla la similitud de todos los fragmentos por
+    igual. Es el momento de probar formatos alternativos, no de heredar el
+    del spike.
 - No se guarda el historial de conversación en `mensaje`: es la memoria del
   agente, Fase 6.
 
@@ -237,6 +252,126 @@ quedó el `telefono_hash`, nunca el número.
 Después de la Fase 5 viene la **Fase 6**: agente orquestador con function
 calling, ingesta de fuentes oficiales y RAG (CU2 y CU4).
 
+### Fase 6, paso 1: ingesta hecha el 04/08/2026
+
+**81 fragmentos** del documento del Jardín Botánico en `fragmento_oficial`,
+`fuente_id` `5afa2267-bcc6-4773-b5a2-c87593fa32cf`, 768 dimensiones, sin
+duplicados. Decisiones en
+[ADR-0009](adr/0009-ingesta-de-fuentes-oficiales.md).
+
+    python -m scripts.ingesta_fuente --simular      # trocea e informa, no escribe
+    python -m scripts.ingesta_fuente --reingerir    # rehace la ya ingerida
+
+- `pypdf` está en **`requirements-scripts.txt`**, aparte, para que no se
+  despliegue en Railway. El servicio no abre un PDF nunca.
+- Los PDF **no se versionan** (`fuentes/` en el `.gitignore`): el script los
+  descarga de la URL registrada en `fuente`.
+- **Se ingiere de la página 12 a la 121.** Había que cortar también la cola,
+  cosa que este documento no advertía: de la 122 a la 128 van la
+  bibliografía, el colofón de imprenta y la contracubierta. El glosario
+  (120–121) sí se conserva.
+- **El folio aparece en tres formas**, no dos: renglón propio (39 páginas),
+  pegado a la palabra (30) y **seguido de espacio** —`"48 Nombre común"`—
+  (37). La tercera es la traicionera: deja el número incrustado a mitad del
+  texto.
+- **El tamaño del fragmento se calibró midiendo tokens de verdad.** La
+  aproximación de 4 caracteres por token dejaba los fragmentos cortos, y
+  medir sobre una muestra de diez oscilaba entre 4.54 y 4.78 según cuáles
+  tocaran. Hay que **dimensionar por el extremo denso del corpus, no por la
+  media**: con la media (4.49) la mitad de los fragmentos se salía del
+  intervalo, con máximos de 625 tokens. Con 3.9 quedan 229–516, mediana
+  392, el 90 % dentro de 300–500. `--medir-tokens` cuenta ahora todos los
+  fragmentos. **La constante está calibrada contra ESTE documento**: con
+  otra fuente hay que remedir.
+- **Las tablas de especies se sanean.** Al extraer, las columnas
+  Exótica/Nativa se colapsan en una `x` de la que ya no se sabe a cuál
+  pertenece. Se retiran esa marca y su encabezado y se conserva nombre
+  común, científico y familia. Se conserva la `x` de los híbridos
+  botánicos (`Fragaria x ananassa`), que es otra cosa.
+
+### Fase 6, paso 2: recuperación y CU2, hecho el 04/08/2026
+
+**El CU2 responde.** Probado de punta a punta contra la base y la API
+reales con `python -m scripts.spike_orientacion`. Decisiones en
+[ADR-0010](adr/0010-umbral-de-similitud-recalibrado.md).
+
+Piezas: `app/services/recuperacion.py` (búsqueda y atribución),
+`app/services/orientacion.py` (CU2: recupera y redacta),
+`app/agent/prompts/redaccion_rag_v1.md`,
+`repositorio.buscar_fragmentos_oficiales`, y la rama del despachador que
+antes callaba.
+
+**El umbral bajó de 0.70 a 0.68**, y es el hallazgo con más recorrido para
+la tesis. Calibrado con `python -m scripts.calibrar_umbral` sobre 12
+consultas que el CU2 debe responder y 6 que no:
+
+| Umbral | Responde | Falsos positivos |
+|---|---|---|
+| 0.65 | 12/12 | 1/6 |
+| **0.68** | **12/12** | **0/6** |
+| 0.70 | 8/12 | 0/6 |
+
+El 0.70 de la Fase 4 se respaldó en el spike del 29/07 contra documentos
+**escritos a mano para la prueba**, con casi las palabras de la consulta
+(0.797). Eso no medía la recuperación, medía el parecido de dos frases
+escritas a la vez. Contra el corpus real, el mismo tipo de acierto da
+0.69–0.77, y con 0.70 se quedaban sin respuesta 4 de 12 consultas
+legítimas, incluida la insignia del proyecto desde la Fase 1.
+
+- **El margen es de una centésima**: peor positiva 0.6854, mejor negativa
+  0.6752. Esa negativa es el caso difícil metido a propósito —"dónde me
+  inscribo para que me regalen una compostera"—, que roza el dominio pero
+  pide un trámite. Sin ella, la siguiente está en 0.5947. **Hay que
+  revalidarlo en la Fase 7 con consultas reales de las usuarias**, no con
+  las que imaginó el autor.
+- `RAG_UMBRAL_SIMILITUD` y `RAG_TOP_K` son **variables de entorno** con
+  valor por defecto en `config.py`, para poder calibrarlas en Railway sin
+  desplegar. Cambiarlas no invalida nada guardado, al contrario que el
+  modelo de embeddings (ADR-0007). La configuración rechaza al arrancar un
+  umbral fuera de [0, 1]: escribir una distancia donde va una similitud no
+  daría error, solo respuestas absurdas.
+- **Sin respaldo oficial no se responde.** Si nada supera el umbral se
+  contesta con texto fijo y **no** se le pregunta al modelo de todos modos.
+  Matiza la jerarquía de CLAUDE.md §6, que admite un tercer nivel de
+  conocimiento del modelo advertido: se decide no usarlo en el CU2, porque
+  el perfil de usuaria no discrimina bien entre un consejo respaldado y uno
+  advertido dentro del mismo mensaje. Queda disponible para el agente en
+  conversación general.
+- **Cuidado con el operador.** `<=>` de pgvector devuelve *distancia*, no
+  similitud. La conversión ocurre una sola vez, dentro del repositorio;
+  fuera se habla siempre en similitud. Confundirlo invierte el filtro sin
+  dar ningún error.
+- Al prompt hubo que meterle dos avisos que salieron de la ingesta: los
+  fragmentos pueden empezar o terminar cortados, y el documento remite a
+  figuras que la usuaria no puede ver por WhatsApp.
+
+Para la tesis: un spike validado contra material sintético sobreestima la
+similitud. La cifra solo vale remedida contra el corpus real.
+
+### Primera fuente oficial, ya verificada
+
+| Campo de `fuente` | Valor |
+|---|---|
+| `entidad` | Jardín Botánico de Bogotá José Celestino Mutis |
+| `titulo` | Pasos básicos para establecer y manejar tu huerta. Una guía práctica para agricultores urbanos |
+| `url` | https://jbb.gov.co/documentos/cientifica/publicaciones/Pasos_basicos_para_establecer_y_manejar_tu_huerta.pdf |
+
+Comprobado el 30/07/2026: 128 páginas, **PDF de texto, no escaneado**
+(Adobe InDesign, 27 fuentes incrustadas), 146 874 caracteres extraíbles y
+solo 5 páginas casi vacías. Vocabulario del dominio bien representado
+—plaga 42, semilla 62, sustrato 56, cosecha 46—. Da para unos 80–110
+fragmentos con el troceado de la Fase 4. Autores: Edgar Germán Herrera
+Guzmán y Edgar Hernán Lara García, 2020, ISBN digital 978-958-8576-49-7.
+
+Al ingerirlo, dos limpiezas: **descartar las ~10 primeras páginas**
+(créditos, ISBN, tabla de contenido), que solo meterían ruido en el RAG, y
+despegar el número de página de la primera palabra (`"65Para la
+propagación"`).
+
+**La ingesta debería ser un script local, no parte del servicio**: se
+ejecuta una vez y escribe en Supabase. Así `pypdf` no entra en el
+`requirements.txt` que se despliega en Railway.
+
 **Aviso para la Fase 6, visto en la bitácora:** el SDK registra `AFC is
 enabled with max remote calls: 10`. AFC es *automatic function calling*, y
 viene activado por defecto: en cuanto el agente tenga herramientas, el SDK
@@ -278,6 +413,19 @@ si Railway permite purgarlos, conviene hacerlo.
 
 **Lo que se pierde:** buscar un mensaje en el panel de Meta, que exige el
 `wamid` completo. Se compensa con la marca de tiempo.
+
+**Queda un resto sin corregir, y se enciende en la Fase 6.** La tabla
+`mensaje` de `db/001_esquema.sql` sigue declarando `wamid text unique`, en
+claro, con un comentario que además dice que la idempotencia "sigue en
+memoria por ahora". Las dos cosas son anteriores a la corrección del
+30/07/2026. Hoy es inocuo porque **nada escribe en `mensaje`**: el código
+solo maneja el `wamid` en `dispatcher.py` y `whatsapp.py`, y los dos usan
+ya huella y referencia.
+
+Pero `mensaje` es justo la tabla que se enciende al implementar la memoria
+del agente, y tal como está volvería a meter el teléfono en la base, esta
+vez de forma permanente y una fila por mensaje. **Hace falta una migración
+`006` que la pase a `huella_wamid` antes de tocar la memoria del agente.**
 
 **Resuelve el punto abierto 1 del [ADR-0005](adr/0005-procesamiento-asincrono-e-idempotencia.md).**
 Su propuesta —guardar el `wamid` "desacoplado de todo identificador de

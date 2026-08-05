@@ -29,6 +29,7 @@ from app.core.identidad import huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta, es_saludo_o_ayuda
 from app.services.extraccion import extraer_huerta
 from app.services.normalizacion import transcribir_audio
+from app.services.orientacion import consultar_orientacion
 from app.services.registro import (
     confirmar_registro,
     descartar_registro,
@@ -201,11 +202,12 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
         )
         return
 
-    # No había nada que registrar y no es un saludo: es una consulta, y
-    # hasta la Fase 6 no hay con qué responderla.
-    logger.info(
-        "Mensaje sin datos de huerta, a la espera del agente | "
-        "usuario_id=%s | ref=%s",
-        usuaria.id,
-        ref,
-    )
+    # No había nada que registrar y no es un saludo: se trata como consulta
+    # de orientación agroecológica (CU2).
+    #
+    # Provisional en el mismo sentido que las ramas de arriba: quien debe
+    # decidir que esto es una consulta y no otra cosa es el function
+    # calling (Fase 2, §4). Mientras tanto es la rama por defecto, que era
+    # la que hasta ahora callaba.
+    logger.info("Consulta de orientación | usuario_id=%s | ref=%s", usuaria.id, ref)
+    await enviar_texto(numero, await consultar_orientacion(texto))
