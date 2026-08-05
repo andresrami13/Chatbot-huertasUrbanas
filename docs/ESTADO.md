@@ -43,7 +43,7 @@ que son la Fase 6.
 | Prompts versionados | `app/agent/prompts/`, `plantillas.py` | `extraccion_v1.md`, `redaccion_rag_v1.md` |
 | Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **81 fragmentos en Supabase** |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
-| Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado de punta a punta** |
+| Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -291,9 +291,16 @@ duplicados. Decisiones en
 
 ### Fase 6, paso 2: recuperación y CU2, hecho el 04/08/2026
 
-**El CU2 responde.** Probado de punta a punta contra la base y la API
-reales con `python -m scripts.spike_orientacion`. Decisiones en
+**El CU2 responde, y está probado en producción** el 04/08/2026 con un
+celular real: una consulta agroecológica recibe respuesta corta con la
+fuente citada, y una consulta ajena al dominio recibe el texto fijo sin
+improvisar. Antes se probó de punta a punta contra la base y la API reales
+con `python -m scripts.spike_orientacion`. Decisiones en
 [ADR-0010](adr/0010-umbral-de-similitud-recalibrado.md).
+
+Es el primer caso de uso que responde con contenido generado: hasta ahora
+todo lo que el bot decía era texto fijo o un resumen compuesto por el
+código.
 
 Piezas: `app/services/recuperacion.py` (búsqueda y atribución),
 `app/services/orientacion.py` (CU2: recupera y redacta),
