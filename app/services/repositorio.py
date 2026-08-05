@@ -9,9 +9,10 @@ tal como llega de Meta, y calculan la huella internamente. Quien las
 llama nunca manipula huellas ni ve datos cifrados. El número no se
 almacena ni se registra en bitácora en ningún momento.
 
-Estado actual: `usuario`, el catálogo `barrio`, la idempotencia del webhook
-y el registro del CU3 (`huerta`, `cultivo` y su borrador). Falta lo del
-RAG: `fuente`, las dos colecciones vectoriales y `mensaje`.
+Estado actual: `usuario`, el catálogo `barrio`, la idempotencia del webhook,
+el registro del CU3 (`huerta`, `cultivo` y su borrador) y la colección
+oficial (`fuente`, `fragmento_oficial`). Falta `fragmento_comunitario` y
+`mensaje`.
 """
 
 import json
@@ -37,6 +38,21 @@ class Barrio:
     id: int
     codigo: str
     nombre: str
+
+
+@dataclass(frozen=True)
+class Fuente:
+    """Un documento oficial curado (Fase 4, §5.1).
+
+    Sus metadatos son los que se citan en la respuesta del CU2: la
+    atribución `[OFICIAL – entidad, título]` sale de aquí, no del texto del
+    fragmento.
+    """
+
+    id: UUID
+    entidad: str
+    titulo: str
+    url: str | None
 
 
 @dataclass(frozen=True)
@@ -359,6 +375,134 @@ async def guardar_huerta(
     # huerta —texto y embedding— para que el CU4 la incluya.
 
     return huerta_id
+
+
+# --- Colección oficial: fuente y sus fragmentos (Fase 4, §5.1) --------
+#
+# Quien las usa hoy es el script de ingesta (`scripts/ingesta_fuente.py`),
+# que se ejecuta a mano y no forma parte del servicio. Viven aquí de todos
+# modos porque este módulo es el único punto de acceso a Supabase: que el
+# script leyera y escribiera por su cuenta duplicaría el conocimiento del
+# esquema en dos sitios. Lo que sí se queda fuera de `app/` es `pypdf`.
+
+
+def _a_literal_vector(vector: list[float]) -> str:
+    """Formatea un embedding como literal de pgvector: `[0.1,0.2,...]`.
+
+    asyncpg no conoce el tipo `vector`, que lo aporta la extensión, así que
+    el valor viaja como texto y la consulta lo convierte con `::vector`.
+
+    Se usa `repr` y no un formato de precisión fija porque `repr` de un
+    float de Python va y vuelve sin perder un bit. Redondear aquí
+    introduciría una diferencia entre el vector que se calculó y el que se
+    almacena, invisible salvo como recuperación ligeramente peor.
+    """
+    return "[" + ",".join(repr(float(componente)) for componente in vector) + "]"
+
+
+async def obtener_fuente_por_url(url: str) -> Fuente | None:
+    """Busca una fuente ya ingerida por su URL.
+
+    La URL es lo que identifica al documento en la práctica: el título y la
+    entidad se pueden escribir de varias maneras. Sirve para que la ingesta
+    detecte que ese PDF ya entró y no lo duplique.
+    """
+    fila = await obtener_pool().fetchrow(
+        """
+        select id, entidad, titulo, url
+          from fuente
+         where url = $1
+        """,
+        url,
+    )
+
+    if fila is None:
+        return None
+
+    return Fuente(
+        id=fila["id"],
+        entidad=fila["entidad"],
+        titulo=fila["titulo"],
+        url=fila["url"],
+    )
+
+
+async def crear_fuente(entidad: str, titulo: str, url: str | None) -> Fuente:
+    """Registra un documento oficial y devuelve su fila."""
+    fila = await obtener_pool().fetchrow(
+        """
+        insert into fuente (entidad, titulo, url)
+             values ($1, $2, $3)
+          returning id, entidad, titulo, url
+        """,
+        entidad,
+        titulo,
+        url,
+    )
+
+    logger.info("Fuente registrada | fuente_id=%s | entidad=%s", fila["id"], entidad)
+
+    return Fuente(
+        id=fila["id"],
+        entidad=fila["entidad"],
+        titulo=fila["titulo"],
+        url=fila["url"],
+    )
+
+
+async def contar_fragmentos_oficiales(fuente_id: UUID) -> int:
+    """Cuántos fragmentos tiene ya esa fuente."""
+    return await obtener_pool().fetchval(
+        "select count(*) from fragmento_oficial where fuente_id = $1",
+        fuente_id,
+    )
+
+
+async def reemplazar_fragmentos_oficiales(
+    fuente_id: UUID,
+    fragmentos: list[tuple[int, str, list[float]]],
+) -> int:
+    """Sustituye por completo los fragmentos de una fuente.
+
+    `fragmentos` son ternas (orden, contenido, embedding).
+
+    Borrado e inserción van en **una transacción**. Si se hicieran por
+    separado y la inserción fallara a mitad, la fuente quedaría sin
+    fragmentos o con parte de ellos, y el CU2 respondería peor sin que nada
+    lo indicara: el fallo del RAG no es una excepción, es una respuesta
+    mediocre.
+
+    Reemplazar entero, y no añadir, es lo que hace repetible la ingesta. Un
+    segundo pase que insertara sin borrar duplicaría el corpus, y con top-k
+    los duplicados se llevarían los cuatro puestos con el mismo texto.
+    """
+    pool = obtener_pool()
+
+    async with pool.acquire() as conexion:
+        async with conexion.transaction():
+            await conexion.execute(
+                "delete from fragmento_oficial where fuente_id = $1", fuente_id
+            )
+
+            await conexion.executemany(
+                """
+                insert into fragmento_oficial
+                       (fuente_id, orden, contenido, embedding)
+                     values ($1, $2, $3, $4::vector)
+                """,
+                [
+                    (fuente_id, orden, contenido, _a_literal_vector(embedding))
+                    for orden, contenido, embedding in fragmentos
+                ],
+            )
+
+    logger.info(
+        "Fragmentos oficiales escritos | fuente_id=%s | fragmentos=%d",
+        fuente_id,
+        len(fragmentos),
+    )
+
+    return len(fragmentos)
 
 
 async def buscar_usuaria(telefono: str) -> Usuaria | None:

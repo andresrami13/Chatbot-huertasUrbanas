@@ -1,0 +1,14 @@
+# Dependencias de los scripts de `scripts/`, que se ejecutan a mano desde
+# el equipo de desarrollo y NO forman parte del servicio.
+#
+# Están aparte de `requirements.txt` a propósito: Railway instala solo
+# aquel, así que nada de lo de aquí llega al despliegue. La ingesta de
+# fuentes oficiales se ejecuta una vez y escribe en Supabase; el servicio
+# únicamente consulta lo que dejó escrito, y no abre un PDF jamás.
+#
+# Para instalarlas:
+#     pip install -r requirements.txt -r requirements-scripts.txt
+#
+# Versiones fijas por el mismo motivo que en requirements.txt: el
+# troceo del corpus tiene que poder repetirse igual en la Fase 8.
+pypdf==6.14.2

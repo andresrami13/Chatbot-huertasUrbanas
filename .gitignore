@@ -15,3 +15,8 @@ venv/
 # Metadatos que genera Windows/OneDrive en cada carpeta sincronizada.
 desktop.ini
 Thumbs.db
+
+# PDF de las fuentes oficiales que ingiere scripts/ingesta_fuente.py. Son
+# publicaciones de terceros y el repositorio es público: se descargan desde
+# la URL que queda registrada en la tabla `fuente`, no se versionan.
+fuentes/
