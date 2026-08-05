@@ -1,8 +1,9 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-04. **Fase 5 terminada; Fase 6 a mitad.** La
-ingesta de la primera fuente oficial y el CU2 están hechos. Siguiente: el
-fragmento comunitario (CU4) y el agente con function calling.
+Última actualización: 2026-08-04. **Fase 5 terminada; de la Fase 6 quedan
+solo el agente y su memoria.** Hechos la ingesta oficial, el CU2 y el CU4.
+Siguiente y último paso: el agente con function calling, que es además
+quien enruta el CU4.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
@@ -44,6 +45,8 @@ que son la Fase 6.
 | Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **81 fragmentos en Supabase** |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
+| Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
+| Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Probado; **sin conectar al despachador** |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -66,31 +69,19 @@ quedó el `telefono_hash`, nunca el número.
 
 ## Lo que NO funciona todavía (esperado)
 
-- **El CU4 no existe**: no se puede preguntar qué siembran otras huertas.
+- **El CU4 está construido pero no conectado.** `consultar_comunidad`
+  funciona y está probado, pero **el despachador no lo invoca**: decidir
+  que un mensaje es una consulta a la comunidad es trabajo del function
+  calling, y añadir palabras clave para enrutarlo sería un clasificador
+  aparte, justo lo que CLAUDE.md §4.9 excluye. Se conecta en el paso 4.
 - **No hay agente.** La intención se resuelve de forma provisional: saludo y
   ayuda por palabras clave, y cualquier otro mensaje se trata como posible
   registro de huerta. En la Fase 6 esa decisión pasa al function calling.
   Consecuencia visible hoy: un mensaje que mezcle consulta y dato —"a mi
   tomate le salieron bichos"— puede ofrecer guardar el tomate en vez de
   responder la duda.
-- **El fragmento comunitario no se genera** al confirmar un registro
-  (ADR-0004). Conviene entender por qué importa: el CU4 no responde con un
-  `SELECT` sobre `cultivo`, sino por **similitud vectorial** sobre
-  `fragmento_comunitario`. Así que una huerta registrada hoy queda en la
-  base —`huerta` y `cultivo` correctos— pero **invisible para el CU4**: la
-  búsqueda no tiene nada contra qué comparar. Hay un TODO en
-  `guardar_huerta`.
-  - **Y hace falta una regeneración de las huertas ya existentes.** Cuando
-    la Fase 6 implemente la generación, se disparará solo en las
-    confirmaciones nuevas; las huertas guardadas antes se quedarían sin
-    fragmento para siempre, salvo que su dueña vuelva a registrar algo. Es
-    un script de un solo uso, pero hay que acordarse de él.
-  - Al diseñar el texto del fragmento, tener presente el hallazgo del spike:
-    la plantilla compartida infla la similitud de todos los fragmentos por
-    igual. Es el momento de probar formatos alternativos, no de heredar el
-    del spike.
 - No se guarda el historial de conversación en `mensaje`: es la memoria del
-  agente, Fase 6.
+  agente, y es lo que falta del paso 4.
 
 ---
 
@@ -354,6 +345,64 @@ legítimas, incluida la insignia del proyecto desde la Fase 1.
 
 Para la tesis: un spike validado contra material sintético sobreestima la
 similitud. La cifra solo vale remedida contra el corpus real.
+
+### Fase 6, paso 3: fragmento comunitario y CU4, hecho el 04/08/2026
+
+**El CU4 funciona, pero no está conectado al despachador** — enrutarlo sin
+agente sería un clasificador aparte (CLAUDE.md §4.9). Probado de punta a
+punta con `python -m scripts.spike_comunidad`, que crea cuatro huertas
+temporales y las borra al terminar. Decisiones en
+[ADR-0011](adr/0011-fragmento-comunitario-solo-especies.md), que
+**sustituye la composición del texto que proponía el ADR-0004**.
+
+Piezas: `app/services/fragmento_comunitario.py` (generación),
+`app/services/comunidad.py` (CU4),
+`app/agent/prompts/redaccion_comunidad_v1.md`, la recuperación comunitaria
+en `recuperacion.py` y `scripts/regenerar_fragmentos.py`.
+
+**El texto del fragmento son solo las especies**: `"tomate, cilantro,
+lechuga"`. Ni nombre de huerta, ni barrio, ni fechas — todo eso llega por
+la clave foránea al componer la respuesta. Comparados cuatro formatos
+contra consultas reales del CU4, la separación media entre la huerta
+pertinente y la que no lo es:
+
+| Formato | Separación |
+|---|---|
+| plantilla del ADR-0004 | 0,0585 |
+| prosa con nombre y barrio | 0,0608 |
+| solo cultivos con fecha | 0,0735 |
+| **solo especies** | **0,1166** |
+
+- **No es la plantilla como forma, es el contenido repetido.** Redactarla
+  como prosa natural no mejora nada: da igual cómo se escriba el nombre y
+  el barrio, lo que estorba es que estén.
+- **Las fechas también son relleno compartido**, y eso no estaba previsto:
+  conservarlas cuesta un tercio de la separación. "marzo de 2026" sale en
+  todos los fragmentos y actúa igual que la plantilla, solo que más
+  disimulado.
+- `RAG_UMBRAL_COMUNITARIO = 0.65`, propio y distinto del 0.68 oficial: un
+  fragmento comunitario es una lista de tres palabras y uno oficial prosa
+  de 400 tokens. El hueco medido es de **+0,0437**, cuatro veces más
+  holgado que el del CU2.
+- **Respaldo por listado.** "¿Qué están sembrando las otras huertas?" no es
+  una búsqueda sino un listado, y una lista de especies se parece poco a
+  esa frase: se queda en 0,63 y el CU4 callaba teniendo tres huertas que
+  enseñar. Si la similitud no devuelve nada, se listan las más recientes.
+  **Ese respaldo no filtra por intención**, y por eso importa que el CU4 lo
+  enrute el agente.
+- **Un error de método que conviene contar en la tesis:** la calibración
+  midió el máximo sobre *todas* las huertas, pero en producción se excluye
+  la de quien pregunta. En la primera prueba real la excluida era justo la
+  que puntuaba más alto, y la consulta general falló pese a que la
+  calibración la daba por buena. Mismo tipo de error que el del umbral del
+  CU2: medir sobre un montaje que no reproduce las condiciones reales.
+- Generar el fragmento **no puede tumbar el registro**: va fuera de la
+  transacción y, si falla, el CU3 responde igual. El precio es que esa
+  huerta queda invisible al CU4 hasta que se regenere, y por eso el fallo
+  queda en la bitácora.
+- `scripts/regenerar_fragmentos.py` sirve para tres cosas: poner al día las
+  huertas anteriores a la Fase 6, reparar los fallos de generación, y
+  rehacerlo todo si algún día cambia el formato del texto.
 
 ### Primera fuente oficial, ya verificada
 

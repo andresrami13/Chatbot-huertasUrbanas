@@ -29,10 +29,17 @@ Fase 7 sin desplegar.
 """
 
 import logging
+from uuid import UUID
 
 from app.config import settings
 from app.services.embeddings import vectorizar_consulta
-from app.services.repositorio import FragmentoOficial, buscar_fragmentos_oficiales
+from app.services.repositorio import (
+    FragmentoComunitario,
+    FragmentoOficial,
+    buscar_fragmentos_comunitarios,
+    buscar_fragmentos_oficiales,
+    listar_fragmentos_comunitarios_recientes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +58,110 @@ def componer_contexto(fragmentos: list[FragmentoOficial]) -> str:
     invita a construir una frase que ninguno de los dos dice.
     """
     return "\n\n---\n\n".join(_etiquetar(fragmento) for fragmento in fragmentos)
+
+
+def _etiquetar_comunitario(fragmento: FragmentoComunitario) -> str:
+    """Antepone la etiqueta `[COMUNITARIO – huerta, barrio]` (Fase 4, §5).
+
+    Es la etiqueta imprescindible. El spike de la Fase 5 lo dejó medido: al
+    preguntar por los cultivos de un barrio se recuperan huertas de los
+    tres, porque el barrio no filtra (ADR-0001). Sin decir de dónde sale
+    cada dato, la usuaria entendería que todo eso se siembra en el suyo.
+
+    Una huerta sin nombre se identifica por su barrio, que es lo único que
+    se puede decir de ella sin inventar.
+    """
+    if fragmento.nombre_huerta:
+        atribucion = f"{fragmento.nombre_huerta}, {fragmento.barrio}"
+    else:
+        atribucion = f"una huerta del barrio {fragmento.barrio}"
+
+    return f"[COMUNITARIO – {atribucion}]\n{fragmento.contenido}"
+
+
+def componer_contexto_comunitario(fragmentos: list[FragmentoComunitario]) -> str:
+    """Arma el bloque de contexto del CU4, cada huerta con su atribución."""
+    return "\n\n---\n\n".join(
+        _etiquetar_comunitario(fragmento) for fragmento in fragmentos
+    )
+
+
+async def recuperar_comunidad(
+    pregunta: str,
+    usuario_id: UUID | None = None,
+) -> list[FragmentoComunitario]:
+    """Recupera lo que siembran **otras** huertas (CU4).
+
+    `usuario_id` se excluye de los resultados: devolverle a la usuaria su
+    propia huerta como dato comunitario sería repetirle lo que ella misma
+    registró.
+
+    Umbral propio, distinto del de la colección oficial (ADR-0011): estos
+    fragmentos son listas de tres o cuatro palabras, no prosa de 400
+    tokens, y sus similitudes viven en otro rango.
+
+    ## Dos etapas, y la segunda no es un parche
+
+    Si la similitud no devuelve nada, se listan las huertas actualizadas
+    más recientemente. El motivo es que el CU4 recibe dos clases de
+    pregunta que no se resuelven igual:
+
+    - **"¿alguien más siembra tomate?"** es una búsqueda. La similitud la
+      resuelve bien y con precisión: en la medición, la huerta con fresas
+      salía a 0.819 y las demás por debajo de 0.653.
+    - **"¿qué están sembrando las otras huertas?"** es un listado. Y una
+      lista de especies —"cebolla larga, acelga"— se parece poco a esa
+      frase por mucho que sea la respuesta correcta. Medido: se queda en
+      0.63, por debajo del umbral, y el CU4 callaba teniendo tres huertas
+      que enseñar.
+
+    Bajar el umbral para que pasara la segunda estropearía la primera: con
+    0.60 entran las cuatro huertas cuando preguntan por fresas, y solo una
+    las tiene. Se conserva el umbral alto para lo específico y se cubre lo
+    general por listado.
+
+    **Lo que este respaldo NO hace es filtrar por intención.** Una pregunta
+    ajena al dominio que llegue hasta aquí recibirá el listado igual. No es
+    descuido: quien decide si esto es una consulta a la comunidad es el
+    function calling (Fase 2, §4), y mientras el agente no exista el CU4 no
+    está conectado al despachador.
+
+    Advertencia que vale también para el documento de grado: **aquí el
+    umbral no hace el trabajo**. Con 5 a 7 huertas y top-k=4, casi
+    cualquier consulta legítima recupera medio corpus. Lo que aporta rigor
+    es el orden y la atribución, no el filtro.
+    """
+    vector = await vectorizar_consulta(pregunta)
+
+    fragmentos = await buscar_fragmentos_comunitarios(
+        vector,
+        top_k=settings.RAG_TOP_K,
+        umbral=settings.RAG_UMBRAL_COMUNITARIO,
+        excluir_usuario=usuario_id,
+    )
+
+    if fragmentos:
+        logger.info(
+            "Recuperación comunitaria | fragmentos=%d | umbral=%.2f | mejor=%.4f",
+            len(fragmentos),
+            settings.RAG_UMBRAL_COMUNITARIO,
+            fragmentos[0].similitud,
+        )
+        return fragmentos
+
+    fragmentos = await listar_fragmentos_comunitarios_recientes(
+        top_k=settings.RAG_TOP_K,
+        excluir_usuario=usuario_id,
+    )
+
+    logger.info(
+        "Recuperación comunitaria por listado | fragmentos=%d | "
+        "ninguna superó el umbral de %.2f",
+        len(fragmentos),
+        settings.RAG_UMBRAL_COMUNITARIO,
+    )
+
+    return fragmentos
 
 
 async def recuperar_orientacion(pregunta: str) -> list[FragmentoOficial]:

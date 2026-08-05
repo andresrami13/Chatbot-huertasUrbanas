@@ -20,6 +20,7 @@ documento queda marcado como pendiente de corrección.
 | [0008](0008-borrador-de-registro-y-una-huerta-por-usuaria.md) | Borrador de registro en la base, y una huerta por usuaria | Aceptada | Fase 2 (CU3) |
 | [0009](0009-ingesta-de-fuentes-oficiales.md) | La ingesta de fuentes oficiales es un script local y repetible | Aceptada | Fase 4 (§7) |
 | [0010](0010-umbral-de-similitud-recalibrado.md) | El umbral baja a 0.68, y sin respaldo oficial no se responde | Aceptada | Fase 4 (§7) / Fase 2 (CU2) |
+| [0011](0011-fragmento-comunitario-solo-especies.md) | El fragmento comunitario lleva solo las especies | Aceptada; sustituye la composición del [0004](0004-cultivo-y-fragmento-comunitario.md) | Fase 3 / Fase 2 (CU4) |
 
 ## Documentos pendientes de corrección
 
@@ -53,3 +54,9 @@ Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
   responder 4 de 12 consultas legítimas del CU2 (ADR-0010).
 - **Fase 2, CU2** — no contempla qué hacer cuando ninguna fuente responde.
   Se resuelve con texto fijo y no con conocimiento del modelo (ADR-0010).
+- **Fase 3 / ADR-0004** — el texto del fragmento comunitario ya no incluye
+  el nombre de la huerta, el barrio ni las fechas: solo las especies
+  (ADR-0011).
+- **Fase 4, §7** — la colección comunitaria lleva **umbral propio** (0.65).
+  El spike de la Fase 5 concluyó que no hacía falta, pero lo midió sobre el
+  formato con plantilla (ADR-0011).

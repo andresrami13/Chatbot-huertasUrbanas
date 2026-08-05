@@ -131,6 +131,26 @@ ORIENTACION_NO_DISPONIBLE = """Perdone, en este momento no pude consultar la inf
 ¿Me vuelve a preguntar en un ratico?"""
 
 
+# --- CU4, qué siembran otras huertas -----------------------------------
+
+# No hay otras huertas registradas todavía, o ninguna viene a cuento. No se
+# distinguen los dos casos: a la usuaria le da igual el motivo, y en la
+# Fase 8 el primero será el habitual durante las primeras sesiones.
+#
+# Se aprovecha para invitarla a registrar la suya, que es lo que hace
+# crecer el dato comunitario. Sin presionar: se le cuenta para qué sirve.
+COMUNIDAD_SIN_DATOS = """Todavía no tengo qué contarle de otras huertas por esa pregunta.
+
+Esto se va llenando a medida que cada quien cuenta lo suyo. Si me cuenta qué tiene sembrado, las demás también pueden verlo.
+
+Mientras tanto, pregúnteme por su huerta y le ayudo con lo que necesite."""
+
+
+COMUNIDAD_NO_DISPONIBLE = """Perdone, en este momento no pude consultar lo de las otras huertas.
+
+¿Me vuelve a preguntar en un ratico?"""
+
+
 # ADR-0003: una sola respuesta, sin volver a insistir. La puerta queda
 # abierta por si cambia de opinión, pero la iniciativa es suya.
 CONSENTIMIENTO_RECHAZADO = """Entiendo, no hay problema.

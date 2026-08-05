@@ -371,9 +371,10 @@ async def guardar_huerta(
         len(cultivos),
     )
 
-    # TODO (Fase 6, ADR-0004): regenerar el fragmento_comunitario de esta
-    # huerta —texto y embedding— para que el CU4 la incluya.
-
+    # El fragmento comunitario lo regenera quien llama, después de que esta
+    # transacción cierre (ADR-0004). No se hace aquí a propósito: exige una
+    # llamada de red al modelo de embeddings, y dejarla dentro tendría la
+    # base bloqueada esperando a un tercero.
     return huerta_id
 
 
@@ -570,6 +571,177 @@ async def buscar_fragmentos_oficiales(
         for fila in filas
     ]
 
+
+
+# --- Colección comunitaria: el dato de las huertas (ADR-0004, ADR-0011) ---
+
+
+@dataclass(frozen=True)
+class FragmentoComunitario:
+    """Un fragmento comunitario recuperado, con su huerta y su barrio.
+
+    El nombre y el barrio **no están en el texto vectorizado** (ADR-0011):
+    llegan por la clave foránea, igual que la entidad y el título en la
+    colección oficial. Son los que forman la etiqueta
+    `[COMUNITARIO – huerta, barrio]`, sin la cual la usuaria creería que
+    todo lo recuperado se siembra en su propio barrio (ADR-0001).
+
+    Solo campos compartibles. Ningún dato personal sale de aquí.
+    """
+
+    contenido: str
+    similitud: float
+    nombre_huerta: str | None
+    barrio: str
+
+
+async def listar_cultivos_de_huerta(huerta_id: UUID) -> list[str]:
+    """Especies sembradas en una huerta, sin repetir y en orden de siembra.
+
+    Es la fuente del texto del fragmento comunitario. Se lee de `cultivo`,
+    que es la fuente de verdad del dato agronómico (ADR-0004); el fragmento
+    es un derivado que se reconstruye entero desde aquí.
+    """
+    filas = await obtener_pool().fetch(
+        """
+        select distinct on (lower(especie)) especie
+          from cultivo
+         where huerta_id = $1
+         order by lower(especie), creado_en
+        """,
+        huerta_id,
+    )
+
+    return [fila["especie"] for fila in filas]
+
+
+async def guardar_fragmento_comunitario(
+    huerta_id: UUID,
+    contenido: str,
+    embedding: list[float],
+) -> None:
+    """Crea o reemplaza el fragmento de una huerta.
+
+    Un fragmento por huerta, garantizado por el `unique` de la columna
+    (ADR-0004). El `on conflict` lo reemplaza entero, texto y vector: no hay
+    actualización incremental, porque el fragmento se reconstruye desde
+    `cultivo` cada vez que la huerta cambia.
+    """
+    await obtener_pool().execute(
+        """
+        insert into fragmento_comunitario (huerta_id, contenido, embedding)
+             values ($1, $2, $3::vector)
+        on conflict (huerta_id) do update
+                set contenido = excluded.contenido,
+                    embedding = excluded.embedding
+        """,
+        huerta_id,
+        contenido,
+        _a_literal_vector(embedding),
+    )
+
+    logger.info("Fragmento comunitario guardado | huerta_id=%s", huerta_id)
+
+
+async def buscar_fragmentos_comunitarios(
+    consulta: list[float],
+    top_k: int,
+    umbral: float,
+    excluir_usuario: UUID | None = None,
+) -> list[FragmentoComunitario]:
+    """Recupera lo que siembran otras huertas.
+
+    `excluir_usuario` deja fuera la huerta de quien pregunta. No es un
+    detalle cosmético: el CU4 es "qué siembran **otras** huertas", y
+    devolverle la suya propia como dato comunitario sería contarle lo que
+    ella misma registró.
+
+    **Sin filtro por barrio**, deliberadamente (ADR-0001): la búsqueda
+    recorre todas las huertas y el barrio solo se informa en la atribución.
+
+    Aquí no hay dato personal: se seleccionan únicamente las columnas
+    compartibles, que es la capa 4 del modelo de seguridad (Fase 3, §5).
+    """
+    filas = await obtener_pool().fetch(
+        """
+        select f.contenido,
+               1 - (f.embedding <=> $1::vector) as similitud,
+               h.nombre_huerta,
+               b.nombre as barrio
+          from fragmento_comunitario f
+          join huerta h on h.id = f.huerta_id
+          join barrio b on b.id = h.barrio_id
+         where f.embedding <=> $1::vector <= $2
+           and ($4::uuid is null or h.usuario_id <> $4)
+         order by f.embedding <=> $1::vector
+         limit $3
+        """,
+        _a_literal_vector(consulta),
+        1 - umbral,
+        top_k,
+        excluir_usuario,
+    )
+
+    return [
+        FragmentoComunitario(
+            contenido=fila["contenido"],
+            similitud=fila["similitud"],
+            nombre_huerta=fila["nombre_huerta"],
+            barrio=fila["barrio"],
+        )
+        for fila in filas
+    ]
+
+
+async def listar_fragmentos_comunitarios_recientes(
+    top_k: int,
+    excluir_usuario: UUID | None = None,
+) -> list[FragmentoComunitario]:
+    """Las huertas actualizadas más recientemente, sin buscar por similitud.
+
+    Es el respaldo del CU4 para la pregunta general —"qué están sembrando
+    las otras huertas"—, que **no es una búsqueda sino un listado**: una
+    lista de especies se parece poco a esa frase, por muy pertinente que
+    sea la respuesta. Ver `recuperacion.recuperar_comunidad`.
+
+    Se ordena por fecha de actualización y no al azar para que dos
+    preguntas seguidas den la misma respuesta, y para que lo que se muestre
+    sea lo último que alguien contó.
+    """
+    filas = await obtener_pool().fetch(
+        """
+        select f.contenido,
+               h.nombre_huerta,
+               b.nombre as barrio
+          from fragmento_comunitario f
+          join huerta h on h.id = f.huerta_id
+          join barrio b on b.id = h.barrio_id
+         where ($2::uuid is null or h.usuario_id <> $2)
+         order by f.actualizado_en desc
+         limit $1
+        """,
+        top_k,
+        excluir_usuario,
+    )
+
+    return [
+        FragmentoComunitario(
+            contenido=fila["contenido"],
+            # No hay similitud que informar: no se buscó por parecido.
+            # Ponerle un número inventado haría que la bitácora de
+            # calibración mezclara medidas con relleno.
+            similitud=float("nan"),
+            nombre_huerta=fila["nombre_huerta"],
+            barrio=fila["barrio"],
+        )
+        for fila in filas
+    ]
+
+
+async def listar_huertas_para_regenerar() -> list[UUID]:
+    """Ids de todas las huertas, para el script de regeneración."""
+    filas = await obtener_pool().fetch("select id from huerta order by creado_en")
+    return [fila["id"] for fila in filas]
 
 
 async def buscar_usuaria(telefono: str) -> Usuaria | None:

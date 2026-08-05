@@ -61,6 +61,18 @@ class Settings(BaseSettings):
     RAG_UMBRAL_SIMILITUD: float = 0.68
     RAG_TOP_K: int = 4
 
+    # La colección comunitaria lleva umbral propio, y no por capricho de
+    # simetría: sus fragmentos son listas de tres o cuatro palabras
+    # ("tomate, cilantro, lechuga"), no prosa de 400 tokens, así que sus
+    # similitudes viven en otro rango. El de arriba se calibró contra la
+    # colección oficial y aplicado aquí dejaría sin responder la consulta
+    # más típica del CU4 (ADR-0011).
+    #
+    # 0.65 cae centrado en el hueco medido: peor consulta legítima 0.6765,
+    # mejor consulta ajena 0.6327 —la de la fiebre, que importa que quede
+    # fuera—.
+    RAG_UMBRAL_COMUNITARIO: float = 0.65
+
     # --- Supabase / PostgreSQL ---
     # Cadena del *session pooler* (puerto 5432). Ver la validación de
     # más abajo para el motivo.
@@ -148,7 +160,7 @@ class Settings(BaseSettings):
             )
         return limpio
 
-    @field_validator("RAG_UMBRAL_SIMILITUD")
+    @field_validator("RAG_UMBRAL_SIMILITUD", "RAG_UMBRAL_COMUNITARIO")
     @classmethod
     def _validar_umbral(cls, valor: float) -> float:
         # Un umbral fuera de [0, 1] no tiene sentido como similitud coseno

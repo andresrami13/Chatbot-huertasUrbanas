@@ -21,6 +21,7 @@ from uuid import UUID
 
 from app import textos
 from app.services.extraccion import CultivoExtraido, HuertaExtraida
+from app.services.fragmento_comunitario import regenerar_fragmento
 from app.services.repositorio import (
     borrar_borrador,
     guardar_borrador,
@@ -208,7 +209,7 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
     ]
 
     try:
-        await guardar_huerta(
+        huerta_id = await guardar_huerta(
             usuario_id=usuario_id,
             barrio_codigo=extraida.barrio_codigo,
             nombre_huerta=extraida.nombre_huerta,
@@ -220,6 +221,18 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
         logger.exception("Falló el guardado del registro | usuario_id=%s", usuario_id)
         await enviar_texto(numero, textos.REGISTRO_FALLO)
         return
+
+    # Fuera de la transacción y después de confirmar el guardado, a
+    # propósito. Regenerar implica una llamada de red al modelo de
+    # embeddings, y meterla dentro de la transacción tendría la base
+    # bloqueada esperando a un tercero.
+    #
+    # Que falle no interrumpe el CU3 ni cambia lo que se le responde: la
+    # huerta ya está guardada y el fragmento es un derivado que se puede
+    # rehacer (ADR-0004). Lo único que se pierde entretanto es que esa
+    # huerta aparezca en el CU4, y `regenerar_fragmento` deja constancia en
+    # la bitácora para poder repararlo.
+    await regenerar_fragmento(huerta_id)
 
     await borrar_borrador(usuario_id)
     await enviar_texto(numero, textos.REGISTRO_GUARDADO)
