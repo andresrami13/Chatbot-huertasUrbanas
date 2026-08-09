@@ -1,8 +1,15 @@
 """Consulta de lo que siembran otras huertas — CU4 (Fase 2, §5.4).
 
 Hermano de `orientacion.py`: `recuperacion.py` trae los fragmentos y aquí
-se redactan. Será la implementación de la herramienta `consultar_comunidad`
-cuando llegue el agente con function calling.
+se redactan. Es la implementación de la herramienta `consultar_comunidad`
+del agente (ADR-0013), y lo que devuelve se envía tal cual.
+
+**Es el agente quien lo enruta**, y por eso estuvo construido y sin
+conectar desde el 04/08/2026: decidir que un mensaje es una consulta a la
+comunidad con palabras clave sería el clasificador aparte que CLAUDE.md
+§4.9 excluye. Importa más de lo que parece, porque el respaldo por listado
+del ADR-0011 no filtra por intención: si algo llega hasta aquí, recibe
+huertas.
 
 ## En qué se diferencia del CU2, y no es un detalle
 
@@ -37,6 +44,7 @@ from app.agent.plantillas import cargar_prompt
 from app.core.gemini import MODELO_GENERATIVO, obtener_cliente
 from app.services.recuperacion import (
     componer_contexto_comunitario,
+    limpiar_etiquetas,
     recuperar_comunidad,
 )
 
@@ -85,7 +93,9 @@ async def consultar_comunidad(pregunta: str, usuario_id: UUID) -> str:
         logger.exception("Gemini falló al redactar la respuesta del CU4")
         return textos.COMUNIDAD_NO_DISPONIBLE
 
-    texto = (respuesta.text or "").strip()
+    # La etiqueta de procedencia es andamiaje del prompt: si el modelo la
+    # copió, se retira antes de que la usuaria la lea.
+    texto = limpiar_etiquetas(respuesta.text or "")
 
     if not texto:
         logger.error("La redacción del CU4 devolvió texto vacío")

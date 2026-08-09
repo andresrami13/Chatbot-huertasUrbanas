@@ -186,6 +186,11 @@ async def main() -> None:
             "atribuye la huerta vecina o reconoce que no hay datos",
         )
         _comprobar("Fuente:" not in texto, "no cita fuente oficial: es dato comunitario")
+        _comprobar(
+            "COMUNITARIO" not in texto,
+            "no se le cuela la etiqueta de procedencia",
+            "el 08/08 el modelo escribió 'la huerta COMUNITARIO – La Esperanza'",
+        )
 
         # -----------------------------------------------------------------
         print("\n" + "=" * 70)

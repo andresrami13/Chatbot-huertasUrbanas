@@ -70,6 +70,11 @@ calling, conforme a la Fase 2 §4.
   function calling asuma esa decisión en la Fase 6. El mismo código cumple
   dos papeles con vigencia distinta, y conviene no confundirlos al retirar el
   provisional.
+
+  **Retirado el 08/08/2026**, y solo ese uso: la función sigue viva dentro
+  de `compuerta`. La decisión posterior al consentimiento la asumió la
+  herramienta `mostrar_ayuda` del agente, que conserva el texto fijo
+  ([ADR-0013](0013-agente-orquestador.md), decisión 4).
 - **Falsos negativos benignos.** Un saludo con una variante no prevista
   ("¿qué hubo pues?") no se reconoce y la usuaria recibe la solicitud de
   consentimiento en vez de la bienvenida. No pierde acceso a nada: el camino

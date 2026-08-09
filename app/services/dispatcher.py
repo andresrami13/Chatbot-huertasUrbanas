@@ -13,36 +13,34 @@ duplicarlo en cada flujo y cierra la posibilidad de procesar datos de
 alguien que no ha autorizado.
 
 Orden interno, y el orden importa: identificar el mensaje -> compuerta de
-consentimiento -> normalización de la entrada -> memoria -> intención. La
+consentimiento -> normalización de la entrada -> memoria -> agente. La
 transcripción va **después** de la compuerta a propósito (ADR-0006), y la
 memoria después de la transcripción, para que el audio quede guardado ya
 convertido en texto (ADR-0012).
 
-Pendiente de conectar: el agente orquestador. Hasta que exista, la
-intención se resuelve de forma provisional —saludo y ayuda por palabras
-clave, y cualquier otro mensaje como posible registro de huerta—. En la
-Fase 6 esa decisión pasa al function calling (Fase 2, §4).
+**Este módulo ya no decide intenciones.** Desde el 08/08/2026 esa decisión
+es del agente por function calling (Fase 2, §4; ADR-0013), y aquí solo
+quedan las que no son interpretación: una pulsación de botón, que es
+respuesta a algo que ya se preguntó, y un audio que no se pudo transcribir.
+
+Lo que se retiró era provisional y está identificado como tal en el
+ADR-0006 y el ADR-0008: el saludo por palabras clave después de la
+compuerta, y tratar cualquier mensaje libre como posible registro. Ojo con
+el primero: `es_saludo_o_ayuda` **sigue vigente dentro de la compuerta**,
+donde el ADR-0006 lo declara camino permanente. Lo único que sobraba era su
+uso posterior.
 """
 
 import logging
 
 from app import textos
+from app.agent.agente import atender
 from app.core.identidad import huella_wamid, referencia_wamid
-from app.services.consentimiento import compuerta, es_saludo_o_ayuda
-from app.services.extraccion import extraer_huerta
-from app.services.memoria import recordar_usuaria, responder
+from app.services.consentimiento import compuerta
+from app.services.memoria import recordar_usuaria
 from app.services.normalizacion import transcribir_audio
-from app.services.orientacion import consultar_orientacion
-from app.services.registro import (
-    confirmar_registro,
-    descartar_registro,
-    proponer_registro,
-)
-from app.services.repositorio import (
-    listar_barrios,
-    marcar_procesado,
-    reclamar_wamid,
-)
+from app.services.registro import confirmar_registro, descartar_registro
+from app.services.repositorio import marcar_procesado, reclamar_wamid
 from app.services.whatsapp import enviar_texto
 
 logger = logging.getLogger(__name__)
@@ -192,45 +190,17 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
         await descartar_registro(numero, usuaria.id)
         return
 
-    # Provisional: mientras no exista el agente, el saludo y la ayuda se
-    # resuelven por palabras clave. Cuando entre el agente, esta decisión
-    # pasa a ser suya por function calling (Fase 2, §4).
-    #
-    # Ahora también alcanza a las notas de voz: un "hola" hablado llega
-    # aquí ya como texto.
-    if es_saludo_o_ayuda(texto):
-        await responder(numero, usuaria.id, textos.BIENVENIDA)
-        return
-
     if not texto:
+        # Un botón que no es ninguno de los dos del registro, o un tipo de
+        # mensaje que no se soporta. No hay nada que interpretar y no se
+        # inventa una respuesta.
         logger.info("Mensaje sin texto que interpretar | ref=%s", ref)
         return
 
-    # Registro de la huerta (CU3). Provisional en un punto: mientras no
-    # exista el agente, todo mensaje libre se trata como un posible registro.
-    # Cuando entre el function calling será él quien decida entre registrar,
-    # consultar orientación o consultar a la comunidad (Fase 2, §4).
-    extraida = await extraer_huerta(texto)
-
-    if extraida.tiene_datos:
-        barrios = await listar_barrios()
-        await proponer_registro(
-            numero,
-            usuaria.id,
-            extraida,
-            {barrio.codigo: barrio.nombre for barrio in barrios},
-        )
-        return
-
-    # No había nada que registrar y no es un saludo: se trata como consulta
-    # de orientación agroecológica (CU2).
-    #
-    # Provisional en el mismo sentido que las ramas de arriba: quien debe
-    # decidir que esto es una consulta y no otra cosa es el function
-    # calling (Fase 2, §4). Mientras tanto es la rama por defecto, que era
-    # la que hasta ahora callaba.
-    logger.info("Consulta de orientación | usuario_id=%s | ref=%s", usuaria.id, ref)
-    await responder(numero, usuaria.id, await consultar_orientacion(texto))
+    # A partir de aquí decide el agente: saludo, orientación, comunidad,
+    # registro, o varias a la vez (Fase 2, §4; ADR-0013). Él responde y
+    # deja constancia en la memoria.
+    await atender(numero, usuaria.id, texto)
 
 
 def _tipo_entrante(media_id_audio: str | None, boton_id: str | None) -> str:

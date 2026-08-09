@@ -1,9 +1,10 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-08. **Fase 5 terminada; de la Fase 6 queda
-solo el agente.** Hechos la ingesta oficial, el CU2, el CU4 y la memoria de
-conversación. Siguiente y último paso: el agente con function calling, que
-es además quien enruta el CU4.
+Última actualización: 2026-08-08. **La Fase 6 está construida entera y
+probada contra la base y la API reales.** Ingesta oficial, CU2, CU4,
+memoria de conversación y agente con function calling, ya conectado al
+despachador. **Lo único pendiente es probarla con un celular real**, que
+exige desplegar en Railway.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
@@ -14,10 +15,12 @@ Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
 ## Resumen en una línea
 
 El bot recibe mensajes escritos y hablados, aplica la compuerta de
-consentimiento, transcribe las notas de voz, extrae los datos de la huerta y
-los guarda tras confirmación. **La Fase 5 está terminada: CU1, CU3 y CU5
-funcionando.** Falta el agente con function calling y el RAG (CU2 y CU4),
-que son la Fase 6.
+consentimiento, transcribe las notas de voz y **un agente con function
+calling decide qué hacer**: responder con la guía oficial (CU2), contar qué
+siembran otras huertas (CU4), ofrecer guardar lo que le contaron (CU3) o
+mostrar la ayuda (CU5). Recuerda los últimos diez mensajes. **Los cinco
+casos de uso están construidos y probados contra la base y la API reales**;
+falta la prueba con celular.
 
 ---
 
@@ -46,9 +49,9 @@ que son la Fase 6.
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
-| Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Probado; **sin conectar al despachador** |
+| Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Enrutado por el agente desde el 08/08 |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | Probada contra la base real; falta el celular |
-| Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | Probado; **sin conectar al despachador** |
+| Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | Conectado al despachador; falta el celular |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -71,20 +74,14 @@ quedó el `telefono_hash`, nunca el número.
 
 ## Lo que NO funciona todavía (esperado)
 
-- **El CU4 está construido pero no conectado.** `consultar_comunidad`
-  funciona y está probado, pero **el despachador no lo invoca**: decidir
-  que un mensaje es una consulta a la comunidad es trabajo del function
-  calling, y añadir palabras clave para enrutarlo sería un clasificador
-  aparte, justo lo que CLAUDE.md §4.9 excluye. Se conecta en el paso 4.
-- **No hay agente.** La intención se resuelve de forma provisional: saludo y
-  ayuda por palabras clave, y cualquier otro mensaje se trata como posible
-  registro de huerta. En la Fase 6 esa decisión pasa al function calling.
-  Consecuencia visible hoy: un mensaje que mezcle consulta y dato —"a mi
-  tomate le salieron bichos"— puede ofrecer guardar el tomate en vez de
-  responder la duda.
-- **La memoria ya se escribe, pero todavía no la lee nadie.** `mensaje` se
-  llena desde el 08/08/2026 (ADR-0012) y `memoria.ventana` está lista; el
-  único que la va a consumir es el agente, que es lo que falta.
+- **Falta la prueba con celular real de la Fase 6.** Es lo único pendiente.
+  Todo lo demás está probado contra la base y la API reales, pero nada de
+  4a, 4b ni 4c ha pasado todavía por WhatsApp.
+- **Un mensaje que mezcle consulta y dato sigue ofreciendo guardar el
+  cultivo por el que se preguntó.** El ADR-0008 daba esto por "cosa del
+  agente" y no lo era: el agente enruta bien las dos intenciones, pero la
+  extracción corre sobre el mensaje entero. La confirmación la protege;
+  queda para calibrar en la Fase 7 (ADR-0013).
 
 ---
 
@@ -507,6 +504,36 @@ Dos cosas que conviene no exagerar en la tesis:
   intenciones, pero la extracción corre sobre el mensaje entero y saca
   `tomate` de la parte que era pregunta, así que el resumen ofrece
   guardarlo. La confirmación la protege; queda para calibrar en la Fase 7.
+
+### Fase 6, paso 4c: el agente conectado, hecho el 08/08/2026
+
+**El despachador ya no decide intenciones.** Se retiraron las dos ramas
+provisionales —el saludo por palabras clave después de la compuerta y
+tratar cualquier mensaje libre como posible registro— y en su lugar queda
+una sola llamada al agente. **Con esto el CU4 queda enrutado**, que era lo
+que faltaba desde el 04/08.
+
+Cuidado con lo que NO se retiró: `es_saludo_o_ayuda` sigue vivo **dentro de
+la compuerta**, donde el ADR-0006 lo declara camino permanente. Solo sobraba
+su uso posterior.
+
+Probado con `python -m scripts.spike_despachador`, que entra por
+`procesar_evento` con cargas útiles con la forma real de las de Meta y
+espía los tres módulos que envían. Las 15 comprobaciones pasaron, incluidas
+las que importan cuando se reemplaza código que funcionaba: la compuerta
+sigue cerrada y sin persistir nada de quien no autoriza, el saludo previo
+al consentimiento sigue respondiéndose sin modelo, los botones se resuelven
+sin pasar por el agente, y el reintento de Meta se sigue descartando.
+
+**Un defecto que solo apareció al cablear:** el modelo copió la etiqueta
+interna en la respuesta —"en la huerta COMUNITARIO – La Esperanza"—. Es
+intermitente, y por eso los spikes anteriores no lo vieron. Corregido en
+los prompts y con una red en `recuperacion.limpiar_etiquetas`, que retira
+el rótulo conservando la atribución. Los dos spikes llevan ya una
+comprobación que lo atrapa.
+
+**Falta la prueba con celular real**, que es lo único pendiente de la Fase
+6. Exige desplegar en Railway.
 
 ### Primera fuente oficial, ya verificada
 

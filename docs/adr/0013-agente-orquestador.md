@@ -166,6 +166,36 @@ Cuando el modelo pide varias funciones:
   de doble intención, que falle la consulta no es motivo para perder
   también el registro.
 
+## Hallazgo del cableado: la etiqueta se cuela en la respuesta
+
+Al conectar el CU4 al despachador apareció un defecto que los spikes
+anteriores no habían destapado. El modelo copió el rótulo de atribución en
+el texto que lee la usuaria:
+
+> "En la huerta **COMUNITARIO –** La Esperanza, del barrio El Regalo,
+> reportaron que tienen sembrado fresa y uchuva."
+
+La etiqueta `[COMUNITARIO – huerta, barrio]` es andamiaje del prompt: le
+dice al modelo de quién es cada dato. Para la usuaria no significa nada.
+
+Es **intermitente** —en la ejecución anterior del mismo caso salió bien—,
+que es lo que lo hacía fácil de no ver. Se corrige por dos vías, y las dos
+hacen falta:
+
+1. **En los prompts**, que ahora dicen explícitamente que la marca es
+   interna y no parte del nombre. Es la defensa principal.
+2. **En el código**, con `recuperacion.limpiar_etiquetas`, que retira el
+   rótulo conservando la atribución. Vive en `recuperacion.py` porque es el
+   módulo que crea las etiquetas y el único que sabe qué forma tienen.
+
+La red del código no sobra: una regla de prompt a temperatura 0.4 no es una
+garantía, y lo que está en juego es la atribución, que el
+[ADR-0011](0011-fragmento-comunitario-solo-especies.md) declara
+imprescindible. Cuando la limpieza actúa lo deja en la bitácora, así que la
+Fase 7 puede contar cuántas veces la regla del prompt no bastó.
+
+Los dos spikes llevan ya una comprobación que lo habría atrapado.
+
 ## Lo que el agente NO resolvió, contra lo previsto
 
 El [ADR-0008](0008-borrador-de-registro-y-una-huerta-por-usuaria.md) dejó

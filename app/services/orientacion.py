@@ -3,10 +3,11 @@
 Une las dos mitades del RAG: `recuperacion.py` trae los fragmentos
 pertinentes y aquí se redactan como respuesta para la usuaria.
 
-Será la implementación de la herramienta `consultar_orientacion` cuando
-llegue el agente con function calling. Hoy el despachador la invoca
-directamente, de forma provisional, para que el CU2 se pueda probar antes
-de que exista el agente.
+Es la implementación de la herramienta `consultar_orientacion` del agente
+(ADR-0013). Lo que devuelve **se le envía a la usuaria tal cual**, sin
+volver a pasar por el modelo: las reglas de abajo son las que sostienen la
+jerarquía de fuentes, y una segunda redacción a temperatura 0.7 las
+anularía sin dejar rastro.
 
 ## Lo que NO se hace aquí
 
@@ -30,7 +31,11 @@ from google.genai import types
 
 from app.agent.plantillas import cargar_prompt
 from app.core.gemini import MODELO_GENERATIVO, obtener_cliente
-from app.services.recuperacion import componer_contexto, recuperar_orientacion
+from app.services.recuperacion import (
+    componer_contexto,
+    limpiar_etiquetas,
+    recuperar_orientacion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +126,9 @@ async def consultar_orientacion(pregunta: str, respaldo: str | None = None) -> s
         logger.exception("Gemini falló al redactar la respuesta del CU2")
         return textos.ORIENTACION_NO_DISPONIBLE
 
-    texto = (respuesta.text or "").strip()
+    # Igual que en el CU4: la etiqueta `[OFICIAL – ...]` es andamiaje del
+    # prompt y no puede llegarle a la usuaria.
+    texto = limpiar_etiquetas(respuesta.text or "")
 
     if not texto:
         # Puede pasar si el modelo corta por filtros de seguridad. Sin esto,

@@ -31,6 +31,12 @@ contar aparte y no lo mezcle con el reporte de las vecinas.
    barrio que sea.
 4. No invente cuántas huertas hay en total ni saque cuentas: hable solo de
    las que aparecen abajo.
+5. Cada bloque de abajo empieza con una marca entre corchetes, así:
+   `[COMUNITARIO – La Esperanza, Holanda]`. **Esa marca es una etiqueta
+   interna, no es parte del nombre de la huerta.** Úsela para saber de
+   quién es el dato y escriba después "la huerta La Esperanza, del barrio
+   Holanda". Nunca copie la palabra COMUNITARIO ni los corchetes en su
+   respuesta: para la usuaria no significan nada.
 
 ## Reglas sobre cómo escribir
 

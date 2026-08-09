@@ -29,6 +29,7 @@ Fase 7 sin desplegar.
 """
 
 import logging
+import re
 from uuid import UUID
 
 from app.config import settings
@@ -42,6 +43,48 @@ from app.services.repositorio import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# --- Retirada de las etiquetas que se cuelan en la respuesta -----------
+#
+# Las etiquetas viven aquí, así que la limpieza también: este es el único
+# módulo que sabe qué forma tienen.
+#
+# Hace falta porque el modelo a veces copia el rótulo en la respuesta. Visto
+# el 08/08/2026 en el spike del despachador: "En la huerta COMUNITARIO – La
+# Esperanza, del barrio El Regalo...". La etiqueta es un andamio para el
+# modelo y para la usuaria no significa nada.
+#
+# Los prompts se lo prohíben, que es la defensa principal. Esto es la red:
+# se comprobó que ocurre de forma intermitente, y una regla de prompt a
+# temperatura 0.4 no es una garantía.
+
+# Con corchetes: se conserva lo de dentro, que es la atribución de verdad.
+_ETIQUETA_ENTERA = re.compile(r"\[\s*(?:OFICIAL|COMUNITARIO)\s*[–—-]\s*([^\]]*)\]")
+
+# Sin corchetes, que es como se coló en la prueba.
+_ETIQUETA_SUELTA = re.compile(r"\b(?:OFICIAL|COMUNITARIO)\s*[–—-]\s*")
+
+_ESPACIOS = re.compile(r"[ \t]{2,}")
+
+
+def limpiar_etiquetas(respuesta: str) -> str:
+    """Quita de la respuesta los rótulos de procedencia que se hayan colado.
+
+    No toca la atribución: de `[COMUNITARIO – La Esperanza, Holanda]` deja
+    `La Esperanza, Holanda`. Lo que se retira es la palabra clave y los
+    corchetes, que son andamiaje del prompt.
+    """
+    limpia = _ETIQUETA_ENTERA.sub(r"\1", respuesta)
+    limpia = _ETIQUETA_SUELTA.sub("", limpia)
+    limpia = _ESPACIOS.sub(" ", limpia)
+
+    if limpia != respuesta:
+        # Interesa para la Fase 7: cuenta cuántas veces la regla del prompt
+        # no bastó. Sin el contenido de la respuesta (CLAUDE.md §11).
+        logger.info("Se retiró una etiqueta de procedencia de la respuesta")
+
+    return limpia.strip()
 
 
 def _etiquetar(fragmento: FragmentoOficial) -> str:
