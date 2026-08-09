@@ -90,6 +90,14 @@ REGISTRO_FALTA_BARRIO = """Anoté lo que me contó de su huerta.
 Para guardarlo me falta el barrio. ¿En qué barrio queda su huerta?"""
 
 
+# El agente vio que contaba algo de su huerta, pero la extracción no sacó
+# ningún dato aprovechable ("sembré algo el otro día"). Se le pregunta en
+# vez de proponerle guardar un borrador vacío.
+REGISTRO_NADA_QUE_ANOTAR = """Me quedé con las ganas de anotarlo, pero no le entendí bien qué sembró.
+
+¿Me cuenta qué fue y por ahí cuándo lo sembró?"""
+
+
 REGISTRO_GUARDADO = """Listo, ya quedó guardado.
 
 Cuando siembre algo nuevo me cuenta y lo agrego."""
@@ -158,6 +166,17 @@ Mientras tanto, pregúnteme por su huerta y le ayudo con lo que necesite."""
 COMUNIDAD_NO_DISPONIBLE = """Perdone, en este momento no pude consultar lo de las otras huertas.
 
 ¿Me vuelve a preguntar en un ratico?"""
+
+
+# --- Agente orquestador -----------------------------------------------
+
+# Falló la llamada al modelo que decide qué hacer con el mensaje. No se
+# puede saber siquiera qué quería, así que no se promete nada concreto.
+# Se distingue de los fallos del CU2 y el CU4 porque allí sí se sabía qué
+# preguntaba y solo falló la redacción.
+AGENTE_NO_DISPONIBLE = """Perdone, en este momento no le puedo responder.
+
+¿Me escribe otra vez en un ratico? Ahí le ayudo con lo que necesite."""
 
 
 # ADR-0003: una sola respuesta, sin volver a insistir. La puerta queda

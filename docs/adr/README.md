@@ -22,6 +22,7 @@ documento queda marcado como pendiente de corrección.
 | [0010](0010-umbral-de-similitud-recalibrado.md) | El umbral baja a 0.68, y sin respaldo oficial no se responde | Aceptada | Fase 4 (§7) / Fase 2 (CU2) |
 | [0011](0011-fragmento-comunitario-solo-especies.md) | El fragmento comunitario lleva solo las especies | Aceptada; sustituye la composición del [0004](0004-cultivo-y-fragmento-comunitario.md) | Fase 3 / Fase 2 (CU4) |
 | [0012](0012-memoria-de-conversacion.md) | La memoria empieza tras la compuerta, y el `wamid` sale de `mensaje` | Aceptada | Fase 3 / Fase 4 (§6) |
+| [0013](0013-agente-orquestador.md) | El agente enruta y no relata; el mensaje completo conserva su oportunidad | Aceptada | Fase 2 (§4) |
 
 ## Documentos pendientes de corrección
 
@@ -70,3 +71,9 @@ Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
   conversación quede almacenada. `mensaje.contenido` es texto libre en
   claro, y la minimización solo gobierna lo que el sistema pide, no lo que
   la usuaria decide contar (ADR-0012).
+- **Fase 2, §4** — las herramientas del agente son **cuatro**, no tres. El
+  saludo posterior al consentimiento no cabía en ninguna de las tres sin
+  incumplir la propia Fase 2 (ADR-0013).
+- **Fase 4, §7** — el umbral se calibró sobre mensajes completos, y el
+  agente puede recortar la consulta. El recorte de un mensaje de doble
+  intención cayó a 0.6796, cuatro diezmilésimas por debajo (ADR-0013).

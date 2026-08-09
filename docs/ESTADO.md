@@ -48,6 +48,7 @@ que son la Fase 6.
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
 | Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Probado; **sin conectar al despachador** |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | Probada contra la base real; falta el celular |
+| Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | Probado; **sin conectar al despachador** |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -451,6 +452,61 @@ de lo escrito.
 
 **Falta la prueba con celular real**, que se hará junto con la del agente:
 la memoria no cambia por sí sola nada de lo que la usuaria ve.
+
+### Fase 6, paso 4b: el agente orquestador, hecho el 08/08/2026
+
+**El agente decide y enruta.** Decisiones en
+[ADR-0013](adr/0013-agente-orquestador.md). Piezas: `app/agent/agente.py`,
+`app/agent/prompts/agente_v1.md`, el respaldo de `orientacion.py` y
+`scripts/spike_agente.py`. **Todavía no está conectado al despachador**:
+eso es el paso 4c.
+
+Probado con `python -m scripts.spike_agente`, que crea dos usuarias
+temporales, sustituye los envíos por espías —no gasta mensajes del número
+de prueba— y las borra al terminar. Las 20 comprobaciones pasaron.
+
+- **El agente enruta, no relata.** La salida de cada herramienta se envía
+  tal cual, sin volver a pasar por el modelo. Si volviera, una segunda
+  pasada a 0.7 podría reescribir una recomendación atada a la guía oficial
+  o perder la cita, **y nada delataría que ocurrió**.
+- **De ahí que no haya bucle de llamadas**, contra lo que el plan preveía:
+  una sola pasada, se ejecuta lo pedido y se manda lo que devuelve.
+- **AFC desactivado**, verificado en `google-genai 2.14.0`. Sin eso el SDK
+  ejecuta las funciones solo y `registrar_huerta` se salta los botones.
+- **Son cuatro herramientas, no tres.** `mostrar_ayuda` existe porque el
+  saludo posterior al consentimiento no cabía en las otras tres sin
+  incumplir la Fase 2: el modelo decide cuándo, el backend decide qué.
+- **`registrar_huerta` no lleva parámetros.** La extracción sigue a 0.1
+  sobre el mensaje literal; si los datos vinieran del modelo, "cebolla
+  larga" volvería como "cebolla".
+
+**El hallazgo del paso, y solo pudo aparecer con el agente delante.** Ante
+"a mi tomate le salieron bichos y de paso sembré lechuga el mes pasado" el
+modelo separa la duda del dato —que es lo correcto— y la recuperación
+falla:
+
+| Formulación | Mejor similitud | ¿Pasa 0.68? |
+|---|---|---|
+| mensaje mixto completo | 0.6840 | sí |
+| **el recorte del agente** | **0.6796** | **no** |
+| "...bichos, que le echo" | 0.6990 | sí |
+
+Cuatro diezmilésimas. El umbral se calibró sobre mensajes **completos**, y
+su margen de una centésima no sobrevive a que el agente recorte. Por eso el
+CU2 reintenta con el mensaje literal si el recorte no recupera nada. Es la
+lección del proyecto al revés: antes era medir reproduciendo producción;
+ahora es **que producción conserve las condiciones de la medición**.
+
+Dos cosas que conviene no exagerar en la tesis:
+
+- **El respaldo evita el silencio, no mejora el corpus.** Rescató un solo
+  fragmento a 0.6840, y la respuesta empieza reconociendo que no tiene
+  información específica. El caso simple recupera tres.
+- **El agente NO arregla lo que el ADR-0008 esperaba.** Ese ADR daba la
+  mezcla consulta/dato por "cosa del agente". El agente enruta bien las dos
+  intenciones, pero la extracción corre sobre el mensaje entero y saca
+  `tomate` de la parte que era pregunta, así que el resumen ofrece
+  guardarlo. La confirmación la protege; queda para calibrar en la Fase 7.
 
 ### Primera fuente oficial, ya verificada
 

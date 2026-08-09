@@ -42,15 +42,65 @@ _PROMPT = "redaccion_rag_v1.md"
 _TEMPERATURA = 0.4
 
 
-async def consultar_orientacion(pregunta: str) -> str:
+async def _recuperar_con_respaldo(
+    pregunta: str,
+    respaldo: str | None,
+) -> tuple[list, str]:
+    """Recupera con la pregunta y, si no sale nada, con el mensaje entero.
+
+    Existe por una medición del 08/08/2026 que solo pudo aparecer con el
+    agente delante. Cuando un mensaje trae dos intenciones —"a mi tomate le
+    salieron bichos y de paso sembré lechuga el mes pasado"— el agente
+    separa la duda del dato, que es lo correcto, y le pasa aquí solo la
+    duda. Medido contra el corpus real:
+
+        mensaje completo .................. 0.6840  recupera
+        solo la duda, que es lo que pasa .. 0.6796  NO recupera
+
+    Cuatro diezmilésimas. **El umbral de 0.68 se calibró sobre mensajes
+    completos** (ADR-0010, 12 consultas), y su margen de una centésima no
+    sobrevive a que el agente recorte la consulta: un recorte más corto
+    pierde señal, y "que le echo" al final vale casi dos centésimas.
+
+    Por eso el mensaje completo conserva siempre su oportunidad: es la
+    formulación sobre la que existe la calibración. El recorte se intenta
+    primero porque suele ser mejor —quita el saludo y el ruido—, pero no
+    puede quitarle a la usuaria una respuesta que el sistema medido sí le
+    daba.
+
+    El coste es una vectorización más, y solo cuando la primera falla.
+
+    Devuelve los fragmentos y la formulación que los encontró, porque es
+    esa la que se le pasa al redactor.
+    """
+    fragmentos = await recuperar_orientacion(pregunta)
+
+    if fragmentos or not respaldo or respaldo == pregunta:
+        return fragmentos, pregunta
+
+    fragmentos = await recuperar_orientacion(respaldo)
+
+    if fragmentos:
+        # Interesa para la Fase 7: dice cuántas veces el recorte del agente
+        # se quedó corto y el mensaje completo salvó la respuesta.
+        logger.info("CU2 recuperado con el mensaje completo tras fallar el recorte")
+
+    return fragmentos, respaldo
+
+
+async def consultar_orientacion(pregunta: str, respaldo: str | None = None) -> str:
     """Responde una consulta agroecológica apoyada en las fuentes oficiales.
+
+    `respaldo` es el mensaje tal como lo escribió la usuaria, cuando quien
+    llama recortó la pregunta. Se reintenta con él si el recorte no
+    recupera nada. Ver `_recuperar_con_respaldo`.
 
     Devuelve siempre un texto enviable. Nunca lanza: una consulta fallida
     no debe tumbar la conversación, y la usuaria tiene que recibir algo.
     """
     from app import textos
 
-    fragmentos = await recuperar_orientacion(pregunta)
+    fragmentos, pregunta = await _recuperar_con_respaldo(pregunta, respaldo)
 
     if not fragmentos:
         logger.info("CU2 sin fragmentos por encima del umbral")
