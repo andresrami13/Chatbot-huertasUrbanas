@@ -83,6 +83,17 @@ class Settings(BaseSettings):
     # nada de lo guardado, solo cuánto de ello se lee.
     MEMORIA_VENTANA_MENSAJES: int = 10
 
+    # --- Identificación del despliegue ---
+    # Las rellena Railway sola en cada despliegue desde GitHub
+    # (comprobado en su documentación el 08/08/2026). No hay que definirlas
+    # a mano, y en local quedan vacías, que es lo correcto: en local no hay
+    # despliegue que identificar.
+    #
+    # Existen porque `/health` no decía qué versión estaba corriendo, y
+    # confirmar un despliegue obligaba a mandar un WhatsApp de prueba.
+    RAILWAY_GIT_COMMIT_SHA: str = ""
+    RAILWAY_GIT_BRANCH: str = ""
+
     # --- Supabase / PostgreSQL ---
     # Cadena del *session pooler* (puerto 5432). Ver la validación de
     # más abajo para el motivo.

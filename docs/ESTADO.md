@@ -60,8 +60,12 @@ quedó el `telefono_hash`, nunca el número.
 ## Infraestructura operativa
 
 - **Railway:** desplegado en `https://web-production-1390a.up.railway.app`.
-  Arranque por `Procfile`, comprobación de salud en `/health` (que también
-  verifica Supabase). Plan Hobby, USD 5/mes.
+  Arranque por `Procfile`, comprobación de salud en `/health`, que verifica
+  Supabase y **dice qué commit está corriendo** desde el 08/08/2026. Sale de
+  `RAILWAY_GIT_COMMIT_SHA`, que Railway rellena sola en los despliegues
+  desde GitHub; no hay que definirla. En local informa `local`. Con eso,
+  confirmar un despliegue ya no exige gastar un mensaje del número de
+  prueba. Plan Hobby, USD 5/mes.
 - **Supabase:** PostgreSQL 17.6, esquema aplicado, RLS activo sin políticas.
   Conexión por **session pooler, puerto 5432** — la directa es solo IPv6 y el
   equipo de desarrollo no tiene IPv6; el puerto 6543 rompe `asyncpg`.

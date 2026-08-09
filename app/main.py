@@ -26,10 +26,37 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Longitud del commit corto, que es como se lee en el historial de git.
+_LONGITUD_COMMIT = 7
+
+
+def _version_desplegada() -> dict[str, str]:
+    """Qué commit está corriendo, para poder confirmar un despliegue.
+
+    Railway rellena estas variables sola en cada despliegue desde GitHub.
+    En local quedan vacías y se informa "local", que es lo correcto: no hay
+    despliegue que identificar.
+
+    Existe porque hasta ahora `/health` decía que el servicio estaba vivo
+    pero no cuál era, así que comprobar si un cambio ya estaba arriba
+    obligaba a mandar un WhatsApp de prueba.
+    """
+    commit = settings.RAILWAY_GIT_COMMIT_SHA
+
+    return {
+        "commit": commit[:_LONGITUD_COMMIT] if commit else "local",
+        "rama": settings.RAILWAY_GIT_BRANCH or "local",
+    }
+
 
 @asynccontextmanager
 async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     """Abre el pool de conexiones al arrancar y lo cierra al apagar."""
+    version = _version_desplegada()
+    logger.info(
+        "Arrancando | commit=%s | rama=%s", version["commit"], version["rama"]
+    )
+
     await abrir_pool()
 
     # Mantenimiento de la idempotencia (ADR-0005). Va aquí y no en el
@@ -78,6 +105,13 @@ async def health() -> JSONResponse:
 
     Incluye la base de datos: un servicio que responde pero no llega a
     Supabase no puede atender a nadie, y conviene que eso se vea.
+
+    E incluye **qué versión está corriendo**, para poder confirmar un
+    despliegue sin gastar un mensaje del número de prueba, que solo admite
+    cinco destinatarios verificados.
+
+    No expone nada sensible: el commit es público —el repositorio lo es— y
+    no hay aquí ninguna variable de entorno con secretos.
     """
     base_ok = await comprobar_conexion()
 
@@ -86,5 +120,6 @@ async def health() -> JSONResponse:
         content={
             "status": "ok" if base_ok else "degradado",
             "base_de_datos": "ok" if base_ok else "sin conexión",
+            "version": _version_desplegada(),
         },
     )
