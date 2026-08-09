@@ -28,6 +28,15 @@ BOTON_NO_ACEPTO = "consentimiento_no_acepto"
 BOTON_REGISTRO_CONFIRMO = "registro_confirmo"
 BOTON_REGISTRO_DESCARTO = "registro_descarto"
 
+# Los rótulos de esos dos botones están aquí, y no escritos en el sitio que
+# los envía, porque se usan dos veces: al mostrarlos y al anotar en la
+# memoria qué pulsó la usuaria (ADR-0012). Lo que se guarda es lo que ella
+# leyó en el botón, no su identificador interno.
+ROTULOS_BOTONES_REGISTRO = {
+    BOTON_REGISTRO_CONFIRMO: "Sí, guardar",
+    BOTON_REGISTRO_DESCARTO: "No",
+}
+
 
 # CU5. Sirve de bienvenida y de ayuda: la Fase 2 define un solo texto para
 # ambos casos. Los ejemplos están en lenguaje natural, para enseñar cómo

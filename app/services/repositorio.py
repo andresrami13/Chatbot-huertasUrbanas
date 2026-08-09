@@ -10,9 +10,9 @@ llama nunca manipula huellas ni ve datos cifrados. El número no se
 almacena ni se registra en bitácora en ningún momento.
 
 Estado actual: `usuario`, el catálogo `barrio`, la idempotencia del webhook,
-el registro del CU3 (`huerta`, `cultivo` y su borrador) y la colección
-oficial (`fuente`, `fragmento_oficial`). Falta `fragmento_comunitario` y
-`mensaje`.
+el registro del CU3 (`huerta`, `cultivo` y su borrador), las dos colecciones
+vectoriales (`fuente`, `fragmento_oficial`, `fragmento_comunitario`) y la
+memoria de conversación (`mensaje`). El esquema queda cubierto entero.
 """
 
 import json
@@ -742,6 +742,92 @@ async def listar_huertas_para_regenerar() -> list[UUID]:
     """Ids de todas las huertas, para el script de regeneración."""
     filas = await obtener_pool().fetch("select id from huerta order by creado_en")
     return [fila["id"] for fila in filas]
+
+
+# --- Memoria de conversación (Fase 3, Tabla 1; ADR-0012) --------------
+
+
+@dataclass(frozen=True)
+class Turno:
+    """Un mensaje de la conversación, tal como lo lee el agente.
+
+    Solo el rol y el contenido: es lo único que entra en el prompt. El
+    `tipo` y la marca de tiempo se guardan en la tabla, pero para el
+    análisis de la Fase 7 —cuánto se usa la voz—, no para el modelo.
+    """
+
+    rol: str
+    contenido: str
+
+
+async def registrar_mensaje(
+    usuario_id: UUID,
+    rol: str,
+    contenido: str,
+    tipo: str = "text",
+    huella: str | None = None,
+) -> None:
+    """Añade un mensaje a la memoria de la usuaria.
+
+    `on conflict do nothing` y no un insert a secas: la garantía del
+    ADR-0005 es **al menos una vez**. Si el proceso muere entre el final
+    del trabajo y `marcar_procesado`, Meta reintenta y el mismo mensaje se
+    procesa dos veces; sin esa cláusula el segundo insert chocaría con el
+    índice único y tumbaría el reintento entero, que es justo la rama que
+    el ADR-0005 existe para proteger.
+
+    La huella puede faltar: si el envío a WhatsApp falla no hay wamid que
+    guardar, y la columna admite nulos porque en PostgreSQL varios nulos no
+    chocan entre sí bajo un índice único.
+
+    Solo se llama después de la compuerta —siempre hay `usuario_id`—, así
+    que ninguna fila de esta tabla pertenece a quien no ha autorizado.
+    """
+    await obtener_pool().execute(
+        """
+        insert into mensaje (usuario_id, rol, tipo, contenido, huella_wamid)
+             values ($1, $2, $3, $4, $5)
+        on conflict (huella_wamid) do nothing
+        """,
+        usuario_id,
+        rol,
+        tipo,
+        contenido,
+        huella,
+    )
+
+
+async def ultimos_mensajes(usuario_id: UUID, limite: int) -> list[Turno]:
+    """La ventana de memoria, del más antiguo al más reciente.
+
+    En orden cronológico porque es como se le entrega al modelo, y el
+    último de la lista es el mensaje que la usuaria acaba de mandar.
+
+    Capa 1 del modelo de seguridad: acotado por `usuario_id`. Es lo que
+    impide que la conversación de una usuaria aparezca en la de otra.
+
+    El desempate por `rol` importa poco pero es gratis: si la pregunta y la
+    respuesta cayeran en la misma marca de tiempo, sin él podrían salir en
+    orden invertido y el agente leería que se contestó antes de preguntar.
+    Ascendente porque 'asistente' va antes que 'usuaria' en el alfabeto, y
+    esta consulta se lee al revés.
+    """
+    filas = await obtener_pool().fetch(
+        """
+        select rol, contenido
+          from mensaje
+         where usuario_id = $1
+         order by creado_en desc, rol asc
+         limit $2
+        """,
+        usuario_id,
+        limite,
+    )
+
+    return [
+        Turno(rol=fila["rol"], contenido=fila["contenido"])
+        for fila in reversed(filas)
+    ]
 
 
 async def buscar_usuaria(telefono: str) -> Usuaria | None:

@@ -22,13 +22,13 @@ from uuid import UUID
 from app import textos
 from app.services.extraccion import CultivoExtraido, HuertaExtraida
 from app.services.fragmento_comunitario import regenerar_fragmento
+from app.services.memoria import responder, responder_con_botones
 from app.services.repositorio import (
     borrar_borrador,
     guardar_borrador,
     guardar_huerta,
     obtener_borrador,
 )
-from app.services.whatsapp import enviar_botones, enviar_texto
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +163,7 @@ async def proponer_registro(
 
     if extraida.barrio_codigo is None:
         logger.info("Registro propuesto sin barrio | usuario_id=%s", usuario_id)
-        await enviar_texto(numero, textos.REGISTRO_FALTA_BARRIO)
+        await responder(numero, usuario_id, textos.REGISTRO_FALTA_BARRIO)
         return
 
     nombre_barrio = nombres_barrios.get(
@@ -176,12 +176,19 @@ async def proponer_registro(
         len(extraida.cultivos),
     )
 
-    await enviar_botones(
+    await responder_con_botones(
         numero,
+        usuario_id,
         componer_resumen(extraida, nombre_barrio),
         [
-            (textos.BOTON_REGISTRO_CONFIRMO, "Sí, guardar"),
-            (textos.BOTON_REGISTRO_DESCARTO, "No"),
+            (
+                textos.BOTON_REGISTRO_CONFIRMO,
+                textos.ROTULOS_BOTONES_REGISTRO[textos.BOTON_REGISTRO_CONFIRMO],
+            ),
+            (
+                textos.BOTON_REGISTRO_DESCARTO,
+                textos.ROTULOS_BOTONES_REGISTRO[textos.BOTON_REGISTRO_DESCARTO],
+            ),
         ],
     )
 
@@ -193,7 +200,7 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
     if datos is None:
         # Caducó, o pulsó el botón de un mensaje viejo ya resuelto.
         logger.info("Confirmación sin borrador vigente | usuario_id=%s", usuario_id)
-        await enviar_texto(numero, textos.REGISTRO_SIN_BORRADOR)
+        await responder(numero, usuario_id, textos.REGISTRO_SIN_BORRADOR)
         return
 
     extraida = _deserializar(datos)
@@ -201,7 +208,7 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
     if extraida.barrio_codigo is None:
         # No debería llegar aquí: sin barrio no se ofrecen los botones.
         logger.warning("Confirmación sin barrio | usuario_id=%s", usuario_id)
-        await enviar_texto(numero, textos.REGISTRO_FALTA_BARRIO)
+        await responder(numero, usuario_id, textos.REGISTRO_FALTA_BARRIO)
         return
 
     cultivos: list[tuple[str, date | None, bool]] = [
@@ -219,7 +226,7 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
         # El borrador NO se borra: así puede reintentar sin volver a
         # contarlo todo.
         logger.exception("Falló el guardado del registro | usuario_id=%s", usuario_id)
-        await enviar_texto(numero, textos.REGISTRO_FALLO)
+        await responder(numero, usuario_id, textos.REGISTRO_FALLO)
         return
 
     # Fuera de la transacción y después de confirmar el guardado, a
@@ -235,11 +242,11 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
     await regenerar_fragmento(huerta_id)
 
     await borrar_borrador(usuario_id)
-    await enviar_texto(numero, textos.REGISTRO_GUARDADO)
+    await responder(numero, usuario_id, textos.REGISTRO_GUARDADO)
 
 
 async def descartar_registro(numero: str, usuario_id: UUID) -> None:
     """Tira el borrador sin guardar nada."""
     await borrar_borrador(usuario_id)
     logger.info("Registro descartado por la usuaria | usuario_id=%s", usuario_id)
-    await enviar_texto(numero, textos.REGISTRO_DESCARTADO)
+    await responder(numero, usuario_id, textos.REGISTRO_DESCARTADO)

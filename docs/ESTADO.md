@@ -1,9 +1,9 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-04. **Fase 5 terminada; de la Fase 6 quedan
-solo el agente y su memoria.** Hechos la ingesta oficial, el CU2 y el CU4.
-Siguiente y último paso: el agente con function calling, que es además
-quien enruta el CU4.
+Última actualización: 2026-08-08. **Fase 5 terminada; de la Fase 6 queda
+solo el agente.** Hechos la ingesta oficial, el CU2, el CU4 y la memoria de
+conversación. Siguiente y último paso: el agente con function calling, que
+es además quien enruta el CU4.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
@@ -31,7 +31,7 @@ que son la Fase 6.
 | Esquema de base de datos | `db/*.sql` | Aplicado en Supabase |
 | Identidad (HMAC) y cifrado (AES-GCM) | `app/core/identidad.py` | Probado |
 | Conexión a PostgreSQL | `app/core/basedatos.py` | Pool con `asyncpg` |
-| Repositorio de datos | `app/services/repositorio.py` | Solo tabla `usuario` |
+| Repositorio de datos | `app/services/repositorio.py` | Cubre el esquema entero |
 | Cliente de WhatsApp | `app/services/whatsapp.py` | Texto y botones |
 | Compuerta de consentimiento (CU1) | `app/services/consentimiento.py` | **Probado de punta a punta** |
 | Textos fijos (CU5) | `app/textos.py` | Sin pasar por el modelo |
@@ -47,6 +47,7 @@ que son la Fase 6.
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
 | Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Probado; **sin conectar al despachador** |
+| Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | Probada contra la base real; falta el celular |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
@@ -64,8 +65,8 @@ quedó el `telefono_hash`, nunca el número.
   prueba `+1 555-136-8057`. Webhook registrado, app suscrita al WABA y campo
   `messages` suscrito. **Los tres pasos son independientes**; que el webhook
   verifique no implica que lleguen mensajes.
-- **GitHub:** repositorio **público**. `origin/main` al día en `840d824`
-  (comprobado con `git ls-remote` el 04/08/2026).
+- **GitHub:** repositorio **público**. `origin/main` al día en `704e459`
+  (comprobado con `git ls-remote` el 08/08/2026).
 
 ## Lo que NO funciona todavía (esperado)
 
@@ -80,8 +81,9 @@ quedó el `telefono_hash`, nunca el número.
   Consecuencia visible hoy: un mensaje que mezcle consulta y dato —"a mi
   tomate le salieron bichos"— puede ofrecer guardar el tomate en vez de
   responder la duda.
-- No se guarda el historial de conversación en `mensaje`: es la memoria del
-  agente, y es lo que falta del paso 4.
+- **La memoria ya se escribe, pero todavía no la lee nadie.** `mensaje` se
+  llena desde el 08/08/2026 (ADR-0012) y `memoria.ventana` está lista; el
+  único que la va a consumir es el agente, que es lo que falta.
 
 ---
 
@@ -404,6 +406,52 @@ pertinente y la que no lo es:
   huertas anteriores a la Fase 6, reparar los fallos de generación, y
   rehacerlo todo si algún día cambia el formato del texto.
 
+### Fase 6, paso 4a: memoria de conversación, hecho el 08/08/2026
+
+**`mensaje` se llena y `mensaje.wamid` ya no existe.** Decisiones en
+[ADR-0012](adr/0012-memoria-de-conversacion.md). Piezas:
+`db/006_memoria_mensaje.sql`, `app/services/memoria.py`,
+`repositorio.registrar_mensaje` y `ultimos_mensajes`, y los flujos que
+antes enviaban sin recordar.
+
+- **Cierra el resto del hallazgo del 30/07/2026**: no queda ninguna columna
+  `wamid` en el esquema.
+- **El `unique` de esa columna obligaba a un segundo cambio.** La escritura
+  lleva `on conflict do nothing`, porque la garantía es *al menos una vez*:
+  sin esa cláusula, el reintento de Meta chocaría con el índice y tumbaría
+  justo la rama que el ADR-0005 existe para proteger.
+- **La memoria empieza donde termina la compuerta.** La única forma de
+  escribir exige `usuario_id`, y ese identificador solo existe si hubo
+  consentimiento. Ni la solicitud, ni el rechazo, ni la bienvenida previa
+  entran.
+- **Enviar y recordar van juntos** (`memoria.responder`). Es una
+  invariante: un envío sin registrar deja un hueco que el agente **no puede
+  detectar** —una pregunta suya sin respuesta parece sin contestar— y le
+  hace repetirse.
+- **El contenido va en claro**, decidido a propósito y con el límite
+  declarado: `mensaje.contenido` es el primer sitio donde el texto libre de
+  la usuaria queda guardado de forma permanente, y ella puede contar ahí lo
+  que quiera. Para la tesis: la minimización de la Fase 3 gobierna lo que
+  el sistema **pide**, no lo que la usuaria decide escribir.
+- **La ventana son diez mensajes, no diez turnos**, y el último es el que
+  ella acaba de mandar: el mensaje entrante se registra antes de atenderlo,
+  así que la ventana ya tiene la forma con la que se le habla al modelo.
+  `MEMORIA_VENTANA_MENSAJES` es opcional, con valor por defecto en código.
+- **`mensaje` no se limpia por antigüedad**, al contrario que las otras dos
+  tablas efímeras: la ventana lee diez filas y la Fase 7 necesita el
+  historial.
+
+**Migración aplicada y probado contra la base real** el 08/08/2026 con
+`python -m scripts.spike_memoria`, que crea dos usuarias temporales, las
+hace conversar y las borra en un `finally`. Las 17 comprobaciones pasaron:
+orden cronológico, corte en 10 conservando los recientes, el reproceso que
+no duplica, los nulos que conviven, el aislamiento entre usuarias, la
+huella de 64 hex donde antes iba el `wamid` y el tipo que distingue la voz
+de lo escrito.
+
+**Falta la prueba con celular real**, que se hará junto con la del agente:
+la memoria no cambia por sí sola nada de lo que la usuaria ve.
+
 ### Primera fuente oficial, ya verificada
 
 | Campo de `fuente` | Valor |
@@ -470,18 +518,16 @@ si Railway permite purgarlos, conviene hacerlo.
 **Lo que se pierde:** buscar un mensaje en el panel de Meta, que exige el
 `wamid` completo. Se compensa con la marca de tiempo.
 
-**Queda un resto sin corregir, y se enciende en la Fase 6.** La tabla
-`mensaje` de `db/001_esquema.sql` sigue declarando `wamid text unique`, en
-claro, con un comentario que además dice que la idempotencia "sigue en
-memoria por ahora". Las dos cosas son anteriores a la corrección del
-30/07/2026. Hoy es inocuo porque **nada escribe en `mensaje`**: el código
-solo maneja el `wamid` en `dispatcher.py` y `whatsapp.py`, y los dos usan
-ya huella y referencia.
+**El resto que quedaba se cerró el 08/08/2026.** La tabla `mensaje` de
+`db/001_esquema.sql` declaraba `wamid text unique`, en claro, con un
+comentario que además decía que la idempotencia "sigue en memoria por
+ahora". Las dos cosas eran anteriores a la corrección del 30/07/2026, y
+eran inocuas mientras nada escribiera en `mensaje`.
 
-Pero `mensaje` es justo la tabla que se enciende al implementar la memoria
-del agente, y tal como está volvería a meter el teléfono en la base, esta
-vez de forma permanente y una fila por mensaje. **Hace falta una migración
-`006` que la pase a `huella_wamid` antes de tocar la memoria del agente.**
+`db/006_memoria_mensaje.sql` la pasa a `huella_wamid` y corrige los
+comentarios (ADR-0012). **Ya no queda ninguna columna `wamid` en el
+esquema**, y la memoria del agente se pudo encender sin volver a meter el
+teléfono en la base.
 
 **Resuelve el punto abierto 1 del [ADR-0005](adr/0005-procesamiento-asincrono-e-idempotencia.md).**
 Su propuesta —guardar el `wamid` "desacoplado de todo identificador de
@@ -501,6 +547,11 @@ consigue.
   es de prueba: borrarla obliga a repetir el consentimiento.
 - La resolución DNS del equipo de desarrollo falla de forma intermitente. Si
   algo "no conecta", reintentar antes de tocar configuración.
+  **Diagnosticado el 08/08/2026:** el culpable es el resolutor configurado
+  en el equipo, no la red ni Supabase. `Resolve-DnsName <host>` devuelve
+  "operación DNS rechazada" mientras que `Resolve-DnsName <host> -Server
+  8.8.8.8` resuelve al momento. Si vuelve a pasar, esa pareja de comandos
+  lo confirma en diez segundos.
 - `requirements.txt` tiene versiones **fijas**, a propósito: el prototipo debe
   comportarse igual en la Fase 8 que hoy.
 - Para probar en local: `.venv`, `uvicorn app.main:app --reload`. El `.env`
@@ -522,6 +573,7 @@ consigue.
 
 ## Correcciones pendientes en los `.docx`
 
-Consolidadas en [`docs/adr/README.md`](adr/README.md). Son diez, e incluyen
-la contradicción sobre el RLS entre las Fases 2 y 3, el modelo de embeddings
-dado de baja, la entrada por voz y el presupuesto de Railway.
+Consolidadas en [`docs/adr/README.md`](adr/README.md). Son dieciocho, e
+incluyen la contradicción sobre el RLS entre las Fases 2 y 3, el modelo de
+embeddings dado de baja, la entrada por voz, el presupuesto de Railway y lo
+que la Fase 3 no dice sobre la conversación almacenada.

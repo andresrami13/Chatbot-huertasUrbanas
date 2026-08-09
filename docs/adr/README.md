@@ -21,6 +21,7 @@ documento queda marcado como pendiente de corrección.
 | [0009](0009-ingesta-de-fuentes-oficiales.md) | La ingesta de fuentes oficiales es un script local y repetible | Aceptada | Fase 4 (§7) |
 | [0010](0010-umbral-de-similitud-recalibrado.md) | El umbral baja a 0.68, y sin respaldo oficial no se responde | Aceptada | Fase 4 (§7) / Fase 2 (CU2) |
 | [0011](0011-fragmento-comunitario-solo-especies.md) | El fragmento comunitario lleva solo las especies | Aceptada; sustituye la composición del [0004](0004-cultivo-y-fragmento-comunitario.md) | Fase 3 / Fase 2 (CU4) |
+| [0012](0012-memoria-de-conversacion.md) | La memoria empieza tras la compuerta, y el `wamid` sale de `mensaje` | Aceptada | Fase 3 / Fase 4 (§6) |
 
 ## Documentos pendientes de corrección
 
@@ -60,3 +61,12 @@ Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
 - **Fase 4, §7** — la colección comunitaria lleva **umbral propio** (0.65).
   El spike de la Fase 5 concluyó que no hacía falta, pero lo midió sobre el
   formato con plantilla (ADR-0011).
+- **Fase 3, §3** — la tabla `mensaje` no guarda el `wamid`, sino su huella.
+  El `wamid` contiene el teléfono del remitente (ADR-0012).
+- **Fase 4, §6** — la ventana de diez no precisa si son mensajes o turnos,
+  ni qué entra en ella. Son mensajes, el último es el de la usuaria, y nada
+  anterior al consentimiento se registra (ADR-0012).
+- **Fase 3, §5.2** — el modelo de seguridad no contempla que la
+  conversación quede almacenada. `mensaje.contenido` es texto libre en
+  claro, y la minimización solo gobierna lo que el sistema pide, no lo que
+  la usuaria decide contar (ADR-0012).

@@ -73,6 +73,16 @@ class Settings(BaseSettings):
     # fuera—.
     RAG_UMBRAL_COMUNITARIO: float = 0.65
 
+    # --- Memoria de conversación (CLAUDE.md §8) ---
+    # Cuántos mensajes ve el agente de lo ya hablado. Se cuentan mensajes,
+    # no turnos: 10 son unos cinco intercambios, y el último es el que la
+    # usuaria acaba de escribir.
+    #
+    # Configurable por el mismo criterio que los umbrales del RAG
+    # (ADR-0010): la Fase 4 lo declara calibrable y cambiarlo no invalida
+    # nada de lo guardado, solo cuánto de ello se lee.
+    MEMORIA_VENTANA_MENSAJES: int = 10
+
     # --- Supabase / PostgreSQL ---
     # Cadena del *session pooler* (puerto 5432). Ver la validación de
     # más abajo para el motivo.
@@ -184,6 +194,18 @@ class Settings(BaseSettings):
     def _validar_top_k(cls, valor: int) -> int:
         if valor < 1:
             raise ValueError(f"RAG_TOP_K debe ser al menos 1; llegó {valor}.")
+        return valor
+
+    @field_validator("MEMORIA_VENTANA_MENSAJES")
+    @classmethod
+    def _validar_ventana(cls, valor: int) -> int:
+        # Al menos dos: con uno solo el agente vería la pregunta en curso y
+        # nada de lo anterior, que es no tener memoria con el coste de
+        # tenerla.
+        if valor < 2:
+            raise ValueError(
+                f"MEMORIA_VENTANA_MENSAJES debe ser al menos 2; llegó {valor}."
+            )
         return valor
 
     @field_validator("DATABASE_URL")

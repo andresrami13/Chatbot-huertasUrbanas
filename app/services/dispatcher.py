@@ -13,8 +13,10 @@ duplicarlo en cada flujo y cierra la posibilidad de procesar datos de
 alguien que no ha autorizado.
 
 Orden interno, y el orden importa: identificar el mensaje -> compuerta de
-consentimiento -> normalización de la entrada -> intención. La
-transcripción va **después** de la compuerta a propósito (ADR-0006).
+consentimiento -> normalización de la entrada -> memoria -> intención. La
+transcripción va **después** de la compuerta a propósito (ADR-0006), y la
+memoria después de la transcripción, para que el audio quede guardado ya
+convertido en texto (ADR-0012).
 
 Pendiente de conectar: el agente orquestador. Hasta que exista, la
 intención se resuelve de forma provisional —saludo y ayuda por palabras
@@ -28,6 +30,7 @@ from app import textos
 from app.core.identidad import huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta, es_saludo_o_ayuda
 from app.services.extraccion import extraer_huerta
+from app.services.memoria import recordar_usuaria, responder
 from app.services.normalizacion import transcribir_audio
 from app.services.orientacion import consultar_orientacion
 from app.services.registro import (
@@ -158,8 +161,25 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     if media_id_audio is not None:
         texto = await transcribir_audio(media_id_audio)
         if texto is None:
+            # No se registra nada en la memoria: no hay contenido que
+            # guardar, y anotar solo la disculpa dejaría una respuesta sin
+            # la pregunta que la provocó (ADR-0012).
             await enviar_texto(numero, textos.AUDIO_NO_ENTENDIDO)
             return
+
+    # Memoria de la conversación (ADR-0012). Aquí y no antes: después de la
+    # compuerta, así que nunca entra un mensaje de quien no ha autorizado, y
+    # después de transcribir, así que el audio queda guardado ya en texto.
+    #
+    # Se registra el mensaje entrante ANTES de atenderlo. Es lo que hace
+    # que la ventana termine siempre en lo que la usuaria acaba de decir,
+    # que es la forma en la que el agente la va a necesitar.
+    await recordar_usuaria(
+        usuaria.id,
+        _contenido_recordable(texto, boton_id),
+        _tipo_entrante(media_id_audio, boton_id),
+        mensaje.get("id"),
+    )
 
     # Botones del registro (CU3). Van antes de cualquier interpretación:
     # una pulsación no es un mensaje que haya que entender, es una respuesta
@@ -179,7 +199,7 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     # Ahora también alcanza a las notas de voz: un "hola" hablado llega
     # aquí ya como texto.
     if es_saludo_o_ayuda(texto):
-        await enviar_texto(numero, textos.BIENVENIDA)
+        await responder(numero, usuaria.id, textos.BIENVENIDA)
         return
 
     if not texto:
@@ -210,4 +230,36 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     # calling (Fase 2, §4). Mientras tanto es la rama por defecto, que era
     # la que hasta ahora callaba.
     logger.info("Consulta de orientación | usuario_id=%s | ref=%s", usuaria.id, ref)
-    await enviar_texto(numero, await consultar_orientacion(texto))
+    await responder(numero, usuaria.id, await consultar_orientacion(texto))
+
+
+def _tipo_entrante(media_id_audio: str | None, boton_id: str | None) -> str:
+    """Cómo llegó el mensaje, antes de normalizarlo.
+
+    No es lo mismo que el contenido que se guarda: una nota de voz se
+    almacena transcrita pero se anota como 'audio', que es lo que la Fase 7
+    necesita para medir cuánto se usa la voz frente a la escritura.
+    """
+    if boton_id is not None:
+        return "interactive"
+    if media_id_audio is not None:
+        return "audio"
+    return "text"
+
+
+def _contenido_recordable(texto: str | None, boton_id: str | None) -> str:
+    """El texto que se guarda en la memoria, o cadena vacía si no hay.
+
+    De una pulsación se guarda el rótulo que la usuaria leyó en el botón,
+    no su identificador interno: "Sí, guardar" se entiende leyendo la
+    conversación, `registro_confirmo` no.
+
+    Los botones del consentimiento no llegan hasta aquí —la compuerta los
+    atiende y corta—, así que solo hay que contemplar los del CU3. Un
+    identificador desconocido no se anota: sería una fila de basura en la
+    memoria del agente.
+    """
+    if boton_id is not None:
+        return textos.ROTULOS_BOTONES_REGISTRO.get(boton_id, "")
+
+    return texto or ""
