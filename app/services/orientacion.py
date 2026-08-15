@@ -53,7 +53,7 @@ async def _recuperar_con_respaldo(
 ) -> tuple[list, str]:
     """Recupera con la pregunta y, si no sale nada, con el mensaje entero.
 
-    Existe por una medición del 08/08/2026 que solo pudo aparecer con el
+    Existe por una medición del 15/08/2026 que solo pudo aparecer con el
     agente delante. Cuando un mensaje trae dos intenciones —"a mi tomate le
     salieron bichos y de paso sembré lechuga el mes pasado"— el agente
     separa la duda del dato, que es lo correcto, y le pasa aquí solo la

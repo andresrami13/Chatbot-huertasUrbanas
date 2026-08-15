@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-08. **La Fase 6 está construida entera,
+Última actualización: 2026-08-15. **La Fase 6 está construida entera,
 probada contra la base y la API reales, y desplegada.** Ingesta oficial,
 CU2, CU4, memoria de conversación y agente con function calling conectado
 al despachador. **Lo único pendiente de la Fase 6 es la prueba con un
@@ -52,7 +52,7 @@ falta la prueba con celular.
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
-| Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Enrutado por el agente desde el 08/08 |
+| Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Enrutado por el agente desde el 15/08 |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | Probada contra la base real; falta el celular |
 | Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | Conectado al despachador; falta el celular |
 
@@ -64,7 +64,7 @@ quedó el `telefono_hash`, nunca el número.
 
 - **Railway:** desplegado en `https://web-production-1390a.up.railway.app`.
   Arranque por `Procfile`, comprobación de salud en `/health`, que verifica
-  Supabase y **dice qué commit está corriendo** desde el 08/08/2026. Sale de
+  Supabase y **dice qué commit está corriendo** desde el 15/08/2026. Sale de
   `RAILWAY_GIT_COMMIT_SHA`, que Railway rellena sola en los despliegues
   desde GitHub; no hay que definirla. En local informa `local`. Con eso,
   confirmar un despliegue ya no exige gastar un mensaje del número de
@@ -77,7 +77,7 @@ quedó el `telefono_hash`, nunca el número.
   `messages` suscrito. **Los tres pasos son independientes**; que el webhook
   verifique no implica que lleguen mensajes.
 - **GitHub:** repositorio **público**. `origin/main` al día en `28b5891`,
-  que es lo que `/health` reporta desplegado (comprobado el 08/08/2026).
+  que es lo que `/health` reporta desplegado (comprobado el 15/08/2026).
 
 ## Lo que NO funciona todavía (esperado)
 
@@ -499,7 +499,7 @@ pertinente y la que no lo es:
   huertas anteriores a la Fase 6, reparar los fallos de generación, y
   rehacerlo todo si algún día cambia el formato del texto.
 
-### Fase 6, paso 4a: memoria de conversación, hecho el 08/08/2026
+### Fase 6, paso 4a: memoria de conversación, hecho el 15/08/2026
 
 **`mensaje` se llena y `mensaje.wamid` ya no existe.** Decisiones en
 [ADR-0012](adr/0012-memoria-de-conversacion.md). Piezas:
@@ -534,7 +534,7 @@ antes enviaban sin recordar.
   tablas efímeras: la ventana lee diez filas y la Fase 7 necesita el
   historial.
 
-**Migración aplicada y probado contra la base real** el 08/08/2026 con
+**Migración aplicada y probado contra la base real** el 15/08/2026 con
 `python -m scripts.spike_memoria`, que crea dos usuarias temporales, las
 hace conversar y las borra en un `finally`. Las 17 comprobaciones pasaron:
 orden cronológico, corte en 10 conservando los recientes, el reproceso que
@@ -545,7 +545,7 @@ de lo escrito.
 **Falta la prueba con celular real**, que se hará junto con la del agente:
 la memoria no cambia por sí sola nada de lo que la usuaria ve.
 
-### Fase 6, paso 4b: el agente orquestador, hecho el 08/08/2026
+### Fase 6, paso 4b: el agente orquestador, hecho el 15/08/2026
 
 **El agente decide y enruta.** Decisiones en
 [ADR-0013](adr/0013-agente-orquestador.md). Piezas: `app/agent/agente.py`,
@@ -600,7 +600,7 @@ Dos cosas que conviene no exagerar en la tesis:
   `tomate` de la parte que era pregunta, así que el resumen ofrece
   guardarlo. La confirmación la protege; queda para calibrar en la Fase 7.
 
-### Fase 6, paso 4c: el agente conectado, hecho el 08/08/2026
+### Fase 6, paso 4c: el agente conectado, hecho el 15/08/2026
 
 **El despachador ya no decide intenciones.** Se retiraron las dos ramas
 provisionales —el saludo por palabras clave después de la compuerta y
@@ -696,7 +696,7 @@ si Railway permite purgarlos, conviene hacerlo.
 **Lo que se pierde:** buscar un mensaje en el panel de Meta, que exige el
 `wamid` completo. Se compensa con la marca de tiempo.
 
-**El resto que quedaba se cerró el 08/08/2026.** La tabla `mensaje` de
+**El resto que quedaba se cerró el 15/08/2026.** La tabla `mensaje` de
 `db/001_esquema.sql` declaraba `wamid text unique`, en claro, con un
 comentario que además decía que la idempotencia "sigue en memoria por
 ahora". Las dos cosas eran anteriores a la corrección del 30/07/2026, y
@@ -725,7 +725,7 @@ consigue.
   es de prueba: borrarla obliga a repetir el consentimiento.
 - La resolución DNS del equipo de desarrollo falla de forma intermitente. Si
   algo "no conecta", reintentar antes de tocar configuración.
-  **Diagnosticado el 08/08/2026:** el culpable es el resolutor configurado
+  **Diagnosticado el 15/08/2026:** el culpable es el resolutor configurado
   en el equipo, no la red ni Supabase. `Resolve-DnsName <host>` devuelve
   "operación DNS rechazada" mientras que `Resolve-DnsName <host> -Server
   8.8.8.8` resuelve al momento. Si vuelve a pasar, esa pareja de comandos

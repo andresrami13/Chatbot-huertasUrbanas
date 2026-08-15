@@ -1,7 +1,7 @@
 # ADR-0012. La memoria de conversación empieza después de la compuerta, y el `wamid` sale de `mensaje`
 
 - **Estado:** Aceptada
-- **Fecha:** 2026-08-08
+- **Fecha:** 2026-08-15
 - **Fase:** 6 (prepara el agente orquestador)
 - **Depende de:** [ADR-0005](0005-procesamiento-asincrono-e-idempotencia.md),
   [ADR-0006](0006-saludo-y-ayuda-sin-modelo.md)

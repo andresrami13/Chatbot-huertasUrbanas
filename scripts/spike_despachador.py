@@ -277,7 +277,7 @@ async def main() -> None:
             "el agente la enrutó al CU4",
             "antes de 4c esta rama no existía",
         )
-        # El 08/08/2026 el modelo escribió "la huerta COMUNITARIO – La
+        # El 15/08/2026 el modelo escribió "la huerta COMUNITARIO – La
         # Esperanza". La etiqueta es andamiaje del prompt y para ella no
         # significa nada.
         _comprobar(

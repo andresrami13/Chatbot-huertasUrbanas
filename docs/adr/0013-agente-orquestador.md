@@ -1,7 +1,7 @@
 # ADR-0013. El agente enruta y no relata, y el mensaje completo conserva su oportunidad
 
 - **Estado:** Aceptada
-- **Fecha:** 2026-08-08
+- **Fecha:** 2026-08-15
 - **Fase:** 6 (implementa el agente orquestador, Fase 2 §4)
 - **Depende de:** [ADR-0006](0006-saludo-y-ayuda-sin-modelo.md),
   [ADR-0008](0008-borrador-de-registro-y-una-huerta-por-usuaria.md),
@@ -55,7 +55,7 @@ encuentra un caso donde el agente sí deba comentar un resultado.
 ## Decisión 2. AFC desactivado
 
 `types.AutomaticFunctionCallingConfig(disable=True)`, verificado en
-`google-genai 2.14.0` el 08/08/2026.
+`google-genai 2.14.0` el 15/08/2026.
 
 Sin esto el SDK ejecuta las funciones por su cuenta en un bucle interno, y
 el modelo daría el registro por hecho sin pasar por los botones, que es
@@ -102,7 +102,7 @@ El prompt le pide al modelo que pase la duda **con las palabras de la
 usuaria**, quitando el saludo. Ante un mensaje de doble intención —"a mi
 tomate le salieron bichos y de paso sembré lechuga el mes pasado"— el
 modelo hace lo correcto: separa la duda del dato y pasa solo la duda. Y la
-recuperación falla. Medido contra el corpus real el 08/08/2026:
+recuperación falla. Medido contra el corpus real el 15/08/2026:
 
 | Formulación | Mejor similitud | ¿Pasa 0.68? |
 |---|---|---|

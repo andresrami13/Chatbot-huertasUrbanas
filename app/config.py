@@ -85,7 +85,7 @@ class Settings(BaseSettings):
 
     # --- Identificación del despliegue ---
     # Las rellena Railway sola en cada despliegue desde GitHub
-    # (comprobado en su documentación el 08/08/2026). No hay que definirlas
+    # (comprobado en su documentación el 15/08/2026). No hay que definirlas
     # a mano, y en local quedan vacías, que es lo correcto: en local no hay
     # despliegue que identificar.
     #

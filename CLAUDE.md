@@ -225,7 +225,7 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
    los botones, rompiendo el §4.7. Ya está hecho en `app/agent/agente.py`;
    **no lo quites** (ADR-0013).
 6. **El `wamid` nunca en claro, tampoco en la base.** Cerrado del todo el
-   08/08/2026 con la migración `006`: ya no queda ninguna columna `wamid`
+   15/08/2026 con la migración `006`: ya no queda ninguna columna `wamid`
    en el esquema. Ver el §11 y el ADR-0012.
 7. **`mensaje.contenido` guarda la conversación sin cifrar**, siguiendo la
    Fase 3 §5.2, que solo obliga a cifrar el nombre. Es el primer y único

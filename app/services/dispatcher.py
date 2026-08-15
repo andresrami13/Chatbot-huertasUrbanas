@@ -18,7 +18,7 @@ transcripción va **después** de la compuerta a propósito (ADR-0006), y la
 memoria después de la transcripción, para que el audio quede guardado ya
 convertido en texto (ADR-0012).
 
-**Este módulo ya no decide intenciones.** Desde el 08/08/2026 esa decisión
+**Este módulo ya no decide intenciones.** Desde el 15/08/2026 esa decisión
 es del agente por function calling (Fase 2, §4; ADR-0013), y aquí solo
 quedan las que no son interpretación: una pulsación de botón, que es
 respuesta a algo que ya se preguntó, y un audio que no se pudo transcribir.

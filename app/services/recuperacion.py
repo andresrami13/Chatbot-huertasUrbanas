@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 # módulo que sabe qué forma tienen.
 #
 # Hace falta porque el modelo a veces copia el rótulo en la respuesta. Visto
-# el 08/08/2026 en el spike del despachador: "En la huerta COMUNITARIO – La
+# el 15/08/2026 en el spike del despachador: "En la huerta COMUNITARIO – La
 # Esperanza, del barrio El Regalo...". La etiqueta es un andamio para el
 # modelo y para la usuaria no significa nada.
 #

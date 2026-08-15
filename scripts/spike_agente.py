@@ -189,7 +189,7 @@ async def main() -> None:
         _comprobar(
             "COMUNITARIO" not in texto,
             "no se le cuela la etiqueta de procedencia",
-            "el 08/08 el modelo escribió 'la huerta COMUNITARIO – La Esperanza'",
+            "el 15/08 el modelo escribió 'la huerta COMUNITARIO – La Esperanza'",
         )
 
         # -----------------------------------------------------------------
