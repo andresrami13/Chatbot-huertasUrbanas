@@ -1,14 +1,17 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-08. **La Fase 6 está construida entera y
-probada contra la base y la API reales.** Ingesta oficial, CU2, CU4,
-memoria de conversación y agente con function calling, ya conectado al
-despachador. **Lo único pendiente es probarla con un celular real**, que
-exige desplegar en Railway.
+Última actualización: 2026-08-08. **La Fase 6 está construida entera,
+probada contra la base y la API reales, y desplegada.** Ingesta oficial,
+CU2, CU4, memoria de conversación y agente con function calling conectado
+al despachador. **Lo único pendiente de la Fase 6 es la prueba con un
+celular real**; después empieza la Fase 7 (calibración y pruebas).
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(decisiones tomadas durante la implementación).
+(trece decisiones tomadas durante la implementación).
+
+**Si retoma en una conversación nueva, vaya directo a
+[Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
 
 ---
 
@@ -38,13 +41,13 @@ falta la prueba con celular.
 | Cliente de WhatsApp | `app/services/whatsapp.py` | Texto y botones |
 | Compuerta de consentimiento (CU1) | `app/services/consentimiento.py` | **Probado de punta a punta** |
 | Textos fijos (CU5) | `app/textos.py` | Sin pasar por el modelo |
-| Cliente de Gemini | `app/core/gemini.py` | Creado; sin llamada real todavía |
+| Cliente de Gemini | `app/core/gemini.py` | En uso por agente, extracción, RAG y transcripción |
 | Vectorización | `app/services/embeddings.py` | Probado contra la API real |
 | Descarga de multimedia | `app/services/media.py` | Probado en producción |
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
-| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | `extraccion_v1.md`, `redaccion_rag_v1.md` |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Cuatro: `agente_v1`, `extraccion_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1` |
 | Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **81 fragmentos en Supabase** |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
@@ -73,8 +76,8 @@ quedó el `telefono_hash`, nunca el número.
   prueba `+1 555-136-8057`. Webhook registrado, app suscrita al WABA y campo
   `messages` suscrito. **Los tres pasos son independientes**; que el webhook
   verifique no implica que lleguen mensajes.
-- **GitHub:** repositorio **público**. `origin/main` al día en `704e459`
-  (comprobado con `git ls-remote` el 08/08/2026).
+- **GitHub:** repositorio **público**. `origin/main` al día en `28b5891`,
+  que es lo que `/health` reporta desplegado (comprobado el 08/08/2026).
 
 ## Lo que NO funciona todavía (esperado)
 
@@ -89,7 +92,95 @@ quedó el `telefono_hash`, nunca el número.
 
 ---
 
-## Siguientes pasos, en orden
+## Por dónde seguir
+
+### 1. Cerrar la Fase 6: probarla con un celular real
+
+Es lo único que falta, y no lo puede hacer la IA. Está desplegado en
+`28b5891`; compruébelo con `/health` antes de escribir, que ya dice qué
+commit corre.
+
+Guion sugerido. El orden importa: 3 y 4 son un solo flujo, y 5 solo tiene
+sentido después.
+
+| # | Mande | Debe pasar |
+|---|---|---|
+| 1 | `hola` | La bienvenida, palabra por palabra |
+| 2 | `a mi mata de tomate le salieron unos bichitos verdes, que le echo` | Respuesta corta terminando en `Fuente: Jardín Botánico...` |
+| 3 | `sembre cilantro en marzo` | Le pregunta el barrio, **sin botones y sin menú** |
+| 4 | `en holanda` | Resumen con [Sí, guardar] / [No], **con el cilantro del mensaje 3** |
+| 5 | `que estan sembrando las otras huertas` | El CU4, que nunca ha corrido en producción |
+| 6 | Una nota de voz | Que la transcripción siga entrando bien al agente |
+
+Dos advertencias para no confundir un acierto con un fallo:
+
+- **En el paso 5 lo esperable es el texto de "todavía no tengo qué
+  contarle".** El CU4 excluye la huerta de quien pregunta, y con una sola
+  huerta registrada no queda ninguna. Eso es correcto.
+- **El enrutamiento no es determinista.** El agente corre a 0.7. Un
+  resultado raro una vez no es una medida; repita antes de darlo por roto.
+
+Si algo sale mal, la bitácora de Railway trae
+`Agente | turnos_memoria=N | funciones=[...]`, que dice a qué enrutó sin
+exponer el contenido del mensaje.
+
+### 2. Después viene la Fase 7 (calibración y pruebas)
+
+Lo que ya está identificado y esperando datos reales:
+
+- **Revalidar el umbral del CU2 con consultas reales de las usuarias**, no
+  con las que imaginó el autor. El margen es de una centésima (ADR-0010), y
+  el ADR-0013 añadió que ese margen no sobrevive a que el agente recorte la
+  consulta. La bitácora ya cuenta las dos cosas que hacen falta:
+  `literal=True/False` y `CU2 recuperado con el mensaje completo tras
+  fallar el recorte`.
+- **Remedir el umbral comunitario** con 5–7 huertas de verdad (ADR-0011).
+- **La mezcla consulta + dato**, que sigue ofreciendo guardar el cultivo por
+  el que se preguntó (ver arriba, y ADR-0013).
+- **Cuántas veces se cuela la etiqueta de procedencia.** La bitácora lo
+  registra cada vez que `limpiar_etiquetas` actúa.
+- **Ampliar las listas de saludos** con los que las usuarias usen de verdad
+  y el sistema no reconozca (ADR-0006).
+- **Calibrar** temperaturas, top-k y la ventana de memoria. Todo por
+  variables de entorno menos la extracción, que es fija a propósito.
+
+### 3. Acciones suyas, que no puede hacer la IA
+
+- **Purgar los registros viejos de Railway.** Lo más urgente: los anteriores
+  al 30/07/2026 contienen su número de teléfono.
+- **Migrar a número propio con SIM nueva antes de la Fase 8.** El
+  `PHONE_NUMBER_ID` cambia; nunca escribirlo en el código.
+- **Pasar al documento de grado los trece ADR y las dieciocho correcciones**
+  de [`docs/adr/README.md`](adr/README.md).
+- **Revisar el DNS del equipo.** El resolutor configurado rechaza el host de
+  Supabase de forma intermitente (ver más abajo). No rompe nada en
+  producción, pero cuesta tiempo en cada sesión de desarrollo.
+
+### Scripts, para no buscarlos
+
+Todos se ejecutan con `python -m scripts.<nombre>` desde la raíz, con el
+`.venv` activo. **Los que escriben en la base crean datos temporales y los
+borran en un `finally`**, acotados a teléfonos que empiezan por `57000000`;
+la fila real del autor no se toca.
+
+| Script | Qué hace |
+|---|---|
+| `spike_despachador` | La rama completa, entrando por `procesar_evento`. **El más útil para comprobar que nada se rompió.** |
+| `spike_agente` | El agente y sus cuatro herramientas, con espías en vez de envíos |
+| `spike_memoria` | La ventana, la deduplicación y el aislamiento entre usuarias |
+| `spike_comunidad`, `spike_orientacion` | El CU4 y el CU2 por separado |
+| `spike_extraccion`, `spike_transcripcion`, `spike_embeddings` | Piezas de la Fase 5 |
+| `calibrar_umbral`, `calibrar_fragmento_comunitario` | Las mediciones de los ADR-0010 y 0011 |
+| `ingesta_fuente` | La ingesta oficial. `--simular` y `--reingerir` |
+| `regenerar_fragmentos` | Rehace los fragmentos comunitarios |
+
+---
+
+## Historia de la implementación, paso a paso
+
+Lo que sigue es el registro de cómo se llegó hasta aquí, con las medidas
+que respaldan cada decisión. Es material para el documento de grado, no
+tareas pendientes.
 
 1. ~~**ADR pendiente.**~~ Hecho:
    [ADR-0006](adr/0006-saludo-y-ayuda-sin-modelo.md) documenta por qué la
