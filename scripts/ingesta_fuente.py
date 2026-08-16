@@ -3,9 +3,16 @@
 **No forma parte del servicio.** Se ejecuta a mano, desde la raíz del
 repositorio, y escribe en Supabase:
 
-    python -m scripts.ingesta_fuente --simular      # no escribe ni vectoriza
-    python -m scripts.ingesta_fuente                # ingesta real
-    python -m scripts.ingesta_fuente --reingerir    # rehace una ya ingerida
+    python -m scripts.ingesta_fuente --listar
+    python -m scripts.ingesta_fuente --fuente jbb_practicas_2022 --simular
+    python -m scripts.ingesta_fuente --fuente jbb_practicas_2022
+    python -m scripts.ingesta_fuente --fuente jbb_practicas_2022 --reingerir
+
+Qué documento se ingiere y con qué parámetros lo dice
+`scripts/catalogo_fuentes.py`. Hasta la Fase 6 había una sola fuente y sus
+datos eran constantes de este módulo; con seis documentos eso obligaba a
+editar el script para cambiar de documento, que es justo lo que impide
+repetir una ingesta igual meses después.
 
 Vive en `scripts/` y no en `app/` por una razón concreta: así `pypdf` se
 queda en `requirements-scripts.txt` y no entra en el `requirements.txt` que
@@ -18,11 +25,11 @@ propio del documento: extraer, limpiar, trocear.
 
 ## Por qué la limpieza es la mitad del trabajo
 
-El PDF está maquetado en InDesign, y lo que `extract_text` devuelve son
-renglones de la página, no frases. Sin reconstruir los párrafos, los
-fragmentos quedarían cortados por la maquetación y no por el sentido, que
-es justo lo que arruina una recuperación. Comprobado sobre el documento del
-Jardín Botánico (128 páginas):
+El PDF está maquetado, y lo que `extract_text` devuelve son renglones de la
+página, no frases. Sin reconstruir los párrafos, los fragmentos quedarían
+cortados por la maquetación y no por el sentido, que es justo lo que
+arruina una recuperación. Comprobado sobre el documento del Jardín Botánico
+(128 páginas):
 
 - El número de página aparece **de dos formas**: en renglón propio (47
   páginas) y pegado a la primera palabra (32 páginas, `"13medicinal"`).
@@ -37,6 +44,10 @@ Jardín Botánico (128 páginas):
   eso tampoco se le añade aquí ninguna plantilla de atribución: la entidad
   y el título salen de la tabla `fuente` al responder, no del texto
   vectorizado.
+
+Eso último **no vale para todos los documentos**. La cartilla de 2011 sí
+lleva cabecera y pie en todas sus páginas, y por eso la detección de
+plantilla no es un adorno: es lo que le impide contaminar el corpus.
 """
 
 import argparse
@@ -45,6 +56,7 @@ import re
 import statistics
 import sys
 import unicodedata
+from collections import Counter
 from pathlib import Path
 
 import httpx
@@ -57,87 +69,29 @@ from app.services.repositorio import (
     obtener_fuente_por_url,
     reemplazar_fragmentos_oficiales,
 )
-
-# --- La fuente, verificada el 30/07/2026 (ESTADO.md) ---------------------
-ENTIDAD = "Jardín Botánico de Bogotá José Celestino Mutis"
-TITULO = (
-    "Pasos básicos para establecer y manejar tu huerta. "
-    "Una guía práctica para agricultores urbanos"
-)
-URL = (
-    "https://jbb.gov.co/documentos/cientifica/publicaciones/"
-    "Pasos_basicos_para_establecer_y_manejar_tu_huerta.pdf"
-)
-
-RUTA_POR_DEFECTO = Path("fuentes/jbb_pasos_basicos.pdf")
-
-# Primera página con contenido aprovechable, en numeración de 1.
-#
-# ESTADO.md decía "las ~10 primeras"; contadas una a una son 11. Del 1 al 7
-# van portada, créditos, ISBN y tabla de contenido; del 8 al 10, la
-# presentación institucional y los agradecimientos, que son prosa de la
-# entidad y no orientación agronómica. La página 11 está en blanco y en la
-# 12 empieza la introducción.
-PAGINA_INICIAL = 12
-
-# Última página aprovechable, también en numeración de 1.
-#
-# ESTADO.md solo advertía de la cabecera, pero la cola hay que cortarla
-# igual: de la 122 a la 126 van las referencias bibliográficas, la 127 es
-# el colofón de imprenta y la 128 la contracubierta. Una lista de URL y el
-# gramaje del papel no responden nada, y como fuente OFICIAL entrarían al
-# nivel más alto de la jerarquía (CLAUDE.md §6).
-#
-# Se conserva en cambio el glosario de las páginas 120 y 121: define
-# alelopatía, nivel freático o patógeno, que es justo el tipo de término
-# que una usuaria puede preguntar.
-PAGINA_FINAL = 121
+from scripts.catalogo_fuentes import FuenteDocumento, describir, obtener
 
 # --- Troceo (CLAUDE.md §8: 300–500 tokens, solape de 50) -----------------
 #
 # El tamaño se mide en caracteres y no llamando al contador de tokens en
 # cada corte: serían ~100 llamadas de red para gobernar un punto de corte.
-# Pero la ratio no se supone, se **midió**.
-#
-# El valor NO es la ratio media del corpus, y la diferencia importa.
-#
-# Medida con `count_tokens` del propio `gemini-embedding-001` sobre los
-# fragmentos completos, la media del documento es **4.49** car./token. Pero
-# dimensionar con la media deja fuera de intervalo a la mitad del corpus:
-# la ratio varía mucho de un fragmento a otro —los que cargan nomenclatura
-# botánica ("Amaranthaceae", "Vasconcellea pubescens") tokenizan mucho más
-# denso— y con 4.49 los fragmentos salían con mediana 482 y **máximo 625**
-# tokens reales, por encima del techo de 500 de la Fase 4 (CLAUDE.md §8).
-#
-# Se dimensiona entonces por el extremo denso observado, no por la media,
-# que es lo que hace que el máximo real caiga dentro del intervalo.
-#
-# Advertencia para la siguiente fuente que se ingiera: esta constante está
-# calibrada contra ESTE documento. Con otro vocabulario hay que volver a
-# medir con `--medir-tokens`, que cuenta los tokens reales de todos los
-# fragmentos, antes de dar el troceo por bueno.
-CARACTERES_POR_TOKEN = 3.9
+# Pero la ratio no se supone, se **mide**, y vive en el catálogo porque es
+# propia de cada documento: la nomenclatura botánica tokeniza mucho más
+# denso que la prosa (ADR-0009, decisión 4).
 
-CARACTERES_MAXIMO = int(500 * CARACTERES_POR_TOKEN)
-CARACTERES_SOLAPE = int(50 * CARACTERES_POR_TOKEN)
+TOKENS_OBJETIVO = 500
+TOKENS_SOLAPE = 50
 
 # Tope duro por fragmento. `gemini-embedding-001` admite 2 048 tokens de
 # entrada por texto y trunca en silencio lo que sobre: un fragmento
 # demasiado largo se vectorizaría a medias sin dar error. Este límite deja
 # margen de sobra sobre el objetivo de 500.
-CARACTERES_TOPE = int(1500 * CARACTERES_POR_TOKEN)
+TOKENS_TOPE = 1500
 
 # Textos por llamada de vectorización. La documentación de Gemini no
 # publica un máximo de entradas por petición —solo el de 2 048 tokens por
 # texto—, así que se lotea conservador en lugar de suponer un número.
 LOTE_VECTORIZACION = 16
-
-# Un renglón que aparece en esta cantidad de páginas distintas es plantilla
-# de maquetación, no contenido. El umbral es alto a propósito: en este
-# documento hay tablas de especies donde "Cebolla" o "Tomate" salen en 5
-# páginas, y descartar contenido legítimo es peor que dejar pasar una línea
-# de ruido. Lo que se descarte se imprime, para que nunca sea silencioso.
-PAGINAS_PARA_PLANTILLA = 10
 
 _VIÑETAS = "○⚫•▪-–—"
 _FIN_DE_FRASE = ".:;?!»”)"
@@ -150,13 +104,13 @@ _PIE_DE_FIGURA = re.compile(r"^\s*(fig\.|figura|tabla|fuente:)\s", re.IGNORECASE
 # =========================================================================
 
 
-def _obtener_pdf(ruta: Path | None) -> Path:
+def _obtener_pdf(fuente: FuenteDocumento, ruta: Path | None) -> Path:
     """Devuelve la ruta al PDF, descargándolo si hace falta.
 
-    Se cachea en `fuentes/`, que está fuera del control de versiones: es una
-    publicación de terceros y el repositorio es público.
+    Se cachea en `fuentes/`, que está fuera del control de versiones: son
+    publicaciones de terceros y el repositorio es público.
     """
-    destino = ruta or RUTA_POR_DEFECTO
+    destino = ruta or fuente.ruta
 
     if destino.exists():
         print(f"PDF local: {destino} ({destino.stat().st_size / 1e6:.1f} MB)")
@@ -166,7 +120,7 @@ def _obtener_pdf(ruta: Path | None) -> Path:
         raise SystemExit(f"No existe el archivo indicado: {ruta}")
 
     destino.parent.mkdir(parents=True, exist_ok=True)
-    print(f"Descargando de {URL}")
+    print(f"Descargando de {fuente.url}")
 
     # La resolución DNS del equipo de desarrollo falla de forma
     # intermitente (ESTADO.md): se reintenta antes de dar el fallo por
@@ -175,7 +129,7 @@ def _obtener_pdf(ruta: Path | None) -> Path:
     for intento in (1, 2, 3):
         try:
             with httpx.stream(
-                "GET", URL, timeout=120.0, follow_redirects=True
+                "GET", fuente.url, timeout=120.0, follow_redirects=True
             ) as respuesta:
                 respuesta.raise_for_status()
                 with destino.open("wb") as archivo:
@@ -195,20 +149,47 @@ def _obtener_pdf(ruta: Path | None) -> Path:
 # =========================================================================
 
 
-def _normalizar_espacios(texto: str) -> str:
-    """Unifica los espacios raros de la maquetación.
+def _normalizar_texto(texto: str) -> str:
+    """Unifica espacios raros y deshace las ligaduras tipográficas.
 
-    El PDF trae espacio duro (U+00A0) y espacio fino (U+2009), que no son
-    separadores para `split()` y acabarían pegados dentro de las palabras.
+    Dos tratamientos distintos con el mismo fin: que la misma palabra se
+    escriba igual venga del documento que venga.
+
+    **Espacios.** El PDF trae espacio duro (U+00A0), espacio fino (U+2009)
+    y espacio de anchura cero (U+200B), que no son separadores para
+    `split()` y acabarían pegados dentro de las palabras. El de anchura
+    cero hay que quitarlo a mano: la normalización de Unicode no lo toca.
+
+    **Ligaduras.** Se normaliza con **NFKC y no con NFC**, que es lo que
+    deshace `ﬁ` (U+FB01) en las dos letras `fi`. No es cosmético: medido el
+    15/08/2026, la cartilla de 2022 trae 293 ligaduras —265 de `ﬁ` y 28 de
+    `ﬂ`— dentro de palabras corrientes como «beneﬁcios», «especíﬁcas» o
+    «ﬂoración». Vectorizadas así, esas palabras no son la misma palabra que
+    escribe una usuaria en WhatsApp, y el fragmento que las contiene se
+    recupera peor sin que nada lo delate.
+
+    NFC no bastaba porque las ligaduras son equivalencia **de
+    compatibilidad**, no canónica.
+
+    El coste sobre lo ya ingerido es despreciable, y se comprobó antes de
+    cambiarlo: el documento del Jardín Botánico no tiene ni una ligadura y
+    NFKC solo le altera 9 caracteres de 130 719, sin mover ningún límite de
+    fragmento. Sigue dando los mismos 81.
     """
-    texto = texto.replace("\xa0", " ").replace(" ", " ").replace("​", "")
-    return unicodedata.normalize("NFC", texto)
+    texto = texto.replace("​", "")
+    return unicodedata.normalize("NFKC", texto)
 
 
-def _quitar_numero_pagina(texto: str, numero: int) -> str:
+def _quitar_numero_pagina(texto: str, folio: int) -> str:
     """Quita el folio de la página, en cualquiera de sus tres formas.
 
-    Medidas sobre este documento, entre las páginas 12 y 121:
+    `folio` es el número **impreso**, que no siempre coincide con el índice
+    de la página dentro del PDF: si el archivo trae hojas de cortesía sin
+    numerar, van desfasados. El desfase lo declara el catálogo y lo calcula
+    `--detectar-folio`.
+
+    Medidas sobre el documento del Jardín Botánico, entre las páginas 12 y
+    121:
 
     - renglón propio, `"12\\nINTRODUCCIÓN"` — 39 páginas;
     - pegado a la palabra, `"13medicinal de algunas..."` — 30 páginas;
@@ -224,23 +205,233 @@ def _quitar_numero_pagina(texto: str, numero: int) -> str:
     respeta por eso: en "1234 kg" el "12" de la página 12 no es folio.
     """
     texto = texto.lstrip()
-    folio = str(numero)
+    esperado = str(folio)
 
-    if texto.startswith(folio):
-        resto = texto[len(folio) :]
+    if texto.startswith(esperado):
+        resto = texto[len(esperado) :]
         if resto[:1].isspace() or resto[:1].isalpha():
             texto = resto.lstrip()
 
     # Algunas páginas lo repiten al final, también en renglón propio.
     lineas = texto.rstrip().split("\n")
-    if lineas and lineas[-1].strip() == folio:
+    if lineas and lineas[-1].strip() == esperado:
         texto = "\n".join(lineas[:-1])
 
     return texto
 
 
-def _detectar_plantilla(paginas: list[str]) -> set[str]:
-    """Renglones que se repiten en tantas páginas que no son contenido."""
+# --- Páginas de dos columnas --------------------------------------------
+#
+# Solo aplica al texto extraído en modo `layout`, que es el único que
+# conserva la posición horizontal de cada palabra. Leído renglón a renglón,
+# una página de dos columnas entreteje dos textos que no tienen nada que
+# ver, frase a frase. Son 82 de las 260 páginas de Sembrando Biodiversidad.
+#
+# La calle se detecta por lo que es: una franja vertical en blanco en casi
+# todos los renglones **que tienen texto a ambos lados**. Solo cuentan esos
+# renglones, porque un título corto o un pie centrado no dicen nada sobre
+# si la página tiene columnas.
+
+# Mínimo de renglones que cruzan la calle. Con menos, dos renglones sueltos
+# bastarían para partir en dos una página de texto corrido.
+RENGLONES_QUE_CRUZAN = 6
+
+# El mismo mínimo, dentro de un bloque suelto de la página. Se baja porque
+# una lista de plagas a dos columnas rara vez pasa de cuatro o cinco
+# renglones, y con seis se quedaba sin detectar.
+RENGLONES_QUE_CRUZAN_EN_BLOQUE = 4
+
+# Qué proporción de esos renglones debe estar en blanco en la franja.
+PROPORCION_EN_BLANCO = 0.92
+
+# Ancho mínimo de la calle, en caracteres. Una separación de una o dos
+# columnas es el espaciado normal entre palabras.
+ANCHO_MINIMO_CALLE = 4
+
+
+def _detectar_calles(
+    lineas: list[str], renglones_minimos: int = RENGLONES_QUE_CRUZAN
+) -> list[tuple[int, int]]:
+    """Franjas verticales en blanco que separan columnas de texto."""
+    con_texto = [linea for linea in lineas if linea.strip()]
+    if not con_texto:
+        return []
+
+    ancho = max(len(linea) for linea in con_texto)
+    candidatas: list[int] = []
+
+    for columna in range(1, ancho):
+        cruzan = 0
+        blancas = 0
+        for linea in con_texto:
+            if not linea[:columna].strip() or not linea[columna + 1 :].strip():
+                continue
+            cruzan += 1
+            if columna >= len(linea) or linea[columna] == " ":
+                blancas += 1
+
+        if cruzan >= renglones_minimos and blancas / cruzan >= PROPORCION_EN_BLANCO:
+            candidatas.append(columna)
+
+    agrupadas: list[tuple[int, int]] = []
+    for columna in candidatas:
+        if agrupadas and columna == agrupadas[-1][1] + 1:
+            agrupadas[-1] = (agrupadas[-1][0], columna)
+        else:
+            agrupadas.append((columna, columna))
+
+    return [
+        (inicio, fin)
+        for inicio, fin in agrupadas
+        if fin - inicio + 1 >= ANCHO_MINIMO_CALLE
+    ]
+
+
+def _partir_por_calle(lineas: list[str], calle: tuple[int, int]) -> list[str]:
+    """Devuelve los renglones de la izquierda y luego los de la derecha.
+
+    Un renglón que **invade** la calle —un título que cruza la página
+    entera— se deja entero en el bloque izquierdo en lugar de partirlo por
+    la mitad: la detección tolera hasta un 8 % de renglones así, y cortarlos
+    destruiría el texto en vez de ordenarlo.
+    """
+    inicio, fin = calle
+    izquierda: list[str] = []
+    derecha: list[str] = []
+
+    for linea in lineas:
+        if linea[inicio : fin + 1].strip():
+            izquierda.append(linea)
+            continue
+
+        parte_izquierda = linea[:inicio].rstrip()
+        parte_derecha = linea[fin + 1 :].rstrip() if len(linea) > fin else ""
+
+        if parte_izquierda:
+            izquierda.append(parte_izquierda)
+        if parte_derecha:
+            derecha.append(parte_derecha)
+
+    # El renglón en blanco entre los dos bloques cierra el párrafo: sin él,
+    # la última frase de la columna izquierda se pegaría a la primera de la
+    # derecha, que es justo lo que se está corrigiendo.
+    return izquierda + [""] + derecha
+
+
+def _separar_columnas(texto: str) -> tuple[str, bool]:
+    """Reordena las columnas de una página para leerlas en orden.
+
+    Se intenta primero con la página entera. Si no hay calle que la cruce
+    de arriba abajo, se prueba **bloque a bloque**, separando por los
+    renglones en blanco que la maquetación ya deja entre secciones.
+
+    Los dos pasos hacen falta porque hay páginas mixtas, y son las que más
+    daño hacían: la ficha de cada especie trae una sección de prosa de una
+    sola columna y, debajo, la lista de plagas y enfermedades en dos. Con
+    la detección solo por página, esa lista se quedaba entretejida —«Trips
+    (Thrips tabaci Lind.): generan Trozador (Agriotes lineatus L.):
+    manchas plateadas en las hojas conocido como gusano del alambre»—, y es
+    justo el contenido que responde la consulta insignia del CU2.
+
+    En un bloque se exigen menos renglones que en una página entera: una
+    lista de plagas a dos columnas rara vez pasa de cuatro o cinco.
+    """
+    lineas = texto.split("\n")
+
+    calles = _detectar_calles(lineas)
+    if calles:
+        mayor = max(calles, key=lambda calle: calle[1] - calle[0])
+        return "\n".join(_partir_por_calle(lineas, mayor)), True
+
+    bloques: list[list[str]] = [[]]
+    for linea in lineas:
+        if linea.strip():
+            bloques[-1].append(linea)
+        elif bloques[-1]:
+            bloques.append([])
+
+    resultado: list[str] = []
+    se_partio = False
+
+    for bloque in bloques:
+        calles_bloque = _detectar_calles(bloque, RENGLONES_QUE_CRUZAN_EN_BLOQUE)
+        if calles_bloque:
+            mayor = max(calles_bloque, key=lambda calle: calle[1] - calle[0])
+            resultado.extend(_partir_por_calle(bloque, mayor))
+            se_partio = True
+        else:
+            resultado.extend(bloque)
+        resultado.append("")
+
+    return "\n".join(resultado), se_partio
+
+
+def _detectar_desfase_folio(crudas: list[tuple[int, str]]) -> None:
+    """Diagnóstico: en cuántas páginas encaja cada desfase posible.
+
+    No se ejecuta durante la ingesta. Sirve para rellenar el catálogo con
+    un número medido en lugar de uno mirado por encima, que es donde se
+    cuela el error: en la cartilla de 2022 hay páginas sueltas con cifras
+    que parecen folios y no lo son, y una sola muestra habría dado un
+    desfase equivocado para todo el documento.
+    """
+    conteo: Counter[int] = Counter()
+
+    for numero, texto in crudas:
+        limpio = texto.strip()
+        if not limpio:
+            continue
+
+        candidatos: set[int] = set()
+
+        inicial = re.match(r"(\d{1,3})", limpio)
+        if inicial:
+            candidatos.add(int(inicial.group(1)))
+
+        lineas = [linea.strip() for linea in limpio.split("\n") if linea.strip()]
+        if lineas:
+            final = re.search(r"(\d{1,3})\s*$", lineas[-1])
+            if final:
+                candidatos.add(int(final.group(1)))
+
+        for candidato in candidatos:
+            desfase = numero - candidato
+            if 0 <= desfase <= 20:
+                conteo[desfase] += 1
+
+    total = sum(1 for _, texto in crudas if texto.strip())
+    print(f"\nDesfase del folio, sobre {total} páginas con texto:")
+
+    if not conteo:
+        print("  No se encontró ningún folio. El documento puede no llevarlo.")
+        return
+
+    for desfase, veces in conteo.most_common(5):
+        print(
+            f"  desfase {desfase:2d}  encaja en {veces:3d} páginas "
+            f"({100 * veces / total:.0f} %)"
+        )
+
+    mejor, veces = conteo.most_common(1)[0]
+    if veces < total * 0.4:
+        print(
+            "\n  Ninguno encaja en la mayoría de las páginas. Compruebe a "
+            "mano antes de fiarse de este número."
+        )
+    else:
+        print(f"\n  Sugerido para el catálogo: desfase_folio={mejor}")
+
+
+def _detectar_plantilla(paginas: list[str], paginas_para_plantilla: int) -> set[str]:
+    """Renglones que se repiten en tantas páginas que no son contenido.
+
+    El umbral lo pone el catálogo por documento. En prosa corrida basta con
+    10; en un documento organizado en fichas de especie hay que subirlo
+    mucho, porque ahí un nombre de familia botánica se repite en decenas de
+    páginas siendo contenido legítimo. Medido en el catálogo de plantas:
+    `Compositae` sale en 12 páginas y `Lamiaceae` en 11, y con el umbral de
+    10 se irían las dos.
+    """
     apariciones: dict[str, int] = {}
 
     for texto in paginas:
@@ -252,7 +443,7 @@ def _detectar_plantilla(paginas: list[str]) -> set[str]:
     return {
         linea
         for linea, veces in apariciones.items()
-        if veces >= PAGINAS_PARA_PLANTILLA
+        if veces >= paginas_para_plantilla
     }
 
 
@@ -276,8 +467,8 @@ def _es_titulo(linea: str) -> bool:
 def _empieza_parrafo(anterior: str, linea: str) -> bool:
     """Decide si `linea` abre un párrafo nuevo o continúa el anterior.
 
-    En este PDF no hay renglones en blanco entre párrafos, así que el corte
-    se deduce: el renglón anterior cerró una frase y este empieza en
+    En estos PDF no hay renglones en blanco entre párrafos, así que el
+    corte se deduce: el renglón anterior cerró una frase y este empieza en
     mayúscula, o uno de los dos es un título, o este arranca con viñeta.
     """
     if not anterior:
@@ -318,8 +509,9 @@ def _reconstruir_parrafos(paginas: list[str], plantilla: set[str]) -> list[str]:
     """Convierte renglones de página en párrafos.
 
     Las páginas se procesan **encadenadas, no una a una**: un párrafo que
-    cruza el salto de página tiene que quedar entero. La página 13 de este
-    documento empieza a mitad de la frase que abrió la 12.
+    cruza el salto de página tiene que quedar entero. La página 13 del
+    documento del Jardín Botánico empieza a mitad de la frase que abrió la
+    12.
     """
     parrafos: list[str] = []
     actual = ""
@@ -355,10 +547,11 @@ def _reconstruir_parrafos(paginas: list[str], plantilla: set[str]) -> list[str]:
 # Tablas de especies
 # =========================================================================
 #
-# El documento trae cuatro tablas de especies aptas para el clima de
-# Bogotá, con las columnas: nombre común, nombre científico, familia,
-# exótica y nativa. Al extraer el PDF las columnas se colapsan en una fila
-# corrida y las dos últimas quedan reducidas a una `x` suelta:
+# El documento del Jardín Botánico trae cuatro tablas de especies aptas
+# para el clima de Bogotá, con las columnas: nombre común, nombre
+# científico, familia, exótica y nativa. Al extraer el PDF las columnas se
+# colapsan en una fila corrida y las dos últimas quedan reducidas a una `x`
+# suelta:
 #
 #     Nombre común Nombre científico Familia Exótica Nativa
 #     Feijoa Acca sellowiana (O.Berg) Burret Myrtaceae x
@@ -465,18 +658,22 @@ def _cola_para_solape(texto: str, caracteres: int) -> str:
     return trozo[espacio + 1 :] if espacio != -1 else trozo
 
 
-def _trocear(parrafos: list[str]) -> list[str]:
+def _trocear(parrafos: list[str], caracteres_por_token: float) -> list[str]:
     """Agrupa párrafos en fragmentos de 300–500 tokens con solape.
 
     Se acumula por párrafos completos: el corte cae siempre en un límite de
     párrafo, nunca dentro de una frase.
     """
+    maximo = int(TOKENS_OBJETIVO * caracteres_por_token)
+    solape = int(TOKENS_SOLAPE * caracteres_por_token)
+    tope = int(TOKENS_TOPE * caracteres_por_token)
+
     unidades: list[str] = []
     for parrafo in parrafos:
-        if len(parrafo) <= CARACTERES_MAXIMO:
+        if len(parrafo) <= maximo:
             unidades.append(parrafo)
         else:
-            unidades.extend(_partir_por_frases(parrafo, CARACTERES_MAXIMO))
+            unidades.extend(_partir_por_frases(parrafo, maximo))
 
     fragmentos: list[str] = []
     actual = ""
@@ -484,9 +681,9 @@ def _trocear(parrafos: list[str]) -> list[str]:
     for unidad in unidades:
         candidato = f"{actual} {unidad}".strip() if actual else unidad
 
-        if actual and len(candidato) > CARACTERES_MAXIMO:
+        if actual and len(candidato) > maximo:
             fragmentos.append(actual)
-            cola = _cola_para_solape(actual, CARACTERES_SOLAPE)
+            cola = _cola_para_solape(actual, solape)
             actual = f"{cola} {unidad}".strip() if cola else unidad
         else:
             actual = candidato
@@ -495,11 +692,10 @@ def _trocear(parrafos: list[str]) -> list[str]:
         fragmentos.append(actual)
 
     # Red de seguridad frente al truncado silencioso del modelo.
-    excedidos = [pieza for pieza in fragmentos if len(pieza) > CARACTERES_TOPE]
+    excedidos = [pieza for pieza in fragmentos if len(pieza) > tope]
     if excedidos:
         raise RuntimeError(
-            f"{len(excedidos)} fragmentos superan el tope de "
-            f"{CARACTERES_TOPE} caracteres."
+            f"{len(excedidos)} fragmentos superan el tope de {tope} caracteres."
         )
 
     return fragmentos
@@ -510,7 +706,9 @@ def _trocear(parrafos: list[str]) -> list[str]:
 # =========================================================================
 
 
-def _informar(fragmentos: list[str], muestra: int) -> None:
+def _informar(
+    fragmentos: list[str], muestra: int, caracteres_por_token: float
+) -> None:
     """Imprime la distribución de tamaños y unos cuantos fragmentos."""
     longitudes = [len(pieza) for pieza in fragmentos]
 
@@ -520,14 +718,14 @@ def _informar(fragmentos: list[str], muestra: int) -> None:
         f"{int(statistics.median(longitudes))}  max={max(longitudes)}"
     )
     print(
-        f"Tokens estimados (a {CARACTERES_POR_TOKEN} car./token)  "
-        f"min={int(min(longitudes) / CARACTERES_POR_TOKEN)}  "
-        f"mediana={int(statistics.median(longitudes) / CARACTERES_POR_TOKEN)}  "
-        f"max={int(max(longitudes) / CARACTERES_POR_TOKEN)}"
+        f"Tokens estimados (a {caracteres_por_token} car./token)  "
+        f"min={int(min(longitudes) / caracteres_por_token)}  "
+        f"mediana={int(statistics.median(longitudes) / caracteres_por_token)}  "
+        f"max={int(max(longitudes) / caracteres_por_token)}"
     )
 
     dentro = sum(
-        1 for largo in longitudes if 300 <= largo / CARACTERES_POR_TOKEN <= 500
+        1 for largo in longitudes if 300 <= largo / caracteres_por_token <= 500
     )
     print(
         f"Dentro del objetivo de 300–500 tokens: {dentro}/{len(fragmentos)} "
@@ -540,7 +738,7 @@ def _informar(fragmentos: list[str], muestra: int) -> None:
         print(pieza)
 
 
-async def _medir_tokens(fragmentos: list[str]) -> None:
+async def _medir_tokens(fragmentos: list[str], caracteres_por_token: float) -> None:
     """Cuenta los tokens reales de **todos** los fragmentos.
 
     Se miden todos y no una muestra porque muestrear diez daba ratios
@@ -550,7 +748,8 @@ async def _medir_tokens(fragmentos: list[str]) -> None:
 
     Es una comprobación, no una dependencia del troceo, pero es la que
     permite declarar en el documento de grado el tamaño real de los
-    fragmentos en lugar del estimado.
+    fragmentos en lugar del estimado, y la que desbloquea `ratio_medida` en
+    el catálogo.
     """
     from app.core.gemini import MODELO_EMBEDDING, obtener_cliente
 
@@ -580,8 +779,18 @@ async def _medir_tokens(fragmentos: list[str]) -> None:
         f"({100 * dentro / len(tokens):.0f} %)"
     )
     print(
-        f"Ratio real del corpus: {caracteres / sum(tokens):.2f} car./token "
-        f"(la usada para trocear es {CARACTERES_POR_TOKEN})"
+        f"Ratio media del corpus: {caracteres / sum(tokens):.2f} car./token "
+        f"(la usada para trocear es {caracteres_por_token})"
+    )
+
+    # La media no es lo que hay que poner en el catálogo. Se dimensiona por
+    # el extremo denso, que es lo que mete el máximo dentro del intervalo
+    # (ADR-0009, decisión 4).
+    ratios = sorted(len(p) / t for p, t in zip(fragmentos, tokens))
+    percentil_10 = ratios[max(0, int(0.10 * len(ratios)) - 1)]
+    print(
+        f"Extremo denso (percentil 10): {percentil_10:.2f} car./token "
+        "— es el valor que se lleva al catálogo."
     )
 
 
@@ -590,29 +799,31 @@ async def _medir_tokens(fragmentos: list[str]) -> None:
 # =========================================================================
 
 
-async def _ingerir(fragmentos: list[str], reingerir: bool) -> None:
+async def _ingerir(
+    fuente: FuenteDocumento, fragmentos: list[str], reingerir: bool
+) -> None:
     """Escribe la fuente y sus fragmentos vectorizados en Supabase."""
     await abrir_pool()
     try:
-        fuente = await obtener_fuente_por_url(URL)
+        fila = await obtener_fuente_por_url(fuente.url)
 
-        if fuente is not None:
-            existentes = await contar_fragmentos_oficiales(fuente.id)
+        if fila is not None:
+            existentes = await contar_fragmentos_oficiales(fila.id)
             if not reingerir:
                 raise SystemExit(
-                    f"Esa fuente ya está ingerida (fuente_id={fuente.id}, "
+                    f"Esa fuente ya está ingerida (fuente_id={fila.id}, "
                     f"{existentes} fragmentos). Repetir la ingesta "
                     "duplicaría el corpus y los duplicados coparían el "
                     "top-k con el mismo texto. Use --reingerir para "
                     "rehacerla."
                 )
             print(
-                f"Fuente ya registrada (fuente_id={fuente.id}); se "
+                f"Fuente ya registrada (fuente_id={fila.id}); se "
                 f"reemplazan sus {existentes} fragmentos."
             )
         else:
-            fuente = await crear_fuente(ENTIDAD, TITULO, URL)
-            print(f"Fuente registrada: fuente_id={fuente.id}")
+            fila = await crear_fuente(fuente.entidad, fuente.titulo, fuente.url)
+            print(f"Fuente registrada: fuente_id={fila.id}")
 
         print(f"Vectorizando {len(fragmentos)} fragmentos...")
         vectores: list[list[float]] = []
@@ -622,7 +833,7 @@ async def _ingerir(fragmentos: list[str], reingerir: bool) -> None:
             print(f"  {len(vectores)}/{len(fragmentos)}")
 
         escritos = await reemplazar_fragmentos_oficiales(
-            fuente.id,
+            fila.id,
             [
                 (orden, contenido, vector)
                 for orden, (contenido, vector) in enumerate(
@@ -630,7 +841,7 @@ async def _ingerir(fragmentos: list[str], reingerir: bool) -> None:
                 )
             ],
         )
-        print(f"\nEscritos {escritos} fragmentos para fuente_id={fuente.id}")
+        print(f"\nEscritos {escritos} fragmentos para fuente_id={fila.id}")
     finally:
         await cerrar_pool()
 
@@ -640,21 +851,23 @@ async def main() -> None:
         description="Ingesta de una fuente oficial al RAG (CU2)."
     )
     analizador.add_argument(
+        "--fuente", help="Clave del documento en scripts/catalogo_fuentes.py."
+    )
+    analizador.add_argument(
+        "--listar", action="store_true", help="Muestra el catálogo y termina."
+    )
+    analizador.add_argument(
         "--pdf", type=Path, help="Ruta local al PDF. Si falta, se descarga."
     )
     analizador.add_argument(
         "--desde-pagina",
         type=int,
-        default=PAGINA_INICIAL,
-        help=f"Primera página con contenido, contando desde 1 "
-        f"(por defecto {PAGINA_INICIAL}).",
+        help="Primera página con contenido. Por defecto, la del catálogo.",
     )
     analizador.add_argument(
         "--hasta-pagina",
         type=int,
-        default=PAGINA_FINAL,
-        help=f"Última página con contenido, inclusive "
-        f"(por defecto {PAGINA_FINAL}).",
+        help="Última página con contenido. Por defecto, la del catálogo.",
     )
     analizador.add_argument(
         "--simular",
@@ -674,7 +887,34 @@ async def main() -> None:
         action="store_true",
         help="Contrasta la ratio caracteres/token contra la API.",
     )
+    analizador.add_argument(
+        "--detectar-folio",
+        action="store_true",
+        help="Calcula el desfase del folio y termina, sin trocear.",
+    )
+    analizador.add_argument(
+        "--ratio",
+        type=float,
+        help=(
+            "Ratio caracteres/token solo para esta corrida, para probar "
+            "valores antes de fijarlos. No habilita la ingesta real: eso "
+            "exige escribirla en el catálogo."
+        ),
+    )
     argumentos = analizador.parse_args()
+
+    if argumentos.listar:
+        print("Fuentes declaradas:\n")
+        print(describir())
+        return
+
+    if not argumentos.fuente:
+        raise SystemExit(
+            "Falta --fuente. Vea las disponibles con:\n"
+            "    python -m scripts.ingesta_fuente --listar"
+        )
+
+    fuente = obtener(argumentos.fuente)
 
     try:
         from pypdf import PdfReader
@@ -685,52 +925,117 @@ async def main() -> None:
             "    pip install -r requirements-scripts.txt"
         ) from None
 
-    ruta = _obtener_pdf(argumentos.pdf)
+    print(f"Fuente: {fuente.clave} — {fuente.titulo}")
+    if fuente.nota:
+        print(f"Nota del catálogo: {fuente.nota}")
+
+    ruta = _obtener_pdf(fuente, argumentos.pdf)
     lector = PdfReader(str(ruta))
     total = len(lector.pages)
-    ultima = min(argumentos.hasta_pagina, total)
-    print(
-        f"Páginas: {total}. Se ingieren de la {argumentos.desde_pagina} "
-        f"a la {ultima}."
-    )
+
+    primera = argumentos.desde_pagina or fuente.pagina_inicial
+    ultima = min(argumentos.hasta_pagina or fuente.pagina_final, total)
+    print(f"Páginas: {total}. Se ingieren de la {primera} a la {ultima}.")
+
+    print(f"Modo de extracción: {fuente.modo_extraccion}")
+
+    crudas: list[tuple[int, str]] = []
+    for numero in range(primera, ultima + 1):
+        bruto = (
+            lector.pages[numero - 1].extract_text(
+                extraction_mode=fuente.modo_extraccion
+            )
+            or ""
+        )
+        crudas.append((numero, _normalizar_texto(bruto)))
+
+    if argumentos.detectar_folio:
+        _detectar_desfase_folio(crudas)
+        return
 
     paginas: list[str] = []
-    for numero in range(argumentos.desde_pagina, ultima + 1):
-        crudo = lector.pages[numero - 1].extract_text() or ""
-        limpio = _quitar_numero_pagina(_normalizar_espacios(crudo), numero)
-        if limpio.strip():
-            paginas.append(limpio)
+    saltadas = 0
+    partidas = 0
+
+    for numero, texto in crudas:
+        limpio = _quitar_numero_pagina(texto, numero - fuente.desfase_folio)
+
+        if not limpio.strip():
+            continue
+
+        # Se decide con el texto ya sin folio y antes de partir columnas: la
+        # marca está en el primer renglón de la página.
+        primeros = [linea.strip() for linea in limpio.split("\n") if linea.strip()]
+        if primeros and primeros[0].startswith(fuente.saltar_pagina_si_empieza_por or ()):
+            saltadas += 1
+            continue
+
+        if fuente.separar_columnas:
+            limpio, se_partio = _separar_columnas(limpio)
+            partidas += se_partio
+
+        paginas.append(limpio)
 
     print(f"Páginas con texto: {len(paginas)}")
+    if saltadas:
+        print(
+            f"Páginas saltadas por empezar con "
+            f"{list(fuente.saltar_pagina_si_empieza_por)}: {saltadas}"
+        )
+    if partidas:
+        print(f"Páginas leídas por columnas: {partidas}")
 
-    plantilla = _detectar_plantilla(paginas)
+    plantilla = _detectar_plantilla(paginas, fuente.paginas_para_plantilla)
     if plantilla:
-        print(f"Renglones descartados por repetirse en muchas páginas: {len(plantilla)}")
+        print(
+            f"Renglones descartados por repetirse en {fuente.paginas_para_plantilla} "
+            f"páginas o más: {len(plantilla)}"
+        )
         for linea in sorted(plantilla):
             print(f"    {linea[:80]}")
 
     parrafos = _reconstruir_parrafos(paginas, plantilla)
     print(f"Párrafos reconstruidos: {len(parrafos)}")
 
-    parrafos, tablas = _limpiar_tablas(parrafos)
-    if tablas:
-        print(
-            f"Tablas de especies saneadas: {tablas} "
-            "(se retiran las columnas Exótica/Nativa, ilegibles tras la "
-            "extracción)"
-        )
+    if fuente.limpiar_tablas_especies:
+        parrafos, tablas = _limpiar_tablas(parrafos)
+        if tablas:
+            print(
+                f"Tablas de especies saneadas: {tablas} "
+                "(se retiran las columnas Exótica/Nativa, ilegibles tras la "
+                "extracción)"
+            )
 
-    fragmentos = _trocear(parrafos)
-    _informar(fragmentos, argumentos.muestra)
+    ratio = argumentos.ratio or fuente.caracteres_por_token
+    if argumentos.ratio:
+        print(f"Ratio de esta corrida: {ratio} (el catálogo dice {fuente.caracteres_por_token})")
+
+    fragmentos = _trocear(parrafos, ratio)
+    _informar(fragmentos, argumentos.muestra, ratio)
 
     if argumentos.medir_tokens:
-        await _medir_tokens(fragmentos)
+        await _medir_tokens(fragmentos, ratio)
 
     if argumentos.simular:
         print("\n--simular: no se ha vectorizado ni escrito nada.")
         return
 
-    await _ingerir(fragmentos, argumentos.reingerir)
+    # La ratio calibrada contra otro documento no vale: la nomenclatura
+    # botánica tokeniza más denso que la prosa y los fragmentos se saldrían
+    # del intervalo de la Fase 4 sin que nada lo indicara (ADR-0009,
+    # decisión 4). Se bloquea aquí y no antes para que simular y medir
+    # sigan funcionando, que es justo lo que hay que hacer para desbloquearlo.
+    if not fuente.ratio_medida:
+        raise SystemExit(
+            f"\nLa fuente {fuente.clave!r} tiene ratio_medida=False: su "
+            f"valor de {fuente.caracteres_por_token} car./token está "
+            "heredado de otro documento y no se ha comprobado contra este.\n"
+            "Mídalo y escríbalo en el catálogo antes de ingerir:\n"
+            f"    python -m scripts.ingesta_fuente --fuente {fuente.clave} "
+            "--simular --medir-tokens"
+        )
+
+    await _ingerir(fuente, fragmentos, argumentos.reingerir)
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ documento queda marcado como pendiente de corrección.
 | [0011](0011-fragmento-comunitario-solo-especies.md) | El fragmento comunitario lleva solo las especies | Aceptada; sustituye la composición del [0004](0004-cultivo-y-fragmento-comunitario.md) | Fase 3 / Fase 2 (CU4) |
 | [0012](0012-memoria-de-conversacion.md) | La memoria empieza tras la compuerta, y el `wamid` sale de `mensaje` | Aceptada | Fase 3 / Fase 4 (§6) |
 | [0013](0013-agente-orquestador.md) | El agente enruta y no relata; el mensaje completo conserva su oportunidad | Aceptada | Fase 2 (§4) |
+| [0014](0014-catalogo-de-fuentes-oficiales.md) | Las fuentes oficiales se declaran en un catálogo, y sus parámetros son mediciones | Aceptada; amplía el [0009](0009-ingesta-de-fuentes-oficiales.md) | Fase 4 (§7) |
 
 ## Documentos pendientes de corrección
 
