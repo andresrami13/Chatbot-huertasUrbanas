@@ -1180,8 +1180,21 @@ async def main() -> None:
 
     print(f"Modo de extracción: {fuente.modo_extraccion}")
 
+    excluidas = {
+        numero
+        for desde, hasta in fuente.paginas_excluidas
+        for numero in range(desde, hasta + 1)
+    }
+    if excluidas:
+        print(
+            f"Páginas excluidas del medio: {len(excluidas)} "
+            f"{list(fuente.paginas_excluidas)}"
+        )
+
     crudas: list[tuple[int, str]] = []
     for numero in range(primera, ultima + 1):
+        if numero in excluidas:
+            continue
         bruto = (
             lector.pages[numero - 1].extract_text(
                 extraction_mode=fuente.modo_extraccion

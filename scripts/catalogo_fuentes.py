@@ -80,6 +80,16 @@ class FuenteDocumento:
     # que el renglón entero no tenga nada más.
     folio_desfase_variable: bool = False
 
+    # Tramos de páginas que se descartan **del medio** del documento,
+    # inclusive ambos extremos. El rango `pagina_inicial`–`pagina_final`
+    # recorta la cabecera y la cola; esto recorta secciones interiores.
+    #
+    # Criterio, fijado con el autor el 15/08/2026: entra lo que le dice a
+    # una líder de huerta **cómo** hacer algo en Bogotá. Sale lo que
+    # describe dónde más se hace, la política nacional, o tecnología que
+    # ella no va a usar. Ante la duda, se recorta.
+    paginas_excluidas: tuple[tuple[int, int], ...] = ()
+
     # Sustituciones de carácter a aplicar nada más extraer, para PDF cuya
     # capa de texto viene con la codificación rota.
     #
@@ -459,19 +469,25 @@ CATALOGO: dict[str, FuenteDocumento] = {
             "Manual de compostaje del agricultor. Experiencias en América "
             "Latina"
         ),
-        url="PENDIENTE",
+        url="https://www.fao.org/4/i3388s/i3388s.pdf",
         archivo="Manual de compostaje del agricultor.pdf",
-        # 1 portada, 3 portadilla, 4 avisos legales, 5 equipo técnico, 6
-        # presentación, 7 resumen ejecutivo, 8 y 9 índice y lista de
-        # figuras. La 15 abre el capítulo 1 (folio impreso 13). De la 103 a
-        # la 108 va la bibliografía y la 109 son anotaciones en blanco.
-        pagina_inicial=15,
+        # Empieza en la 19 y no en la 15: la sección 1 es «Papel de la FAO
+        # en la preservación del suelo», prosa institucional de la entidad,
+        # el mismo caso que las presentaciones que se recortan en los demás.
+        # La 19 abre la sección 2. De la 103 a la 108 va la bibliografía.
+        pagina_inicial=19,
         pagina_final=101,
-        # Medida sobre sus fragmentos: media 4.11, extremo denso 3.32.
-        caracteres_por_token=3.32,
+        # La sección 6, «Experiencias en América Latina», son 18 páginas de
+        # casos en Nicaragua, Honduras, Paraguay y Neiva: otros climas y
+        # otras alturas. Fuera por el criterio de Bogotá. Se conservan los
+        # fundamentos —secciones 2 a 5— y el anexo, que son los mismos en
+        # cualquier sitio, y por eso este documento sí entra.
+        paginas_excluidas=((79, 96),),
+        # Medida sobre el documento ya recortado: extremo denso 3.27.
+        caracteres_por_token=3.27,
         # Constante y comprobado en las 100 páginas que llevan folio.
         desfase_folio=2,
-        ratio_medida=False,
+        ratio_medida=True,
         nota=(
             "Primera fuente que no es del Jardín Botánico. Su alcance es "
             "América Latina, no Bogotá: el compostaje es de los temas que "
@@ -486,19 +502,28 @@ CATALOGO: dict[str, FuenteDocumento] = {
             "Producción agroecológica urbana - periurbana y su contribución "
             "en la seguridad alimentaria de Colombia"
         ),
-        url="PENDIENTE",
+        url=(
+            "https://libros.unad.edu.co/index.php/selloeditorial/catalog/"
+            "download/11/9/366?inline=1"
+        ),
         archivo="Producción+agroecológica+(Digital).pdf",
-        # De la 1 a la 14 van portada, autores, créditos, ficha catalográfica,
-        # reseñas, contenido y listas de tablas y figuras. La 15 es la
-        # presentación, prosa institucional; la 16 abre la introducción, que
-        # es el mismo criterio con el que entraron los otros. De la 204 en
-        # adelante van las referencias.
-        pagina_inicial=16,
-        pagina_final=203,
+        # **Entra solo el capítulo 3**, de la 63 a la 141. Es el único que
+        # le dice a una líder de huerta cómo hacer algo: hidroponía,
+        # aeroponía, acuaponía, organoponía, materia orgánica, compostaje,
+        # lombricultura, captación de agua y control alelopático.
+        #
+        # Fuera los otros cuatro, por el criterio de Bogotá:
+        #   cap. 1 (18-46)    contexto global y colombiano; describe, no enseña
+        #   cap. 2 (47-62)    experiencias en las regiones Pacífica, Caribe,
+        #                     Orinoquía y Amazonía, que son tierra caliente
+        #   cap. 4 (142-178)  agricultura digital: agrovoltaica, IoT, sensores
+        #   cap. 5 (179-203)  política nacional de seguridad alimentaria
+        pagina_inicial=63,
+        pagina_final=141,
         # Elegida COMPARANDO, no por la regla del extremo denso, y es el
-        # primer documento en que esa regla no sirve. Medido sobre sus
-        # fragmentos: media 4.16, extremo denso 3.18. Pero con 3.18 solo el
-        # 58 % cae en el intervalo, con 3.6 el 69 % y con 3.9 el 73 %.
+        # primer documento en que esa regla no sirve. Medida sobre el
+        # capítulo 3 ya recortado: extremo denso 3.33, pero con 3.33 cae en
+        # el intervalo el 78 % de los fragmentos y con 3.9 el 82 %.
         #
         # El motivo es la mecánica del troceo: cuando un párrafo largo llega
         # detrás de uno corto, el corto se cierra tal cual y sale un
@@ -511,7 +536,7 @@ CATALOGO: dict[str, FuenteDocumento] = {
         # El desfase se reparte entre -1, -2, -3 y -4: hay páginas sin
         # numerar intercaladas, como en la cartilla de 2011.
         folio_desfase_variable=True,
-        ratio_medida=False,
+        ratio_medida=True,
         nota=(
             "Libro académico. Lleva cabecera repetida en 92 páginas y "
             "encabezados de capítulo en otras tantas, que los quita la "
@@ -529,7 +554,11 @@ CATALOGO: dict[str, FuenteDocumento] = {
             "Protocolo de agricultura urbana y periurbana agroecológica en "
             "espacio público, en el marco del Decreto 315 de 2024"
         ),
-        url="PENDIENTE",
+        url=(
+            "https://jbb.gov.co/documentos/agricultura/2025/marzo/"
+            "Protocolo_de_Agricultura_Urbana_y_Periurbana_Agroecologica_"
+            "en_Espacio_Publico.pdf"
+        ),
         archivo=(
             "Protocolo_de_Agricultura_Urbana_y_Periurbana_Agroecologica_"
             "en_Espacio_Publico.pdf"
@@ -566,7 +595,7 @@ CATALOGO: dict[str, FuenteDocumento] = {
             ("<", '"'),
             ("=", '"'),
         ),
-        ratio_medida=False,
+        ratio_medida=True,
         nota=(
             "El único de los tres que es normativo y no agronómico: fija "
             "quién autoriza una huerta en espacio público, qué se puede "

@@ -48,7 +48,7 @@ falta la prueba con celular.
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
 | Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Cuatro: `agente_v1`, `extraccion_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1` |
-| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py`, `scripts/catalogo_fuentes.py` | **568 fragmentos de seis fuentes en Supabase** |
+| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py`, `scripts/catalogo_fuentes.py` | **774 fragmentos de nueve fuentes en Supabase** |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
