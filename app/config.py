@@ -55,9 +55,33 @@ class Settings(BaseSettings):
     # El valor por defecto vive aquí, no solo en Railway, para que el
     # repositorio deje constancia de con qué se probó.
     #
-    # 0.68 y no el 0.70 de la Fase 4: ver ADR-0010. Medido contra el corpus
-    # oficial ya ingerido, 0.70 deja sin respuesta 4 de 12 consultas
-    # legítimas del CU2, incluida la insignia.
+    # Se queda en 0.68 (ADR-0010), pero **ya no significa lo mismo**, y eso
+    # importa más que el número.
+    #
+    # Hasta ahora el umbral decidía responder o callar. Con el respaldo del
+    # modelo activo (`CU2_RESPALDO_MODELO`, aquí debajo) decide otra cosa:
+    # **citar o no citar**. Por encima se responde con la guía oficial y su
+    # atribución; por debajo responde el modelo, sin fuente ninguna.
+    #
+    # Y para ese oficio 0.68 es mejor que bajarlo. Medido con
+    # `scripts/calibrar_umbral_real.py` sobre las consultas de la primera
+    # prueba con celular, y comprobado con el CU2 corriendo de verdad: al
+    # bajar a 0.65 aparecía un modo de fallo que a 0.68 no existe —consultas
+    # que pasan el filtro, no encuentran nada útil y terminan respondiendo
+    # "no tengo la información sobre eso" con `Fuente: Jardín Botánico` al
+    # pie—. Una cita al pie de una frase vacía es peor que no responder.
+    #
+    # Dos mediciones que conviene no perder, porque contradicen al ADR-0010
+    # aunque el número no cambie:
+    #
+    # - La frontera que ese ADR midió ya no existe. Con consultas reales, la
+    #   peor consulta legítima puntúa 0.6584 y el mejor mensaje que NO es
+    #   del CU2, 0.6977: los rangos se solapan y ningún umbral los separa.
+    #   Quien filtra la intención hoy es el agente (ADR-0013), no esto.
+    # - Su control negativo difícil —"dónde me inscribo para que me regalen
+    #   una compostera", 0.6752— puntúa MÁS ALTO que una consulta legítima
+    #   de la prueba real —"qué recomendaciones me das para sembrar papa",
+    #   0.6729—. No hay umbral que admita una y rechace la otra.
     RAG_UMBRAL_SIMILITUD: float = 0.68
     RAG_TOP_K: int = 4
 
@@ -72,6 +96,30 @@ class Settings(BaseSettings):
     # mejor consulta ajena 0.6327 —la de la fiebre, que importa que quede
     # fuera—.
     RAG_UMBRAL_COMUNITARIO: float = 0.65
+
+    # --- Respaldo del CU2 con conocimiento del modelo ---------------------
+    #
+    # Cuando ninguna fuente oficial supera el umbral, el CU2 responde con el
+    # conocimiento del modelo, sin citar nada y solo dentro del dominio.
+    # Es el tercer nivel de la jerarquía de CLAUDE.md §6, que siempre estuvo
+    # contemplado y que el ADR-0010 había decidido no usar aquí.
+    #
+    # Se revierte esa decisión por evidencia de campo: en la primera prueba
+    # con celular, seis de diez consultas terminaron en el texto fijo de "no
+    # le puedo responder". El criterio de éxito del proyecto es un SUS >= 68
+    # con usuarias de la comunidad, y un asistente que se bloquea seis veces
+    # en una sesión no llega a esa cifra.
+    #
+    # ES UN INTERRUPTOR A PROPÓSITO. Ponerlo en `false` en Railway devuelve
+    # el comportamiento del ADR-0010 sin desplegar y sin tocar código, que es
+    # lo que hace falta si la evaluación con usuarias dice que un consejo sin
+    # respaldo confunde más de lo que ayuda.
+    #
+    # Lo que sostiene la jerarquía del §6 cuando esto está activo no es el
+    # umbral, son dos cosas: que los dos caminos **nunca se mezclen en un
+    # mismo mensaje** —o cita entero, o no cita nada— y que la respuesta sin
+    # respaldo se abra reconociéndolo. Ver `app/services/orientacion.py`.
+    CU2_RESPALDO_MODELO: bool = True
 
     # --- Memoria de conversación (CLAUDE.md §8) ---
     # Cuántos mensajes ve el agente de lo ya hablado. Se cuentan mensajes,

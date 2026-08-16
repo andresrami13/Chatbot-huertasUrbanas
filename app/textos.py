@@ -125,10 +125,14 @@ No se guardó nada. ¿Lo intentamos de nuevo en un rato?"""
 
 # --- CU2, orientación agroecológica -----------------------------------
 
-# No se recuperó ninguna fuente por encima del umbral. Se responde con este
-# texto fijo y NO se le pregunta al modelo de todos modos: sin respaldo
-# oficial, su conocimiento solo podría ofrecerse advirtiendo que no está
-# verificado (CLAUDE.md §6), y aquí vale más reconocer que no se sabe.
+# Dejó de ser la respuesta habitual cuando no hay fuente oficial: con
+# `CU2_RESPALDO_MODELO` activo, ese caso lo atiende ahora el modelo sin
+# citar nada. Este texto queda para los tres casos en los que ese camino
+# tampoco puede responder:
+#
+# - el modelo dio la pregunta por ajena a las huertas,
+# - devolvió una respuesta atribuida a una fuente y hubo que descartarla,
+# - el respaldo está apagado, que es el comportamiento del ADR-0010.
 #
 # Se evita decir "no encontré información", que suena a base de datos. Y se
 # le ofrece reformular, porque muchas veces la pregunta era buena y lo que
