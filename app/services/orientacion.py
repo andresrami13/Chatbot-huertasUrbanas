@@ -119,6 +119,65 @@ _ATRIBUCION_INVENTADA = re.compile(
 )
 
 
+# --- Advertencia sobre contenido de salud -------------------------------
+#
+# Las fuentes oficiales del corpus traen usos medicinales y toxicidad.
+# Medido el 15/08/2026 contra el corpus real: «para qué sirve la limonaria»
+# recupera un fragmento que la llama «anticonceptiva» y «antiulceroso», y
+# «qué mata es buena para el dolor de estómago» recupera usos tradicionales
+# para fiebre y dolor de cabeza. Se responde citando al Jardín Botánico, o
+# sea con el sello de fuente verificada del §6.
+#
+# El documento oficial avala la botánica, no un consejo de salud para una
+# persona concreta.
+#
+# ## Por qué se mira el texto que sale, y no el fragmento que entra
+#
+# Marcar el fragmento en la ingesta era la otra opción, y cubre menos: no
+# alcanza al camino sin respaldo, donde el modelo responde de su propio
+# conocimiento y **no hay ningún fragmento que marcar**. Ese camino es
+# además el más expuesto, porque ahí la respuesta ni siquiera está atada a
+# un documento. Mirando el texto que se va a enviar quedan cubiertos los
+# dos caminos y cualquiera que se añada después.
+#
+# El vocabulario tira a ancho a propósito. Advertir de más cuesta dos
+# renglones; advertir de menos falla justo en el mensaje en que importaba.
+_HABLA_DE_SALUD = re.compile(
+    r"medicinal|medicina|remedio|curativ|terapéutic|terapeutic"
+    r"|anticonceptiv|abortiv|emenagog|afrodisíac|afrodisiac"
+    r"|antiinflamatori|antibiótic|antibiotic|antiséptic|antiseptic"
+    r"|analgésic|analgesic|expectorante|diurétic|diuretic|laxante"
+    r"|digestiv|estomáquic|estomaquic|carminativ|antiulceros|antiespasmódic"
+    r"|sedante|calmante|cicatrizante|desinflamat|purgante|vermífug"
+    r"|t[óo]xic|venenos|intoxicaci[óo]n|contraindicaci"
+    r"|\btos\b|\bfiebre\b|\bgripa\b|\bgripe\b|dolor de|dolencia|malestar"
+    r"|infusi[óo]n|aromática para|agua de panela para"
+    r"|embarazo|lactancia|diabetes|hipertensi[óo]n|presi[óo]n alta"
+    r"|colesterol|gastritis|[úu]lcera|insomnio|ansiedad"
+    r"|para (la|el) salud|propiedades? (medicinal|curativ|terap)",
+    re.IGNORECASE,
+)
+
+
+def _con_advertencia_medica(texto: str) -> str:
+    """Añade la advertencia si la respuesta habla de salud.
+
+    Va al final, después de la línea de la fuente, para no romper el
+    formato de atribución que exige la regla 4 del prompt del CU2.
+    """
+    from app import textos
+
+    if not _HABLA_DE_SALUD.search(texto):
+        return texto
+
+    # Sin el contenido de la respuesta (CLAUDE.md §11). El contador dice
+    # qué proporción del CU2 toca salud, que es dato para la Fase 7 y para
+    # el documento de grado.
+    logger.info("CU2: se añadió la advertencia médica a la respuesta")
+
+    return f"{texto}\n\n{textos.ADVERTENCIA_MEDICA}"
+
+
 async def _recuperar_con_respaldo(
     pregunta: str,
     respaldo: str | None,
@@ -226,7 +285,10 @@ async def _responder_sin_respaldo(pregunta: str) -> str:
         "CU2 respondido SIN respaldo oficial | longitud_respuesta=%d", len(limpio)
     )
 
-    return limpio
+    # Este camino es el más expuesto de los dos: la respuesta no está atada
+    # a ningún documento, así que si habla de salud lo hace solo con el
+    # conocimiento del modelo.
+    return _con_advertencia_medica(limpio)
 
 
 async def consultar_orientacion(pregunta: str, respaldo: str | None = None) -> str:
@@ -288,4 +350,4 @@ async def consultar_orientacion(pregunta: str, respaldo: str | None = None) -> s
         len(texto),
     )
 
-    return texto
+    return _con_advertencia_medica(texto)

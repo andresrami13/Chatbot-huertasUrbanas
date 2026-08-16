@@ -152,6 +152,32 @@ ORIENTACION_NO_DISPONIBLE = """Perdone, en este momento no pude consultar la inf
 ¿Me vuelve a preguntar en un ratico?"""
 
 
+# Se añade al final de cualquier respuesta del CU2 que hable de salud.
+#
+# Hace falta porque las fuentes oficiales del corpus traen usos medicinales
+# y toxicidad. Comprobado el 15/08/2026 contra el corpus real: «para qué
+# sirve la limonaria» recupera un fragmento que la describe como
+# «anticonceptiva» y «antiulceroso», y «qué mata es buena para el dolor de
+# estómago» recupera usos tradicionales para fiebre y dolor de cabeza. Todo
+# eso se responde citando al Jardín Botánico, es decir, con el sello de
+# fuente verificada (CLAUDE.md §6).
+#
+# Que el documento sea oficial avala la botánica, no un consejo de salud
+# para una persona concreta. La usuaria es mayoritariamente adulta mayor y
+# puede estar medicada; una planta «buena para el estómago» no es inocua
+# junto a un tratamiento.
+#
+# Va como texto fijo del backend y no como regla de prompt por lo mismo que
+# el saludo y la ayuda (ADR-0006): a temperatura 0.4 una regla de prompt no
+# es una garantía, y ya está medido que se incumplen —la prohibición de
+# copiar la etiqueta `[OFICIAL – ...]` está en los dos prompts y aun así se
+# cuela—. Una advertencia que falte una vez de cada diez es peor que no
+# tenerla, porque falta justo cuando hace falta.
+ADVERTENCIA_MEDICA = """Eso que le conté es lo que dice la guía sobre la planta, no es un consejo médico.
+
+Antes de tomar cualquier planta como remedio, consúltelo con su médico o en el centro de salud, sobre todo si usted toma alguna droga formulada."""
+
+
 # --- CU4, qué siembran otras huertas -----------------------------------
 
 # No hay otras huertas registradas todavía, o ninguna viene a cuento. No se
