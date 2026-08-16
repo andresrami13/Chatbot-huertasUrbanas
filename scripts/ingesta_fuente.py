@@ -659,27 +659,88 @@ def _cola_para_solape(texto: str, caracteres: int) -> str:
     return trozo[espacio + 1 :] if espacio != -1 else trozo
 
 
-def _trocear(parrafos: list[str], caracteres_por_token: float) -> list[str]:
+# Cuántos párrafos de rótulo se arrastran hacia atrás al abrir una ficha.
+# En Sembrando Biodiversidad son exactamente dos —nombre común en
+# mayúsculas y nombre científico, cada uno en su párrafo— y el corte tiene
+# que dejarlos dentro del fragmento nuevo, porque son lo que identifica de
+# qué planta habla el resto.
+ROTULOS_DE_FICHA = 2
+
+# Un rótulo es corto y no lleva cifras. Lo segundo importa más de lo que
+# parece: el párrafo anterior al rótulo suele ser la última fila de una
+# tabla de resultados —"Canastillas 0,806 30"— y también es corto.
+_LARGO_MAXIMO_ROTULO = 60
+
+
+def _parece_rotulo_de_ficha(parrafo: str) -> bool:
+    return len(parrafo) <= _LARGO_MAXIMO_ROTULO and not any(
+        caracter.isdigit() for caracter in parrafo
+    )
+
+
+def _inicios_de_ficha(parrafos: list[str], marcador: str) -> set[int]:
+    """Índices de párrafo por los que hay que abrir fragmento nuevo."""
+    patron = re.compile(marcador)
+    inicios: set[int] = set()
+
+    for indice, parrafo in enumerate(parrafos):
+        if not patron.match(parrafo):
+            continue
+
+        inicio = indice
+        for _ in range(ROTULOS_DE_FICHA):
+            if inicio > 0 and _parece_rotulo_de_ficha(parrafos[inicio - 1]):
+                inicio -= 1
+            else:
+                break
+
+        inicios.add(inicio)
+
+    return inicios
+
+
+def _trocear(
+    parrafos: list[str],
+    caracteres_por_token: float,
+    inicios_de_ficha: set[int] | None = None,
+) -> list[str]:
     """Agrupa párrafos en fragmentos de 300–500 tokens con solape.
 
     Se acumula por párrafos completos: el corte cae siempre en un límite de
     párrafo, nunca dentro de una frase.
+
+    `inicios_de_ficha` fuerza además el corte donde empieza una ficha nueva,
+    **y ahí no se arrastra solape**: el solape existe para no perder la
+    continuidad de un texto seguido, y entre dos especies distintas no hay
+    continuidad que preservar. Arrastrarlo reintroduciría justo la
+    contaminación que este corte viene a quitar.
     """
     maximo = int(TOKENS_OBJETIVO * caracteres_por_token)
     solape = int(TOKENS_SOLAPE * caracteres_por_token)
     tope = int(TOKENS_TOPE * caracteres_por_token)
+    inicios_de_ficha = inicios_de_ficha or set()
 
-    unidades: list[str] = []
-    for parrafo in parrafos:
+    unidades: list[tuple[str, bool]] = []
+    for indice, parrafo in enumerate(parrafos):
+        abre_ficha = indice in inicios_de_ficha
         if len(parrafo) <= maximo:
-            unidades.append(parrafo)
+            unidades.append((parrafo, abre_ficha))
         else:
-            unidades.extend(_partir_por_frases(parrafo, maximo))
+            piezas = _partir_por_frases(parrafo, maximo)
+            unidades.extend(
+                (pieza, abre_ficha and orden == 0)
+                for orden, pieza in enumerate(piezas)
+            )
 
     fragmentos: list[str] = []
     actual = ""
 
-    for unidad in unidades:
+    for unidad, abre_ficha in unidades:
+        if abre_ficha and actual:
+            fragmentos.append(actual)
+            actual = unidad
+            continue
+
         candidato = f"{actual} {unidad}".strip() if actual else unidad
 
         if actual and len(candidato) > maximo:
@@ -1147,7 +1208,12 @@ async def main() -> None:
     if argumentos.ratio:
         print(f"Ratio de esta corrida: {ratio} (el catálogo dice {fuente.caracteres_por_token})")
 
-    fragmentos = _trocear(parrafos, ratio)
+    inicios = set()
+    if fuente.marcador_de_ficha:
+        inicios = _inicios_de_ficha(parrafos, fuente.marcador_de_ficha)
+        print(f"Fichas detectadas, y por las que se corta fragmento: {len(inicios)}")
+
+    fragmentos = _trocear(parrafos, ratio, inicios)
     _informar(fragmentos, argumentos.muestra, ratio)
 
     if argumentos.medir_tokens:

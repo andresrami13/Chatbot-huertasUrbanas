@@ -121,6 +121,18 @@ class FuenteDocumento:
     # de la base, no en abstracto.
     descartar_repetidos: bool = False
 
+    # Expresión regular que reconoce el primer párrafo de una ficha. Donde
+    # encaja, el troceo cierra el fragmento anterior y abre uno nuevo, sin
+    # arrastrar solape.
+    #
+    # Hace falta en los documentos organizados por fichas de especie: sin
+    # esto, un fragmento contiene el final de una planta y el principio de
+    # la siguiente, y el modelo puede atribuirle a una los datos de la otra.
+    # Medido en el corpus del 15/08/2026, un fragmento que se recupera al
+    # preguntar por la limonaria terminaba con «el mejor contenedor para el
+    # hinojo son los baldes» dentro.
+    marcador_de_ficha: str = ""
+
     # `True` cuando `caracteres_por_token` se midió contra este documento.
     # Con `False`, la ingesta real se bloquea.
     ratio_medida: bool = False
@@ -261,6 +273,10 @@ CATALOGO: dict[str, FuenteDocumento] = {
         # de especies. Se conservan las páginas de valor nutricional y las
         # de cultivo del recetario, que son de una columna y salen bien.
         saltar_pagina_si_empieza_por=("Bibliografía", "PREPARACIÓN"),
+        # Cada ficha abre con `1. Generalidades`, precedido del nombre común
+        # en mayúsculas y del nombre científico. Comprobado el 15/08/2026:
+        # aparece 18 veces, siempre al principio de párrafo, una por especie.
+        marcador_de_ficha=r"^1\.\s*Generalidades",
         ratio_medida=True,
         nota=(
             "El más trabajado de los tres. 33 páginas cortadas por regla y "
