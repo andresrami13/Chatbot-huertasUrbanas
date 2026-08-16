@@ -506,6 +506,37 @@ async def reemplazar_fragmentos_oficiales(
     return len(fragmentos)
 
 
+async def listar_contenidos_oficiales(
+    excluir_fuente_id: UUID | None = None,
+) -> list[tuple[str, str]]:
+    """Devuelve el texto de los fragmentos oficiales ya ingeridos.
+
+    Pares (título de la fuente, contenido). **Sin el embedding**, que aquí
+    no hace falta y son 768 flotantes por fila.
+
+    Lo usa la comprobación de casi duplicados de la ingesta, que compara un
+    documento nuevo contra el corpus antes de escribirlo. `excluir_fuente_id`
+    deja fuera la propia fuente cuando se está reingiriendo: si no, cada
+    fragmento se encontraría a sí mismo.
+
+    No la usa el servicio en producción: recuperar es cosa de
+    `buscar_fragmentos_oficiales`, que filtra por similitud. Esta trae el
+    corpus entero y solo tiene sentido ejecutándose a mano.
+    """
+    filas = await obtener_pool().fetch(
+        """
+        select f.titulo, o.contenido
+          from fragmento_oficial o
+          join fuente f on f.id = o.fuente_id
+         where $1::uuid is null or o.fuente_id <> $1
+         order by o.fuente_id, o.orden
+        """,
+        excluir_fuente_id,
+    )
+
+    return [(fila["titulo"], fila["contenido"]) for fila in filas]
+
+
 @dataclass(frozen=True)
 class FragmentoOficial:
     """Un fragmento recuperado, con la fuente que lo respalda.

@@ -66,6 +66,7 @@ from app.services.embeddings import vectorizar_documentos
 from app.services.repositorio import (
     contar_fragmentos_oficiales,
     crear_fuente,
+    listar_contenidos_oficiales,
     obtener_fuente_por_url,
     reemplazar_fragmentos_oficiales,
 )
@@ -799,6 +800,115 @@ async def _medir_tokens(fragmentos: list[str], caracteres_por_token: float) -> N
 # =========================================================================
 
 
+# =========================================================================
+# Casi duplicados entre fuentes
+# =========================================================================
+#
+# La decisión 5 del ADR-0009 previó los duplicados **dentro** de una
+# fuente: reingerir añadiendo duplicaría el corpus y los duplicados
+# coparían el top-k con el mismo texto. Con una sola fuente ahí se acababa
+# el problema.
+#
+# Con seis no. La cartilla de 2022 comparte el 22 % de su texto, palabra
+# por palabra, con el documento ya ingerido —medido el 15/08/2026 sobre
+# secuencias de ocho palabras—: no son dos ediciones de la misma obra, pero
+# hay pasajes que sí están repetidos. En una consulta que caiga sobre uno
+# de ellos, el top-k=4 puede gastar dos de sus cuatro puestos en decir lo
+# mismo dos veces, firmado por dos fuentes distintas.
+#
+# La comprobación es **textual y no vectorial**, a propósito. Lo que
+# interesa aquí es si el pasaje está literalmente repetido, y para eso la
+# coincidencia de palabras es más precisa que la similitud coseno: dos
+# fragmentos distintos sobre el mismo tema pueden puntuar muy alto en
+# coseno sin ser el mismo texto, y confundirlos llevaría a descartar
+# material legítimo. Además no gasta embeddings.
+
+# Ocho palabras seguidas no coinciden por azar entre dos textos del mismo
+# dominio. Es la misma ventana con la que se midió el solape entre los dos
+# documentos.
+VENTANA_SOLAPE = 8
+
+# A partir de aquí el fragmento se considera repetido: más de la mitad de
+# sus secuencias ya están en el corpus.
+SOLAPE_PARA_DUPLICADO = 0.50
+
+_SIN_LETRAS = re.compile(r"[^a-z0-9ñ ]+")
+
+
+def _huellas(texto: str) -> set[tuple[str, ...]]:
+    """Secuencias de palabras del texto, sin tildes ni puntuación."""
+    plano = "".join(
+        caracter
+        for caracter in unicodedata.normalize("NFD", texto.lower())
+        if unicodedata.category(caracter) != "Mn"
+    )
+    palabras = _SIN_LETRAS.sub(" ", plano).split()
+
+    return {
+        tuple(palabras[indice : indice + VENTANA_SOLAPE])
+        for indice in range(len(palabras) - VENTANA_SOLAPE + 1)
+    }
+
+
+async def _comprobar_duplicados(
+    fuente: FuenteDocumento, fragmentos: list[str]
+) -> None:
+    """Compara los fragmentos nuevos contra el corpus ya ingerido."""
+    await abrir_pool()
+    try:
+        fila = await obtener_fuente_por_url(fuente.url)
+        existentes = await listar_contenidos_oficiales(
+            excluir_fuente_id=fila.id if fila else None
+        )
+    finally:
+        await cerrar_pool()
+
+    if not existentes:
+        print("\nNo hay otras fuentes en la base: nada contra lo que comparar.")
+        return
+
+    print(
+        f"\nComprobando {len(fragmentos)} fragmentos nuevos contra "
+        f"{len(existentes)} ya ingeridos..."
+    )
+
+    # El corpus entero como un solo conjunto: lo que importa es si el
+    # pasaje ya está, no en cuál de los documentos anteriores.
+    corpus: set[tuple[str, ...]] = set()
+    for _, contenido in existentes:
+        corpus |= _huellas(contenido)
+
+    solapes: list[tuple[float, int]] = []
+    for indice, pieza in enumerate(fragmentos):
+        huellas = _huellas(pieza)
+        if not huellas:
+            continue
+        solapes.append((len(huellas & corpus) / len(huellas), indice))
+
+    solapes.sort(reverse=True)
+    repetidos = [par for par in solapes if par[0] >= SOLAPE_PARA_DUPLICADO]
+
+    medio = sum(solape for solape, _ in solapes) / len(solapes)
+    print(f"Solape medio con el corpus: {100 * medio:.1f} %")
+    print(
+        f"Fragmentos con más del {100 * SOLAPE_PARA_DUPLICADO:.0f} % repetido: "
+        f"{len(repetidos)}/{len(solapes)}"
+    )
+
+    for solape, indice in solapes[:5]:
+        print(f"\n  fragmento {indice}: {100 * solape:.0f} % ya está en el corpus")
+        print(f"    {fragmentos[indice][:220]}...")
+
+    if repetidos:
+        print(
+            f"\nESOS {len(repetidos)} FRAGMENTOS COMPETIRÁN CON EL CORPUS EN EL "
+            "TOP-K.\nNo se bloquea la ingesta: con el top-k a 4 y dos fuentes "
+            "que se solapan\nen una cuarta parte, decidir cuál sobra es una "
+            "decisión editorial y no\nalgo que este script pueda resolver "
+            "solo. Queda medido y dicho."
+        )
+
+
 async def _ingerir(
     fuente: FuenteDocumento, fragmentos: list[str], reingerir: bool
 ) -> None:
@@ -886,6 +996,14 @@ async def main() -> None:
         "--medir-tokens",
         action="store_true",
         help="Contrasta la ratio caracteres/token contra la API.",
+    )
+    analizador.add_argument(
+        "--comprobar-duplicados",
+        action="store_true",
+        help=(
+            "Compara los fragmentos contra el corpus ya ingerido. Se hace "
+            "sola antes de toda ingesta real."
+        ),
     )
     analizador.add_argument(
         "--detectar-folio",
@@ -1016,6 +1134,9 @@ async def main() -> None:
     if argumentos.medir_tokens:
         await _medir_tokens(fragmentos, ratio)
 
+    if argumentos.comprobar_duplicados:
+        await _comprobar_duplicados(fuente, fragmentos)
+
     if argumentos.simular:
         print("\n--simular: no se ha vectorizado ni escrito nada.")
         return
@@ -1034,6 +1155,12 @@ async def main() -> None:
             f"    python -m scripts.ingesta_fuente --fuente {fuente.clave} "
             "--simular --medir-tokens"
         )
+
+    # Antes de escribir, siempre: mirar contra qué se está añadiendo. Es el
+    # mismo criterio por el que existe `--simular`, llevado al caso que el
+    # ADR-0009 no contemplaba porque solo había una fuente.
+    if not argumentos.comprobar_duplicados:
+        await _comprobar_duplicados(fuente, fragmentos)
 
     await _ingerir(fuente, fragmentos, argumentos.reingerir)
 

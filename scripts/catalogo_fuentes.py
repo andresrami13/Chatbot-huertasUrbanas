@@ -229,18 +229,33 @@ CATALOGO: dict[str, FuenteDocumento] = {
         # de su propio contenido.
         modo_extraccion="layout",
         separar_columnas=True,
-        # Las 18 bibliografías de ficha, una por especie. Comprobado el
-        # 15/08/2026: ocupan la página entera y empiezan por ese renglón.
-        saltar_pagina_si_empieza_por=("Bibliografía",),
+        # Dos cortes por regla, ambos comprobados el 15/08/2026: ocupan la
+        # página entera y empiezan por ese renglón.
+        #
+        # `Bibliografía` — las 18 bibliografías de ficha, una por especie.
+        #
+        # `PREPARACIÓN` — las 15 páginas de preparación del recetario. Se
+        # maquetan en TRES columnas y la extracción las deja inservibles:
+        # «1. Cocinar el haba al 2. Una vez cocinada 3. Pasar por un vapor
+        # o con poca agua, dejar enfriar y colar. procesador o licuadora».
+        # La separación de columnas no las salva porque parte por una sola
+        # calle y ahí hay dos. Una receta revuelta entrando como fuente
+        # oficial es peor que no tenerla: invita al modelo a componer una
+        # preparación que el documento no dice, que es el mismo motivo por
+        # el que el ADR-0009 recortó las columnas ilegibles de las tablas
+        # de especies. Se conservan las páginas de valor nutricional y las
+        # de cultivo del recetario, que son de una columna y salen bien.
+        saltar_pagina_si_empieza_por=("Bibliografía", "PREPARACIÓN"),
         ratio_medida=True,
         nota=(
-            "El más trabajado de los tres. 18 bibliografías de ficha fuera y "
-            "95 páginas leídas por columnas. Queda un residuo conocido: en "
-            "las páginas de descripción botánica los rótulos del margen "
-            "izquierdo (TALLO, HOJAS, SEMILLAS) se inyectan dentro de la "
-            "frase, porque ahí no hay dos columnas de texto sino una "
-            "etiqueta al margen. Cinco páginas avisan además de texto "
-            "rotado que pypdf no extrae."
+            "El más trabajado de los tres. 33 páginas cortadas por regla y "
+            "81 leídas por columnas. No solapa con el corpus ya ingerido: "
+            "0 de 211 fragmentos por encima del 50 %. Queda un residuo "
+            "conocido: en las páginas de descripción botánica los rótulos "
+            "del margen izquierdo (TALLO, HOJAS, SEMILLAS) se inyectan "
+            "dentro de la frase, porque ahí no hay dos columnas de texto "
+            "sino una etiqueta al margen. Cinco páginas avisan además de "
+            "texto rotado que pypdf no extrae."
         ),
     ),
 }

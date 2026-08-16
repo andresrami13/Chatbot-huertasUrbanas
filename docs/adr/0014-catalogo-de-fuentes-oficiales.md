@@ -119,7 +119,55 @@ valiendo. Una lista de autores y URLs no responde nada y ocuparía puestos
 del top-k, que es el mismo motivo por el que se recortan las referencias
 del final en los otros documentos.
 
-## Decisión 6. La normalización pasa de NFC a NFKC, y es igual para todos
+La misma regla resuelve un segundo caso, y por un motivo distinto: las
+**15 páginas de preparación del recetario** se maquetan en *tres* columnas
+y la extracción las deja inservibles.
+
+> «1. Cocinar el haba al 2. Una vez cocinada 3. Pasar por un vapor o con
+> poca agua, dejar enfriar y colar. procesador o licuadora»
+
+La separación de columnas no las salva, porque parte por una sola calle y
+ahí hay dos. Y aquí no se descarta por irrelevante sino por **ilegible**:
+una receta revuelta que entra como fuente oficial invita al modelo a
+componer una preparación que el documento no dice. Es el mismo criterio con
+el que la decisión 3 del ADR-0009 retiró las columnas que la extracción
+había destruido en las tablas de especies. Se conservan las páginas de
+valor nutricional y las de cultivo del recetario, que van a una columna y
+salen bien.
+
+## Decisión 7. Antes de escribir se comprueban los casi duplicados
+
+La decisión 5 del ADR-0009 previó los duplicados **dentro** de una fuente.
+Con seis fuentes aparece el caso que no contemplaba: pasajes repetidos
+**entre** documentos distintos.
+
+`--comprobar-duplicados` compara los fragmentos nuevos contra el corpus ya
+ingerido, y **se ejecuta sola antes de toda ingesta real**, por el mismo
+criterio por el que existe `--simular`: mirar antes de escribir.
+
+La comprobación es **textual y no vectorial**, a propósito. Lo que interesa
+es si el pasaje está literalmente repetido, y para eso la coincidencia de
+secuencias de ocho palabras es más precisa que la similitud coseno: dos
+fragmentos distintos sobre el mismo tema pueden puntuar muy alto en coseno
+sin ser el mismo texto, y confundirlos llevaría a descartar material
+legítimo. Además no gasta embeddings.
+
+Medido el 15/08/2026:
+
+| Fuente | Solape medio | Fragmentos con más del 50 % repetido |
+|---|---|---|
+| `jbb_practicas_2022` | 27,9 % | **21 de 83** |
+| `jbb_sembrando_2023` | 0,4 % | **0 de 211** |
+
+*Sembrando Biodiversidad* es material enteramente nuevo. La cartilla de
+2022, no: uno de cada cuatro de sus fragmentos ya está en el corpus, y el
+peor repite el 85 %.
+
+**No se bloquea la ingesta.** Con el top-k en 4 y dos fuentes que se
+solapan en una cuarta parte, decidir cuál sobra es una decisión editorial y
+no algo que el script pueda resolver solo. Queda medido y dicho.
+
+## Decisión 8. La normalización pasa de NFC a NFKC, y es igual para todos
 
 Las ligaduras tipográficas —`ﬁ` en U+FB01— sobreviven a NFC porque son
 equivalencia de compatibilidad y no canónica. La cartilla de 2022 trae
@@ -169,14 +217,12 @@ caracteres de 130 719, sin mover ningún límite de fragmento.
   un solo renglón, y con un renglón no se puede afirmar que haya calle. Son
   unas 17 páginas y el ruido es de una palabra suelta por caja. Cinco
   páginas avisan además de texto rotado que `pypdf` no extrae.
-- **El solape entre fuentes.** La cartilla de 2022 comparte el 22 % de su
-  texto, palabra por palabra, con el documento ya ingerido, medido sobre
-  secuencias de ocho palabras. No son dos ediciones de la misma obra —el
-  78 % es material nuevo—, pero en las consultas que caigan sobre un pasaje
-  compartido el top-k puede llenarse con el mismo párrafo firmado por dos
-  fuentes. La decisión 5 del ADR-0009 previó los duplicados **dentro** de
-  una fuente, no entre fuentes distintas. Falta una comprobación previa a
-  la escritura.
+- **Qué hacer con los 21 fragmentos repetidos de la cartilla de 2022.** La
+  decisión 7 los mide y los enseña, pero no decide. Las opciones son
+  ingerirla entera y dejar que el top-k arbitre, descartar esos fragmentos,
+  o reemplazar el documento antiguo por el nuevo. Ninguna se puede elegir
+  sin ver primero cómo se comporta la recuperación con el corpus ampliado,
+  que es trabajo de la revalidación del umbral.
 - **La advertencia sobre contenido medicinal**, acordada el 15/08/2026 y
   pendiente de implementar: se marcará el fragmento en la ingesta y el
   backend añadirá un texto fijo, en lugar de confiarlo a una regla del
