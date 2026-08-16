@@ -181,7 +181,7 @@ def _normalizar_texto(texto: str) -> str:
     return unicodedata.normalize("NFKC", texto)
 
 
-def _quitar_numero_pagina(texto: str, folio: int) -> str:
+def _quitar_numero_pagina(texto: str, folio: int, variable: bool = False) -> str:
     """Quita el folio de la página, en cualquiera de sus tres formas.
 
     `folio` es el número **impreso**, que no siempre coincide con el índice
@@ -208,17 +208,33 @@ def _quitar_numero_pagina(texto: str, folio: int) -> str:
     texto = texto.lstrip()
     esperado = str(folio)
 
+    # Con el desfase variable no se puede comparar contra un folio
+    # esperado, porque no lo hay: se quita cualquier renglón que sea solo
+    # un número. Ver `folio_desfase_variable` en el catálogo.
+    if variable:
+        return "\n".join(
+            linea
+            for linea in texto.split("\n")
+            if not re.fullmatch(r"[-–—\s]*\d{1,3}[-–—\s]*", linea.strip())
+        )
+
     if texto.startswith(esperado):
         resto = texto[len(esperado) :]
         if resto[:1].isspace() or resto[:1].isalpha():
             texto = resto.lstrip()
 
-    # Algunas páginas lo repiten al final, también en renglón propio.
-    lineas = texto.rstrip().split("\n")
-    if lineas and lineas[-1].strip() == esperado:
-        texto = "\n".join(lineas[:-1])
+    # En renglón propio, con o sin adornos. La cartilla de 2011 lo imprime
+    # como `- 16 -`, y con guiones no coincide con el número pelado: se
+    # quedaba dentro del texto vectorizado. No basta con mirar el último
+    # renglón, que es lo que hacía antes: ahí el folio va en el segundo,
+    # justo debajo de la cabecera.
+    solo_folio = re.compile(rf"^[-–—\s]*{esperado}[-–—\s]*$")
 
-    return texto
+    return "\n".join(
+        linea
+        for linea in texto.split("\n")
+        if not solo_folio.match(linea.strip())
+    )
 
 
 # --- Páginas de dos columnas --------------------------------------------
@@ -395,6 +411,16 @@ def _detectar_desfase_folio(crudas: list[tuple[int, str]]) -> None:
             if final:
                 candidatos.add(int(final.group(1)))
 
+        # En renglón propio y con adornos, que es como lo imprime la
+        # cartilla de 2011: `- 16 -`, y además en el segundo renglón, no en
+        # el último. El detector tiene que reconocer las mismas formas que
+        # `_quitar_numero_pagina`, o declararía que el documento no lleva
+        # folio y habría que fijarlo a ojo.
+        for linea in lineas:
+            adornado = re.fullmatch(r"[-–—\s]*(\d{1,3})[-–—\s]*", linea)
+            if adornado:
+                candidatos.add(int(adornado.group(1)))
+
         for candidato in candidatos:
             desfase = numero - candidato
             if 0 <= desfase <= 20:
@@ -412,6 +438,22 @@ def _detectar_desfase_folio(crudas: list[tuple[int, str]]) -> None:
             f"  desfase {desfase:2d}  encaja en {veces:3d} páginas "
             f"({100 * veces / total:.0f} %)"
         )
+
+    # Varios desfases con peso repartido significan que el desfase no es
+    # constante: el PDF trae páginas sin numerar intercaladas y cada una
+    # corre la cuenta. Pasó en la cartilla de 2011, donde crece de 2 a 5, y
+    # ahí ningún número único sirve. Sin este aviso, el más votado parecía
+    # el bueno y dejaba el folio dentro del texto en la mitad del documento.
+    repartidos = [
+        desfase for desfase, veces in conteo.items() if veces >= total * 0.10
+    ]
+    if len(repartidos) > 1:
+        print(
+            f"\n  El desfase NO es constante: {sorted(repartidos)} tienen peso.\n"
+            "  Suele ser por páginas sin numerar intercaladas. Ningún número\n"
+            "  único sirve: use folio_desfase_variable=True en el catálogo."
+        )
+        return
 
     mejor, veces = conteo.most_common(1)[0]
     if veces < total * 0.4:
@@ -659,13 +701,6 @@ def _cola_para_solape(texto: str, caracteres: int) -> str:
     return trozo[espacio + 1 :] if espacio != -1 else trozo
 
 
-# Cuántos párrafos de rótulo se arrastran hacia atrás al abrir una ficha.
-# En Sembrando Biodiversidad son exactamente dos —nombre común en
-# mayúsculas y nombre científico, cada uno en su párrafo— y el corte tiene
-# que dejarlos dentro del fragmento nuevo, porque son lo que identifica de
-# qué planta habla el resto.
-ROTULOS_DE_FICHA = 2
-
 # Un rótulo es corto y no lleva cifras. Lo segundo importa más de lo que
 # parece: el párrafo anterior al rótulo suele ser la última fila de una
 # tabla de resultados —"Canastillas 0,806 30"— y también es corto.
@@ -678,8 +713,16 @@ def _parece_rotulo_de_ficha(parrafo: str) -> bool:
     )
 
 
-def _inicios_de_ficha(parrafos: list[str], marcador: str) -> set[int]:
-    """Índices de párrafo por los que hay que abrir fragmento nuevo."""
+def _inicios_de_ficha(
+    parrafos: list[str], marcador: str, rotulos: int
+) -> set[int]:
+    """Índices de párrafo por los que hay que abrir fragmento nuevo.
+
+    `rotulos` es cuántos párrafos de encabezado van **delante** del
+    marcador y tienen que quedar dentro del fragmento nuevo, porque son lo
+    que identifica de qué planta habla el resto. Depende de cómo esté
+    maquetada la ficha, así que lo declara el catálogo.
+    """
     patron = re.compile(marcador)
     inicios: set[int] = set()
 
@@ -688,7 +731,7 @@ def _inicios_de_ficha(parrafos: list[str], marcador: str) -> set[int]:
             continue
 
         inicio = indice
-        for _ in range(ROTULOS_DE_FICHA):
+        for _ in range(rotulos):
             if inicio > 0 and _parece_rotulo_de_ficha(parrafos[inicio - 1]):
                 inicio -= 1
             else:
@@ -1156,7 +1199,9 @@ async def main() -> None:
     partidas = 0
 
     for numero, texto in crudas:
-        limpio = _quitar_numero_pagina(texto, numero - fuente.desfase_folio)
+        limpio = _quitar_numero_pagina(
+            texto, numero - fuente.desfase_folio, fuente.folio_desfase_variable
+        )
 
         if not limpio.strip():
             continue
@@ -1210,7 +1255,9 @@ async def main() -> None:
 
     inicios = set()
     if fuente.marcador_de_ficha:
-        inicios = _inicios_de_ficha(parrafos, fuente.marcador_de_ficha)
+        inicios = _inicios_de_ficha(
+            parrafos, fuente.marcador_de_ficha, fuente.rotulos_de_ficha
+        )
         print(f"Fichas detectadas, y por las que se corta fragmento: {len(inicios)}")
 
     fragmentos = _trocear(parrafos, ratio, inicios)

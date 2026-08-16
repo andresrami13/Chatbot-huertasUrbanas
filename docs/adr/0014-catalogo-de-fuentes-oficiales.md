@@ -239,6 +239,41 @@ caracteres de 130 719, sin mover ningún límite de fragmento.
   sin orientación. Competiría en el top-k contra los fragmentos que sí
   explican algo.
 
+## Las tres fuentes restantes, y lo que enseñó cada una
+
+Ingeridas el 15/08/2026. El corpus queda en **568 fragmentos de seis
+fuentes**. Ninguna de las tres solapa con lo anterior: 0 fragmentos
+repetidos de 205.
+
+**El desfase del folio no siempre es constante.** La cartilla de 2011 lo
+imprime como `- 16 -` y su desfase **crece de 2 a 5** a lo largo del
+documento, porque las páginas 13, 18 y 27 son imágenes sin numerar y cada
+una corre la cuenta. Ningún valor único sirve, y el más votado —5— habría
+dejado el folio dentro del texto en 21 de sus 47 páginas. Se añade
+`folio_desfase_variable`, que retira cualquier renglón que sea solo un
+número. `--detectar-folio` avisa ahora cuando varios desfases se reparten
+el peso, en vez de sugerir el más votado como si fuera el bueno.
+
+**El umbral de plantilla lo fija el documento, no el gusto.** En el
+catálogo de plantas, con 20 se descartaba `HIERBA` (61 páginas) pero
+sobrevivían `ENREDADERA` (15), `ÁRBOL` (12) y `ARBUSTO` (11): unas fichas
+conservaban el hábito de la planta y otras lo perdían, que es peor que
+cualquiera de los dos extremos. Con 70 sobreviven los cuatro y se van solo
+los dos renglones de ruido uniforme: `USOS` (102) y `KJBNVBJNBHJBHJ` (110),
+un resto de maquetación.
+
+**Una desviación declarada del intervalo de la Fase 4.** El catálogo son
+104 fichas cortas, y sin cortar por ficha caían dos especies en cada
+fragmento. En un documento que atribuye usos medicinales, esa mezcla es el
+peor fallo posible: le adjudicaría a una planta el uso de otra. Cortando
+por ficha, sus fragmentos miden unos **183 tokens** y solo el 10 % cae en
+el intervalo de 300–500.
+
+Se acepta la desviación. El intervalo es un medio para que el fragmento sea
+una unidad con sentido, y aquí la unidad con sentido es más corta que el
+intervalo. Queda por ver en la revalidación del umbral si estos fragmentos
+cortos se comportan distinto en similitud.
+
 ## Lo que este ADR no resuelve
 
 - **Los rótulos al margen de *Sembrando Biodiversidad*.** En las páginas de

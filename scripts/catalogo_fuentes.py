@@ -66,6 +66,20 @@ class FuenteDocumento:
     # mitad del texto vectorizado.
     desfase_folio: int = 0
 
+    # Cuando el desfase **no es constante**, porque el PDF trae páginas sin
+    # numerar intercaladas y cada una corre la cuenta. En la cartilla de
+    # 2011 el desfase crece de 2 a 5 a lo largo del documento, por las
+    # páginas de imagen 13, 18 y 27: ningún número único sirve.
+    #
+    # Con esto, se retira cualquier renglón que sea **solo** un número, con
+    # o sin adornos, sin compararlo con el folio esperado. Es más agresivo y
+    # por eso no es el comportamiento por defecto: un renglón que contenga
+    # únicamente una cifra podría ser una celda de tabla. Pero el caso
+    # peligroso que el modo normal evita —quitarle el número a un texto que
+    # empieza legítimamente por una cifra— aquí no se da, porque se exige
+    # que el renglón entero no tenga nada más.
+    folio_desfase_variable: bool = False
+
     # Un renglón repetido en esta cantidad de páginas se descarta por ser
     # maquetación. El valor por defecto sirve para prosa corrida; los
     # documentos organizados en fichas necesitan más, porque en ellos un
@@ -132,6 +146,13 @@ class FuenteDocumento:
     # preguntar por la limonaria terminaba con «el mejor contenedor para el
     # hinojo son los baldes» dentro.
     marcador_de_ficha: str = ""
+
+    # Cuántos párrafos de rótulo van DELANTE del marcador y hay que
+    # arrastrar al fragmento nuevo. En Sembrando Biodiversidad son dos
+    # —nombre común y nombre científico, antes de `1. Generalidades`—. En el
+    # catálogo de plantas es cero: allí el marcador es el hábito de la
+    # planta, que ya es el primer párrafo de la ficha.
+    rotulos_de_ficha: int = 2
 
     # `True` cuando `caracteres_por_token` se midió contra este documento.
     # Con `False`, la ingesta real se bloquea.
@@ -287,6 +308,121 @@ CATALOGO: dict[str, FuenteDocumento] = {
             "dentro de la frase, porque ahí no hay dos columnas de texto "
             "sino una etiqueta al margen. Cinco páginas avisan además de "
             "texto rotado que pypdf no extrae."
+        ),
+    ),
+    # --- El resto de la carpeta, declarados el 15/08/2026 ----------------
+    "jbb_manejo_integrado_2011": FuenteDocumento(
+        clave="jbb_manejo_integrado_2011",
+        entidad="Jardín Botánico de Bogotá José Celestino Mutis",
+        titulo=(
+            "Cartilla para el manejo integrado de la fertilización, las "
+            "plagas y las enfermedades en las Unidades Integrales de "
+            "Agricultura Urbana en Bogotá D.C."
+        ),
+        # Comprobado el 15/08/2026: los bytes de esta URL son idénticos al
+        # PDF local. La candidata anterior, `cartilla_tecnica_agricultura_
+        # urbana.pdf`, se descargó y se descartó: era otro documento, de 62
+        # páginas y de otra administración.
+        url=(
+            "https://jbb.gov.co/documentos/tecnica/2018/"
+            "Cartilla_agricultura_urbana_final.pdf"
+        ),
+        archivo="Cartilla_agricultura_urbana_final.pdf",
+        # 1 y 3 portadas, 5 créditos y autoras. La 7 abre la introducción.
+        # La 54 es la literatura citada y la 55 la contracubierta.
+        pagina_inicial=7,
+        pagina_final=53,
+        # Medida sobre sus fragmentos: media 4.61, extremo denso 3.56.
+        caracteres_por_token=3.56,
+        # El folio va impreso como `- 16 -` en el segundo renglón, debajo
+        # de la cabecera, y su desfase **crece de 2 a 5** a lo largo del
+        # documento: las páginas 13, 18 y 27 son imágenes sin numerar y
+        # cada una corre la cuenta. Medido página a página el 15/08/2026.
+        folio_desfase_variable=True,
+        ratio_medida=True,
+        nota=(
+            "El de plagas y enfermedades, que es la consulta insignia del "
+            "CU2. Lleva cabecera y pie repetidos en 23 y 25 páginas, que "
+            "los quita la detección de plantilla. Su maquetación en "
+            "versalitas deja 63 palabras con mayúscula intercalada "
+            "(«agriCUltUra»), casi todas en esa cabecera y en títulos; la "
+            "prosa sale limpia."
+        ),
+    ),
+    "jbb_cartilla_1_2010": FuenteDocumento(
+        clave="jbb_cartilla_1_2010",
+        entidad="Jardín Botánico de Bogotá José Celestino Mutis",
+        titulo="Cartilla 1. Agricultura urbana",
+        url=(
+            "https://jbb.gov.co/documentos/agricultura/2022/protocolo/"
+            "Cartilla_1_Agricultura_urbana2010.pdf"
+        ),
+        archivo="Cartilla_1_Agricultura_urbana2010.pdf",
+        # 1 portada, 3 y 4 junta directiva y comité editorial, 5 tabla de
+        # contenido. La 7 abre la presentación. De la 52 a la 54 va
+        # divulgación institucional —programa de radio, curso virtual,
+        # directorio— y la 55 es la bibliografía.
+        pagina_inicial=7,
+        pagina_final=51,
+        # Medida sobre sus fragmentos: media 4.53, extremo denso 3.81.
+        caracteres_por_token=3.81,
+        ratio_medida=True,
+        nota="El más sencillo de los cinco: folio sin desfase y sin plantilla repetida.",
+    ),
+    "jbb_catalogo_plantas": FuenteDocumento(
+        clave="jbb_catalogo_plantas",
+        entidad="Jardín Botánico de Bogotá José Celestino Mutis",
+        titulo="Catálogo de plantas usadas en agricultura urbana",
+        url=(
+            "https://jbb.gov.co/documentos/agricultura/2022/protocolo/"
+            "catalog-plantas-usadas-agricultura-urb.pdf"
+        ),
+        archivo="catalog-plantas-usadas-agricultura-urb.pdf",
+        # 1 portada, 2 a 4 tabla de contenido. La 5 abre la introducción.
+        # De la 125 a la 127 van las referencias.
+        pagina_inicial=5,
+        pagina_final=124,
+        # El más denso de los seis: media 3.74 y extremo denso 2.97. Son
+        # fichas cortas cargadas de nomenclatura botánica y de nombres de
+        # principios activos. Con el 3.9 heredado, el máximo real llegaba a
+        # 722 tokens y solo el 52 % caía dentro del intervalo.
+        caracteres_por_token=2.97,
+        desfase_folio=10,
+        # Sube desde 10 porque es un documento por fichas: `Compositae`
+        # sale en 12 páginas y `Lamiaceae` en 11, y son familias botánicas,
+        # no maquetación.
+        #
+        # El valor no es libre, lo fija el propio documento. Con 20 se caía
+        # `HIERBA` (61 páginas) pero sobrevivían `ENREDADERA` (15), `ÁRBOL`
+        # (12) y `ARBUSTO` (11): unas fichas conservaban el hábito de la
+        # planta y otras lo perdían, que es peor que cualquiera de los dos
+        # extremos. Con 70 sobreviven los cuatro y se van solo los dos
+        # renglones que sí son ruido uniforme: `USOS` (102 páginas) y
+        # `KJBNVBJNBHJBHJ` (110), un resto de maquetación.
+        paginas_para_plantilla=70,
+        # Cada ficha abre con el hábito de la planta, que ya es el primer
+        # párrafo: no hay rótulo que arrastrar hacia atrás. Son 104 fichas
+        # en 56 fragmentos, o sea dos especies por fragmento, y en el
+        # documento del contenido medicinal esa mezcla es la más dañina de
+        # todas: atribuiría a una planta el uso medicinal de otra.
+        # El límite de palabra no sobra: sin él, `ÁRBOL` encajaría
+        # también en `ÁRBOLES`, que es el título de la sección y no una
+        # ficha de especie.
+        marcador_de_ficha=r"^(ÁRBOL|ARBUSTO|SUBARBUSTO|HIERBA|ENREDADERA)\b",
+        rotulos_de_ficha=0,
+        ratio_medida=True,
+        nota=(
+            "El del contenido medicinal: atribuye a la papayuela uso «como "
+            "tratamiento de diabetes, enfermedades hepáticas». Entra con la "
+            "advertencia del ADR-0015 ya puesta. DESVIACIÓN DECLARADA: sus "
+            "fragmentos miden unos 183 tokens, por debajo del intervalo de "
+            "300-500 de la Fase 4, y solo el 10 % cae dentro. Es "
+            "deliberado: una ficha de especie mide eso, y respetar el "
+            "intervalo exigiría meter dos plantas en cada fragmento. En un "
+            "documento que atribuye usos medicinales, esa mezcla es el peor "
+            "fallo posible. El intervalo es un medio para que el fragmento "
+            "sea una unidad con sentido; aquí la unidad con sentido es más "
+            "corta que el intervalo."
         ),
     ),
 }
