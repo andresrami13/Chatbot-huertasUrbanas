@@ -80,6 +80,23 @@ class FuenteDocumento:
     # que el renglón entero no tenga nada más.
     folio_desfase_variable: bool = False
 
+    # Sustituciones de carácter a aplicar nada más extraer, para PDF cuya
+    # capa de texto viene con la codificación rota.
+    #
+    # El Protocolo de Espacio Público sale de Ghostscript con un mapa de
+    # fuente equivocado: unos 600 caracteres mal en 30 páginas.
+    #
+    # **La tabla se saca de un inventario completo de caracteres, no
+    # buscando los sospechosos.** Buscándolos aparecieron tres; el
+    # inventario destapó cinco más. Con los tres primeros el texto ya
+    # *parecía* correcto de un vistazo y seguía diciendo «a travØs» y
+    # «MAR˝A CLAUDIA GARC˝A D`VILA».
+    #
+    # Se declara por documento y no como limpieza general a propósito. Una
+    # tabla de sustituciones aplicada a ciegas a todo el corpus es una
+    # forma excelente de estropear un texto que estaba bien.
+    sustituciones: tuple[tuple[str, str], ...] = ()
+
     # Un renglón repetido en esta cantidad de páginas se descarta por ser
     # maquetación. El valor por defecto sirve para prosa corrida; los
     # documentos organizados en fichas necesitan más, porque en ellos un
@@ -423,6 +440,139 @@ CATALOGO: dict[str, FuenteDocumento] = {
             "fallo posible. El intervalo es un medio para que el fragmento "
             "sea una unidad con sentido; aquí la unidad con sentido es más "
             "corta que el intervalo."
+        ),
+    ),
+    # --- Tercera tanda, del 15/08/2026 -----------------------------------
+    #
+    # Las dos primeras NO son del Jardín Botánico, y es la primera vez que
+    # pasa. La línea de la fuente que lee la usuaria dirá «FAO» y
+    # «Universidad Nacional Abierta y a Distancia», que es lo correcto: sale
+    # de la tabla `fuente` por la clave foránea, no del texto vectorizado
+    # (ADR-0009, decisión 6).
+    "fao_compostaje_2013": FuenteDocumento(
+        clave="fao_compostaje_2013",
+        entidad=(
+            "Organización de las Naciones Unidas para la Alimentación y la "
+            "Agricultura (FAO)"
+        ),
+        titulo=(
+            "Manual de compostaje del agricultor. Experiencias en América "
+            "Latina"
+        ),
+        url="PENDIENTE",
+        archivo="Manual de compostaje del agricultor.pdf",
+        # 1 portada, 3 portadilla, 4 avisos legales, 5 equipo técnico, 6
+        # presentación, 7 resumen ejecutivo, 8 y 9 índice y lista de
+        # figuras. La 15 abre el capítulo 1 (folio impreso 13). De la 103 a
+        # la 108 va la bibliografía y la 109 son anotaciones en blanco.
+        pagina_inicial=15,
+        pagina_final=101,
+        # Medida sobre sus fragmentos: media 4.11, extremo denso 3.32.
+        caracteres_por_token=3.32,
+        # Constante y comprobado en las 100 páginas que llevan folio.
+        desfase_folio=2,
+        ratio_medida=False,
+        nota=(
+            "Primera fuente que no es del Jardín Botánico. Su alcance es "
+            "América Latina, no Bogotá: el compostaje es de los temas que "
+            "peor y mejor viajan, porque el proceso es universal pero los "
+            "tiempos dependen del clima, y Bogotá está a 2.600 m."
+        ),
+    ),
+    "unad_agroecologica_2021": FuenteDocumento(
+        clave="unad_agroecologica_2021",
+        entidad="Universidad Nacional Abierta y a Distancia (UNAD)",
+        titulo=(
+            "Producción agroecológica urbana - periurbana y su contribución "
+            "en la seguridad alimentaria de Colombia"
+        ),
+        url="PENDIENTE",
+        archivo="Producción+agroecológica+(Digital).pdf",
+        # De la 1 a la 14 van portada, autores, créditos, ficha catalográfica,
+        # reseñas, contenido y listas de tablas y figuras. La 15 es la
+        # presentación, prosa institucional; la 16 abre la introducción, que
+        # es el mismo criterio con el que entraron los otros. De la 204 en
+        # adelante van las referencias.
+        pagina_inicial=16,
+        pagina_final=203,
+        # Elegida COMPARANDO, no por la regla del extremo denso, y es el
+        # primer documento en que esa regla no sirve. Medido sobre sus
+        # fragmentos: media 4.16, extremo denso 3.18. Pero con 3.18 solo el
+        # 58 % cae en el intervalo, con 3.6 el 69 % y con 3.9 el 73 %.
+        #
+        # El motivo es la mecánica del troceo: cuando un párrafo largo llega
+        # detrás de uno corto, el corto se cierra tal cual y sale un
+        # fragmento pequeño. Este libro alterna prosa con pies de figura, así
+        # que eso pasa a menudo, y cuanto menor es la ratio —y por tanto el
+        # tamaño máximo— más veces ocurre. La regla del ADR-0009 dimensiona
+        # para que el máximo entre en el intervalo; aquí lo que domina es el
+        # mínimo.
+        caracteres_por_token=3.9,
+        # El desfase se reparte entre -1, -2, -3 y -4: hay páginas sin
+        # numerar intercaladas, como en la cartilla de 2011.
+        folio_desfase_variable=True,
+        ratio_medida=False,
+        nota=(
+            "Libro académico. Lleva cabecera repetida en 92 páginas y "
+            "encabezados de capítulo en otras tantas, que los quita la "
+            "detección de plantilla. PENDIENTE DE DECIDIR: su capítulo 4, "
+            "«Agricultura digital urbana», ocupa de la 142 a la 171 y trata "
+            "de plantas agro-voltaicas y análisis de palabras clave; no "
+            "responde nada que una usuaria vaya a preguntar y competiría en "
+            "el top-k."
+        ),
+    ),
+    "jbb_protocolo_espacio_publico_2024": FuenteDocumento(
+        clave="jbb_protocolo_espacio_publico_2024",
+        entidad="Jardín Botánico de Bogotá José Celestino Mutis",
+        titulo=(
+            "Protocolo de agricultura urbana y periurbana agroecológica en "
+            "espacio público, en el marco del Decreto 315 de 2024"
+        ),
+        url="PENDIENTE",
+        archivo=(
+            "Protocolo_de_Agricultura_Urbana_y_Periurbana_Agroecologica_"
+            "en_Espacio_Publico.pdf"
+        ),
+        # La 1 es la tabla de contenido; la 2 abre la introducción. No tiene
+        # bibliografía que recortar al final.
+        pagina_inicial=2,
+        pagina_final=31,
+        # Medida sobre sus fragmentos: media 4.53, extremo denso 3.87.
+        caracteres_por_token=3.87,
+        # Su capa de texto viene de Ghostscript con el mapa de fuente
+        # equivocado. Cada correspondencia se lee sola en su contexto
+        # —«prÆcticas», «pœblico», «a travØs», «diseæo», «BOGOT`»,
+        # «MAR˝A»— y todas son seguras porque esas letras no existen en
+        # español.
+        #
+        # La tabla se sacó de un **inventario completo de caracteres**, no
+        # buscando los sospechosos de uno en uno. Buscándolos aparecieron
+        # tres; el inventario destapó seis más. Con los tres primeros el
+        # texto ya *parecía* correcto de un vistazo y seguía diciendo
+        # «a travØs» y «JosØ Celestino Mutis».
+        #
+        # `<` y `=` son las comillas de apertura y cierre con que el
+        # documento entrecomilla los títulos de los decretos. El `@` en
+        # cambio se deja: son correos institucionales del Jardín Botánico,
+        # no un carácter roto.
+        sustituciones=(
+            ("Æ", "á"),
+            ("œ", "ú"),
+            ("Ø", "é"),
+            ("æ", "ñ"),
+            ("`", "Á"),
+            ("˝", "Í"),
+            ("<", '"'),
+            ("=", '"'),
+        ),
+        ratio_medida=False,
+        nota=(
+            "El único de los tres que es normativo y no agronómico: fija "
+            "quién autoriza una huerta en espacio público, qué se puede "
+            "sembrar y de qué no responden las entidades. Es el más pegado "
+            "al Programa 25 del Plan de Desarrollo Local de Bosa. Repite el "
+            "título entero como cabecera en 29 de sus 30 páginas."
         ),
     ),
 }

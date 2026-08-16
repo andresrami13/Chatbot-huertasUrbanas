@@ -1188,6 +1188,8 @@ async def main() -> None:
             )
             or ""
         )
+        for malo, bueno in fuente.sustituciones:
+            bruto = bruto.replace(malo, bueno)
         crudas.append((numero, _normalizar_texto(bruto)))
 
     if argumentos.detectar_folio:
@@ -1272,6 +1274,19 @@ async def main() -> None:
     if argumentos.simular:
         print("\n--simular: no se ha vectorizado ni escrito nada.")
         return
+
+    # La URL es la clave por la que la ingesta reconoce lo ya ingerido, y
+    # sin ella no hay forma de rehacer el corpus en la Fase 8: los PDF no se
+    # versionan (ADR-0009). Se comprueba aquí porque el fallo sería
+    # silencioso y destructivo: con dos fuentes marcadas `PENDIENTE`, la
+    # segunda encontraría la fila de la primera y se creería ya ingerida.
+    if not fuente.url.startswith("http"):
+        raise SystemExit(
+            f"\nLa fuente {fuente.clave!r} no tiene URL ({fuente.url!r}).\n"
+            "Es la clave que identifica el documento y lo que permite "
+            "volver a descargarlo:\nsin ella la ingesta no es reproducible. "
+            "Escríbala en el catálogo."
+        )
 
     # La ratio calibrada contra otro documento no vale: la nomenclatura
     # botánica tokeniza más denso que la prosa y los fragmentos se saldrían
