@@ -111,6 +111,16 @@ class FuenteDocumento:
     # ocuparía puestos del top-k.
     saltar_pagina_si_empieza_por: tuple[str, ...] = ()
 
+    # Descarta los fragmentos cuyo texto ya esté en el corpus ingerido.
+    #
+    # Se declara como regla y no como lista de números de fragmento para
+    # que la ingesta se vuelva a derivar sola. Pero conviene tener presente
+    # su límite: **el resultado depende del corpus que haya en la base en
+    # ese momento**. Reingerir esta fuente con otro corpus delante puede
+    # descartar un conjunto distinto. Es reproducible dado el mismo estado
+    # de la base, no en abstracto.
+    descartar_repetidos: bool = False
+
     # `True` cuando `caracteres_por_token` se midió contra este documento.
     # Con `False`, la ingesta real se bloquea.
     ratio_medida: bool = False
@@ -186,6 +196,11 @@ CATALOGO: dict[str, FuenteDocumento] = {
         # cortos: mediana de 386 tokens reales y mínimo de 169.
         caracteres_por_token=4.18,
         ratio_medida=True,
+        # Decidido el 15/08/2026. De sus 83 fragmentos, 21 repiten más de
+        # la mitad de su texto de lo que ya está ingerido, y el peor un
+        # 85 %: en una consulta que caiga sobre uno de esos pasajes, el
+        # top-k gastaría dos de sus cuatro puestos diciendo lo mismo.
+        descartar_repetidos=True,
         nota=(
             "Comparte el 22 % de su texto, palabra por palabra, con "
             "jbb_pasos_basicos (medido el 15/08/2026 sobre secuencias de 8 "

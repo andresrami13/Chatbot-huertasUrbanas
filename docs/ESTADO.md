@@ -48,7 +48,7 @@ falta la prueba con celular.
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
 | Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Cuatro: `agente_v1`, `extraccion_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1` |
-| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **81 fragmentos en Supabase** |
+| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py`, `scripts/catalogo_fuentes.py` | **354 fragmentos de tres fuentes en Supabase** |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
@@ -345,8 +345,12 @@ calling, ingesta de fuentes oficiales y RAG (CU2 y CU4).
 duplicados. Decisiones en
 [ADR-0009](adr/0009-ingesta-de-fuentes-oficiales.md).
 
-    python -m scripts.ingesta_fuente --simular      # trocea e informa, no escribe
-    python -m scripts.ingesta_fuente --reingerir    # rehace la ya ingerida
+Desde el 15/08/2026 el script recibe la fuente del catálogo y estas órdenes
+llevan `--fuente` (ADR-0014):
+
+    python -m scripts.ingesta_fuente --listar
+    python -m scripts.ingesta_fuente --fuente jbb_pasos_basicos --simular
+    python -m scripts.ingesta_fuente --fuente jbb_pasos_basicos --reingerir
 
 - `pypdf` está en **`requirements-scripts.txt`**, aparte, para que no se
   despliegue en Railway. El servicio no abre un PDF nunca.

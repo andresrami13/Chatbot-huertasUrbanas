@@ -163,9 +163,41 @@ Medido el 15/08/2026:
 2022, no: uno de cada cuatro de sus fragmentos ya está en el corpus, y el
 peor repite el 85 %.
 
-**No se bloquea la ingesta.** Con el top-k en 4 y dos fuentes que se
-solapan en una cuarta parte, decidir cuál sobra es una decisión editorial y
-no algo que el script pueda resolver solo. Queda medido y dicho.
+**El script mide y enseña; descartar es decisión de quien ingiere.** Se
+resolvió el 15/08/2026 **descartar los 21** de la cartilla de 2022, que
+entra con 62 de sus 83 fragmentos.
+
+La exclusión se declara como **regla** (`descartar_repetidos`) y no como
+lista de números de fragmento, para que la ingesta se vuelva a derivar
+sola. Tiene un límite que conviene declarar en el documento de grado: **el
+conjunto descartado depende del corpus que hubiera en la base en ese
+momento**. Es reproducible dado el mismo estado de la base, no en
+abstracto. Por eso se ingirió primero la cartilla de 2022, contra los
+mismos 81 fragmentos con los que se midió.
+
+## Consecuencia medida: el corpus era el límite, no el umbral
+
+Ingeridas las dos fuentes, el corpus oficial pasa de 81 a **354
+fragmentos**. Medido contra las consultas del ADR-0010, con el umbral de
+0.68 y top-k=4 sin tocar:
+
+| Consulta | Antes (81 fragmentos) | Después (354) |
+|---|---|---|
+| «a mi mata de tomate le salieron unos bichitos verdes» | 0.6911, recupera 1 | **0.7133, recupera 4** |
+| «cada cuánto tengo que regar la huerta» | 0.7320, recupera 4 | 0.7358, recupera 4 |
+| «cómo hago compost con lo que sobra de la cocina» | 0.7167, recupera 1 | **0.7311, recupera 4** |
+| «cuándo cambio el aceite del carro» | descarta | descarta |
+
+La consulta insignia del CU2 era la que motivó bajar el umbral de 0.70 a
+0.68 en el ADR-0010, porque se quedaba a centésimas. Con el corpus ampliado
+puntúa **0.7133 y superaría incluso el umbral original**. La separación
+frente a lo ajeno al dominio se mantiene: la pregunta del aceite sigue sin
+recuperar nada.
+
+Es una corrección al diagnóstico del ADR-0010, que vale la pena registrar:
+lo que fallaba no era el umbral sino la cobertura del corpus. Bajarlo fue lo
+correcto con un solo documento; queda por ver, en la revalidación, si con
+354 fragmentos sigue haciendo falta.
 
 ## Decisión 8. La normalización pasa de NFC a NFKC, y es igual para todos
 
@@ -217,12 +249,8 @@ caracteres de 130 719, sin mover ningún límite de fragmento.
   un solo renglón, y con un renglón no se puede afirmar que haya calle. Son
   unas 17 páginas y el ruido es de una palabra suelta por caja. Cinco
   páginas avisan además de texto rotado que `pypdf` no extrae.
-- **Qué hacer con los 21 fragmentos repetidos de la cartilla de 2022.** La
-  decisión 7 los mide y los enseña, pero no decide. Las opciones son
-  ingerirla entera y dejar que el top-k arbitre, descartar esos fragmentos,
-  o reemplazar el documento antiguo por el nuevo. Ninguna se puede elegir
-  sin ver primero cómo se comporta la recuperación con el corpus ampliado,
-  que es trabajo de la revalidación del umbral.
+- **Los rótulos al margen** y las cinco páginas de texto rotado de
+  *Sembrando Biodiversidad*, descritos arriba.
 - **La advertencia sobre contenido medicinal**, acordada el 15/08/2026 y
   pendiente de implementar: se marcará el fragmento en la ingesta y el
   backend añadirá un texto fijo, en lugar de confiarlo a una regla del

@@ -852,8 +852,12 @@ def _huellas(texto: str) -> set[tuple[str, ...]]:
 
 async def _comprobar_duplicados(
     fuente: FuenteDocumento, fragmentos: list[str]
-) -> None:
-    """Compara los fragmentos nuevos contra el corpus ya ingerido."""
+) -> list[str]:
+    """Compara los fragmentos nuevos contra el corpus ya ingerido.
+
+    Devuelve los que hay que conservar: todos, salvo que la fuente pida
+    `descartar_repetidos`, en cuyo caso se van los que superen el umbral.
+    """
     await abrir_pool()
     try:
         fila = await obtener_fuente_por_url(fuente.url)
@@ -865,7 +869,7 @@ async def _comprobar_duplicados(
 
     if not existentes:
         print("\nNo hay otras fuentes en la base: nada contra lo que comparar.")
-        return
+        return fragmentos
 
     print(
         f"\nComprobando {len(fragmentos)} fragmentos nuevos contra "
@@ -881,12 +885,14 @@ async def _comprobar_duplicados(
     solapes: list[tuple[float, int]] = []
     for indice, pieza in enumerate(fragmentos):
         huellas = _huellas(pieza)
-        if not huellas:
-            continue
-        solapes.append((len(huellas & corpus) / len(huellas), indice))
+        solapes.append(
+            (len(huellas & corpus) / len(huellas) if huellas else 0.0, indice)
+        )
 
-    solapes.sort(reverse=True)
-    repetidos = [par for par in solapes if par[0] >= SOLAPE_PARA_DUPLICADO]
+    ordenados = sorted(solapes, reverse=True)
+    repetidos = {
+        indice for solape, indice in solapes if solape >= SOLAPE_PARA_DUPLICADO
+    }
 
     medio = sum(solape for solape, _ in solapes) / len(solapes)
     print(f"Solape medio con el corpus: {100 * medio:.1f} %")
@@ -895,18 +901,31 @@ async def _comprobar_duplicados(
         f"{len(repetidos)}/{len(solapes)}"
     )
 
-    for solape, indice in solapes[:5]:
+    for solape, indice in ordenados[:5]:
         print(f"\n  fragmento {indice}: {100 * solape:.0f} % ya está en el corpus")
         print(f"    {fragmentos[indice][:220]}...")
 
-    if repetidos:
+    if not repetidos:
+        return fragmentos
+
+    if not fuente.descartar_repetidos:
         print(
             f"\nESOS {len(repetidos)} FRAGMENTOS COMPETIRÁN CON EL CORPUS EN EL "
-            "TOP-K.\nNo se bloquea la ingesta: con el top-k a 4 y dos fuentes "
-            "que se solapan\nen una cuarta parte, decidir cuál sobra es una "
-            "decisión editorial y no\nalgo que este script pueda resolver "
-            "solo. Queda medido y dicho."
+            "TOP-K.\nLa fuente no pide descartarlos (descartar_repetidos=False), "
+            "así que entran.\nQueda medido y dicho."
         )
+        return fragmentos
+
+    conservados = [
+        pieza for indice, pieza in enumerate(fragmentos) if indice not in repetidos
+    ]
+    print(
+        f"\nDescartados {len(repetidos)} fragmentos por estar ya en el corpus "
+        f"(descartar_repetidos=True).\nSe ingieren {len(conservados)} de "
+        f"{len(fragmentos)}."
+    )
+
+    return conservados
 
 
 async def _ingerir(
@@ -1135,7 +1154,7 @@ async def main() -> None:
         await _medir_tokens(fragmentos, ratio)
 
     if argumentos.comprobar_duplicados:
-        await _comprobar_duplicados(fuente, fragmentos)
+        fragmentos = await _comprobar_duplicados(fuente, fragmentos)
 
     if argumentos.simular:
         print("\n--simular: no se ha vectorizado ni escrito nada.")
@@ -1160,7 +1179,7 @@ async def main() -> None:
     # mismo criterio por el que existe `--simular`, llevado al caso que el
     # ADR-0009 no contemplaba porque solo había una fuente.
     if not argumentos.comprobar_duplicados:
-        await _comprobar_duplicados(fuente, fragmentos)
+        fragmentos = await _comprobar_duplicados(fuente, fragmentos)
 
     await _ingerir(fuente, fragmentos, argumentos.reingerir)
 
