@@ -17,6 +17,7 @@ from app.services.repositorio import (
     contar_mensajes_atascados,
     limpiar_borradores,
     limpiar_idempotencia,
+    limpiar_onboardings,
 )
 
 logging.basicConfig(
@@ -64,6 +65,7 @@ async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
     try:
         await limpiar_idempotencia()
         await limpiar_borradores()
+        await limpiar_onboardings()
 
         # Los mensajes que se tomaron y nunca terminaron delatan un
         # procesamiento interrumpido, casi siempre un redeploy a mitad de

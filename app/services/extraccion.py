@@ -1,23 +1,29 @@
-"""Extracción de entidades de la huerta (Fase 4, Tabla 3).
+"""Extracción de los cultivos de la huerta (Fase 4, Tabla 3).
 
-Convierte lo que la usuaria escribió —o dictó— en los datos estructurados
-del CU3: nombre de la huerta, barrio y cultivos con su fecha aproximada.
+Convierte lo que la usuaria escribió —o dictó— en los cultivos del CU3, con
+su fecha aproximada de siembra.
 
 Tres decisiones que vienen de las fases y no deben cambiarse aquí:
 
 - **Temperatura 0.1, fija** (CLAUDE.md §8). Es la única de la tabla que no
   se calibra: el formato es estricto y la variabilidad solo puede
   estropearlo.
-- **El enum de barrios se genera leyendo la tabla `barrio`**, nunca escrito
-  a mano (ADR-0002). Añadir un barrio es un INSERT.
+- **Ni el barrio ni el nombre de la huerta se extraen aquí** (ADR-0016).
+  Los dos se preguntan en el onboarding, una pregunta por mensaje, y ya
+  están guardados cuando este extractor entra en juego. Antes sí se
+  extraían, por la decisión 5 del ADR-0008: `huerta.barrio_id` es NOT NULL
+  y no había otro momento donde preguntarlo.
 - **Nada se persiste aquí.** Esta función solo lee y devuelve; el CU3 tiene
   que mostrar el resultado y esperar la confirmación de la usuaria antes de
   guardar (CLAUDE.md §4.7).
 
-Sobre la salida estructurada: el esquema obliga al modelo a devolver un
-código de barrio válido, así que no hace falta validar contra el catálogo
-después. Lo que el esquema no puede garantizar es que el mes esté entre 1 y
-12 ni que el año sea razonable, y eso sí se comprueba abajo.
+Que el barrio saliera de aquí tiene además un motivo de coste: el catálogo
+pasó de 8 a 313 barrios (ADR-0016), y su enum viajaba en **cada** llamada de
+extracción, que ocurre en cada mensaje. La desambiguación del barrio lo
+paga una sola vez, en el onboarding.
+
+Sobre la salida estructurada: el esquema garantiza el tipo, no el rango. Que
+el mes esté entre 1 y 12 y que el año sea razonable se comprueba abajo.
 """
 
 import json
@@ -29,11 +35,10 @@ from google.genai import types
 
 from app.agent.plantillas import cargar_prompt
 from app.core.gemini import MODELO_GENERATIVO, obtener_cliente
-from app.services.repositorio import Barrio, listar_barrios
 
 logger = logging.getLogger(__name__)
 
-_PROMPT = "extraccion_v1.md"
+_PROMPT = "extraccion_v2.md"
 
 # Fija por decisión documentada, no calibrable (CLAUDE.md §8).
 _TEMPERATURA = 0.1
@@ -41,6 +46,30 @@ _TEMPERATURA = 0.1
 # Margen de cordura para el año. Una huerta sembrada antes de esto, o en el
 # futuro, es un error de extracción, no un dato.
 _ANIO_MINIMO = 2015
+
+_ESQUEMA = types.Schema(
+    type=types.Type.OBJECT,
+    properties={
+        "cultivos": types.Schema(
+            type=types.Type.ARRAY,
+            items=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "especie": types.Schema(type=types.Type.STRING),
+                    "anio": types.Schema(type=types.Type.INTEGER, nullable=True),
+                    "mes": types.Schema(
+                        type=types.Type.INTEGER,
+                        nullable=True,
+                        description="Mes de siembra, de 1 a 12.",
+                    ),
+                    "fecha_imprecisa": types.Schema(type=types.Type.BOOLEAN),
+                },
+                required=["especie", "anio", "mes", "fecha_imprecisa"],
+            ),
+        ),
+    },
+    required=["cultivos"],
+)
 
 
 @dataclass(frozen=True)
@@ -67,62 +96,20 @@ class CultivoExtraido:
 
 @dataclass(frozen=True)
 class HuertaExtraida:
-    """Lo extraído de un mensaje. Ningún campo es obligatorio.
+    """Lo extraído de un mensaje. Puede venir vacío.
 
-    Que todo pueda venir vacío es lo correcto: el mensaje pudo no hablar de
-    la huerta en absoluto. `tiene_datos` distingue ese caso.
+    Que pueda venir vacío es lo correcto: el mensaje pudo no hablar de la
+    huerta en absoluto. `tiene_datos` distingue ese caso.
+
+    Desde el ADR-0016 solo lleva cultivos. El nombre de la huerta y el
+    barrio los fija el onboarding y se leen de `huerta`, no de aquí.
     """
 
-    nombre_huerta: str | None = None
-    barrio_codigo: str | None = None
     cultivos: list[CultivoExtraido] = field(default_factory=list)
 
     @property
     def tiene_datos(self) -> bool:
-        return bool(self.nombre_huerta or self.barrio_codigo or self.cultivos)
-
-
-def _construir_esquema(barrios: list[Barrio]) -> types.Schema:
-    """Arma el esquema de salida con el enum del catálogo."""
-    return types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "nombre_huerta": types.Schema(
-                type=types.Type.STRING,
-                nullable=True,
-                description="Cómo llama la usuaria a su huerta. null si no lo dice.",
-            ),
-            "barrio": types.Schema(
-                type=types.Type.STRING,
-                enum=[barrio.codigo for barrio in barrios],
-                nullable=True,
-                description="Código del barrio. null si no lo menciona.",
-            ),
-            "cultivos": types.Schema(
-                type=types.Type.ARRAY,
-                items=types.Schema(
-                    type=types.Type.OBJECT,
-                    properties={
-                        "especie": types.Schema(type=types.Type.STRING),
-                        "anio": types.Schema(type=types.Type.INTEGER, nullable=True),
-                        "mes": types.Schema(
-                            type=types.Type.INTEGER,
-                            nullable=True,
-                            description="Mes de siembra, de 1 a 12.",
-                        ),
-                        "fecha_imprecisa": types.Schema(type=types.Type.BOOLEAN),
-                    },
-                    required=["especie", "anio", "mes", "fecha_imprecisa"],
-                ),
-            ),
-        },
-        required=["nombre_huerta", "barrio", "cultivos"],
-    )
-
-
-def _texto_barrios(barrios: list[Barrio]) -> str:
-    """La lista para el prompt: código y nombre, uno por línea."""
-    return "\n".join(f"- `{barrio.codigo}` — {barrio.nombre}" for barrio in barrios)
+        return bool(self.cultivos)
 
 
 def _limpiar_cultivo(bruto: dict, hoy: date) -> CultivoExtraido | None:
@@ -157,25 +144,17 @@ def _limpiar_cultivo(bruto: dict, hoy: date) -> CultivoExtraido | None:
 
 
 async def extraer_huerta(mensaje: str, hoy: date | None = None) -> HuertaExtraida:
-    """Extrae los datos de la huerta que haya en el mensaje.
+    """Extrae los cultivos que haya en el mensaje.
 
-    Devuelve una `HuertaExtraida` vacía si el mensaje no habla de la huerta
+    Devuelve una `HuertaExtraida` vacía si el mensaje no habla de cultivos
     o si el modelo falla. Nunca lanza: quien llama sigue el flujo del CU3, y
     un fallo de extracción no debe tumbar la conversación.
 
     `hoy` es inyectable para poder probar las fechas relativas.
     """
     hoy = hoy or date.today()
-    barrios = await listar_barrios()
-
-    if not barrios:
-        # Sin catálogo no hay enum, y sin enum el modelo devolvería barrios
-        # inventados. Es un fallo de instalación: falta ejecutar 002.
-        logger.error("El catálogo de barrios está vacío; no se puede extraer")
-        return HuertaExtraida()
 
     prompt = cargar_prompt(_PROMPT).format(
-        barrios=_texto_barrios(barrios),
         hoy=hoy.isoformat(),
         mensaje=mensaje,
     )
@@ -187,7 +166,7 @@ async def extraer_huerta(mensaje: str, hoy: date | None = None) -> HuertaExtraid
             config=types.GenerateContentConfig(
                 temperature=_TEMPERATURA,
                 response_mime_type="application/json",
-                response_schema=_construir_esquema(barrios),
+                response_schema=_ESQUEMA,
             ),
         )
     except Exception:
@@ -202,8 +181,6 @@ async def extraer_huerta(mensaje: str, hoy: date | None = None) -> HuertaExtraid
         logger.error("La extracción no devolvió JSON válido")
         return HuertaExtraida()
 
-    nombre = (datos.get("nombre_huerta") or "").strip() or None
-
     cultivos = []
     for bruto in datos.get("cultivos") or []:
         if isinstance(bruto, dict):
@@ -211,19 +188,12 @@ async def extraer_huerta(mensaje: str, hoy: date | None = None) -> HuertaExtraid
             if cultivo is not None:
                 cultivos.append(cultivo)
 
-    extraida = HuertaExtraida(
-        nombre_huerta=nombre,
-        barrio_codigo=datos.get("barrio") or None,
-        cultivos=cultivos,
-    )
+    extraida = HuertaExtraida(cultivos=cultivos)
 
     # Nunca el contenido (CLAUDE.md §11): se registra la forma de lo
-    # extraído, no lo extraído. El barrio sí, que es un código del catálogo
-    # y no identifica a nadie por sí solo.
+    # extraído, no lo extraído.
     logger.info(
-        "Extracción | nombre=%s | barrio=%s | cultivos=%d | sin_fecha=%d",
-        extraida.nombre_huerta is not None,
-        extraida.barrio_codigo,
+        "Extracción | cultivos=%d | sin_fecha=%d",
         len(extraida.cultivos),
         sum(1 for c in extraida.cultivos if c.fecha_siembra() is None),
     )

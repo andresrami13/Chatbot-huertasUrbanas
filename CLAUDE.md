@@ -36,14 +36,15 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Quince decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Dieciséis decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
-15/08/2026 con la prueba en un celular real. De la 7 va hecha la ampliación
-del corpus —de 81 a **774 fragmentos en nueve fuentes**— y falta lo
-principal: **revalidar el umbral**, que se calibró contra un corpus nueve
-veces menor. El detalle está en `docs/ESTADO.md`, sección «Por dónde
-seguir».
+15/08/2026 con la prueba en un celular real. De la 7 van hechas dos cosas:
+la ampliación del corpus —de 81 a **774 fragmentos en nueve fuentes**— y el
+**onboarding de tres preguntas cerradas** que corrige la captura del CU3
+(ADR-0016, 17/08/2026). Falta lo principal: **revalidar el umbral**, que se
+calibró contra un corpus nueve veces menor. El detalle está en
+`docs/ESTADO.md`, sección «Por dónde seguir».
 
 ---
 
@@ -75,6 +76,11 @@ encuesta (Fase 1, n=11). No las revises ni las "mejores" por tu cuenta.
    dos momentos binarios: consentimiento y confirmación de registro. **Nunca**
    un menú de navegación permanente: reintroduce la barrera que el diseño
    quiere eliminar.
+   Se estudió un tercer momento —botones para desambiguar el barrio— y se
+   **descartó** (ADR-0016): el rótulo de un botón admite 20 caracteres y el
+   24 % de los barrios de Bosa pasa de ahí. La desambiguación se resuelve
+   con una **lista numerada dentro del cuerpo del mensaje**, que admite
+   1024, así que esta regla sigue intacta.
 4. **Normalización única de la entrada.** Si el mensaje es audio, se transcribe
    una sola vez antes de interpretar la intención. No dupliques transcripción
    por flujo.
@@ -110,6 +116,15 @@ encuesta (Fase 1, n=11). No las revises ni las "mejores" por tu cuenta.
 | CU1 | Iniciar y autorizar datos | Primer contacto |
 | CU2 | Consultar orientación agroecológica | Consentimiento (CU1) |
 | CU3 | Registrar información de la huerta | Consentimiento (CU1) |
+
+**El CU3 tiene dos entradas desde el ADR-0016.** Al aceptar el
+consentimiento arranca un **onboarding de tres preguntas cerradas** —nombre
+de pila, barrio y nombre de la huerta, una por mensaje— que cierra con los
+botones del registro y **crea la fila de `huerta`**. Después, lo que ella
+vaya contando lo atiende el CU3 conversacional de siempre, que ya solo
+añade cultivos. Consecuencia que hay que tener presente: **existir en
+`huerta` significa ahora «completó el onboarding»**, no «registró algo», y
+una huerta sin cultivos es lo normal.
 | CU4 | Consultar qué siembran otras huertas | Consentimiento (CU1) + datos existentes |
 | CU5 | Pedir ayuda | Ninguna (contenido estático) |
 
@@ -147,11 +162,18 @@ Dos colecciones vectoriales **separadas** (no una sola con discriminador):
 `fragmento_oficial` (vinculada a `fuente`) y `fragmento_comunitario` (vinculada
 a `huerta`).
 
-**Barrios — enumeración cerrada.** Valor abierto rompe el filtro del RAG:
+**Barrios — enumeración cerrada, y desde el 17/08/2026 son 313.** El
+catálogo pasó de los siete de la UPZ 84 a **los 312 barrios de la
+localidad de Bosa** del listado oficial, más `otro` (ADR-0016). Los
+nombres van **en MAYÚSCULA y sin recortar**, tal como vienen del listado.
 
-```
-Holanda | Los 3 Sectores | El Regalo | El Anhelo | La Cabaña | El Bosque | Santa Fe | otro
-```
+`Los 3 Sectores` **ya no está**: no aparece en el listado oficial. El
+ADR-0002 lo había sembrado dando la razón al anteproyecto §5.3.1 frente
+al §7.1; el listado indica que acertaba el §7.1.
+
+No se siembra a mano: `python -m scripts.generar_catalogo_barrios` produce
+`db/003_catalogo_barrios_bosa.sql` desde `fuentes/barrios_localidad.json`,
+que no se versiona.
 
 ---
 
@@ -188,6 +210,7 @@ llevan el ADR que lo justifica.
 |---|---|---|
 | Conversación (agente) | Temperatura | 0.7 |
 | Extracción de entidades | Temperatura | 0.1 (fijo, formato estricto) |
+| Desambiguación de barrio | Temperatura | 0.1 (ADR-0016, mismo criterio) |
 | Redacción RAG y comunidad | Temperatura | 0.4 |
 | Transcripción de voz | Temperatura | 0.0 — **no está en la Fase 4**, es anterior a la entrada por voz |
 | Recuperación oficial | Umbral de similitud (coseno) | **0.68**, no 0.7 (ADR-0010) |
@@ -267,7 +290,14 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
     ella no va a usar. **Ante la duda, se recorta.** Por eso del libro de
     la UNAD entró solo un capítulo de cinco, y del manual de la FAO se
     quitaron las experiencias en otros países.
-11. **El intervalo de 300–500 tokens de la Fase 4 tiene una desviación
+11. **El extractor ya no saca el barrio ni el nombre de la huerta**
+    (`extraccion_v2.md`, ADR-0016). La Fase 4, Tabla 3, los incluye porque
+    entonces no había otro momento para preguntarlos; hoy los fija el
+    onboarding y volver a extraerlos del texto libre solo arriesgaría
+    pisar lo que ella confirmó. El extractor devuelve **cultivos y
+    fechas**, y por eso ya no lee el catálogo de barrios: su enum de 313
+    valores viajaba en cada mensaje.
+12. **El intervalo de 300–500 tokens de la Fase 4 tiene una desviación
     declarada.** Los fragmentos del catálogo de plantas miden unos 183,
     porque una ficha de especie mide eso y respetar el intervalo exigiría
     meter dos plantas en el mismo fragmento. En un documento que atribuye
@@ -313,8 +343,9 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   mensajes que envías, que lleva el número del destinatario.
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
 - Los prompts viven en `app/agent/prompts/` como archivos versionados
-  (`agente_v1.md`, `extraccion_v1.md`, `redaccion_rag_v1.md`,
-  `redaccion_comunidad_v1.md`, `respuesta_general_v1.md`), conforme a la
+  (`agente_v1.md`, `extraccion_v2.md`, `barrio_v1.md`,
+  `redaccion_rag_v1.md`, `redaccion_comunidad_v1.md`,
+  `respuesta_general_v1.md`), conforme a la
   práctica de versionamiento
   declarada en la metodología. **Se rellenan con `str.format`: una llave
   literal rompe la carga con un `KeyError`.** El del agente no lleva huecos

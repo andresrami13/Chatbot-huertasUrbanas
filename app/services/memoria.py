@@ -18,10 +18,12 @@ detectar.
 import logging
 from uuid import UUID
 
+from app import textos
 from app.config import settings
 from app.core.identidad import huella_wamid
 from app.services.repositorio import (
     Turno,
+    nombre_para_saludo,
     registrar_mensaje,
     ultimos_mensajes,
 )
@@ -122,14 +124,51 @@ async def recordar_asistente(
     await _recordar(usuario_id, _ROL_ASISTENTE, contenido, "text", wamid)
 
 
+async def _con_saludo(usuario_id: UUID, texto: str) -> str:
+    """Antepone "Hola, Fulana." si lleva un día sin escribir (ADR-0016).
+
+    **Lo que devuelve esta función se envía pero no se recuerda**, y esa
+    separación es el motivo de que el saludo se resuelva aquí y no en cada
+    flujo. El nombre vive cifrado con AES-GCM en `usuario`, mientras que
+    `mensaje.contenido` va en claro por decisión del ADR-0012: si el saludo
+    entrara en la memoria, el nombre quedaría legible ahí y el cifrado
+    dejaría de proteger nada.
+
+    Tampoco conviene que lo vea el agente. Es cosmética de entrega, no
+    información de la conversación; si entrara en la ventana, el modelo
+    podría imitarlo y ponerse a saludar por su cuenta.
+
+    Un fallo aquí no puede costar la respuesta: si la consulta falla se
+    envía el texto tal cual, sin saludo.
+    """
+    try:
+        nombre = await nombre_para_saludo(usuario_id)
+    except Exception:
+        logger.exception(
+            "No se pudo decidir el saludo | usuario_id=%s", usuario_id
+        )
+        return texto
+
+    if not nombre:
+        return texto
+
+    # Sin el nombre en la bitácora (CLAUDE.md §11): solo que hubo saludo.
+    logger.info("Saludo personalizado antepuesto | usuario_id=%s", usuario_id)
+    return f"{textos.SALUDO_PERSONALIZADO.format(nombre=nombre)}\n\n{texto}"
+
+
 async def responder(numero: str, usuario_id: UUID, texto: str) -> None:
     """Envía un texto a la usuaria y lo deja en la memoria.
 
     Es la forma normal de responder a alguien que ya autorizó. Antes de la
     compuerta no sirve —no hay `usuario_id`— y allí se usa `enviar_texto`
     directamente, que es lo correcto: esos mensajes no son memoria.
+
+    **Se envía `enviado` y se recuerda `texto`**, que pueden diferir en el
+    saludo personalizado. Es deliberado; ver `_con_saludo`.
     """
-    wamid = await enviar_texto(numero, texto)
+    enviado = await _con_saludo(usuario_id, texto)
+    wamid = await enviar_texto(numero, enviado)
     await recordar_asistente(usuario_id, texto, wamid)
 
 
@@ -145,5 +184,6 @@ async def responder_con_botones(
     que ella leyó. Cuál pulsó se registra por separado, cuando la pulsación
     vuelve por el webhook.
     """
-    wamid = await enviar_botones(numero, cuerpo, botones)
+    enviado = await _con_saludo(usuario_id, cuerpo)
+    wamid = await enviar_botones(numero, enviado, botones)
     await recordar_asistente(usuario_id, cuerpo, wamid)

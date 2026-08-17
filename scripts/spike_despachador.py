@@ -239,6 +239,88 @@ async def main() -> None:
         )
         _comprobar(ana_id is not None, "queda registrado su consentimiento")
 
+        # Al aceptar arranca el onboarding (ADR-0016): tres preguntas
+        # cerradas, una por mensaje. Mientras no las conteste, el agente no
+        # ve nada — es lo que se comprueba de paso al final del bloque.
+        enviados = await _entra(
+            _texto(_NUMERO_ANA, _wamid("03a"), "Carmen"),
+            "contesta el nombre",
+        )
+        _comprobar(
+            textos.ONBOARDING_PREGUNTA_BARRIO in _todo(enviados),
+            "el eco del nombre va dentro de la pregunta del barrio",
+            "confirmación implícita: no se le pide un 'sí' aparte",
+        )
+        _comprobar(
+            "guardé" in _todo(enviados),
+            "del nombre dice 'guardé', que es verdad",
+            "su fila de usuario existe desde el consentimiento",
+        )
+
+        enviados = await _entra(
+            _texto(_NUMERO_ANA, _wamid("03b"), "Holanda"),
+            "contesta el barrio",
+        )
+        texto = _todo(enviados)
+        _comprobar(
+            textos.ONBOARDING_OPCION_NINGUNO in texto,
+            "ofrece los candidatos como lista numerada de texto",
+            "sin botones: el 24 % de los barrios no cabe en un rótulo",
+        )
+        _comprobar(
+            not any(clase == "botones" for clase, _ in enviados),
+            "la desambiguación NO usa botones",
+            "por eso no hay que enmendar el §4.3 de CLAUDE.md",
+        )
+        _comprobar(
+            textos.ONBOARDING_OPCION_OTRO not in texto,
+            "la salida 'mi barrio no está' todavía NO aparece",
+            "solo al tercer 'Ninguno', para no ofrecer el camino corto",
+        )
+
+        enviados = await _entra(
+            _texto(_NUMERO_ANA, _wamid("03c"), "1"),
+            "elige la opción 1",
+        )
+        _comprobar(
+            textos.ONBOARDING_PREGUNTA_HUERTA in _todo(enviados),
+            "pasa a la tercera pregunta",
+        )
+        _comprobar(
+            "anoté" in _todo(enviados),
+            "del barrio dice 'anoté', no 'guardé'",
+            "todavía espera al botón: decir 'guardé' sería falso",
+        )
+
+        enviados = await _entra(
+            _texto(_NUMERO_ANA, _wamid("03d"), "La Milagrosa"),
+            "contesta el nombre de la huerta",
+        )
+        _comprobar(
+            any(clase == "botones" for clase, _ in enviados),
+            "cierra con el resumen y los botones del CU3",
+            "el único momento con botones del onboarding, y son los de siempre",
+        )
+
+        huertas = await obtener_pool().fetchval(
+            "select count(*) from huerta where usuario_id = $1", ana_id
+        )
+        _comprobar(huertas == 0, "todavía NO hay huerta: solo se propuso")
+
+        enviados = await _entra(
+            _boton(_NUMERO_ANA, _wamid("03e"), textos.BOTON_REGISTRO_CONFIRMO),
+            "pulsa [Sí, guardar] del onboarding",
+        )
+
+        huertas = await obtener_pool().fetchval(
+            "select count(*) from huerta where usuario_id = $1", ana_id
+        )
+        _comprobar(
+            huertas == 1,
+            "la huerta existe solo después del botón",
+            "y desde el ADR-0016 significa 'completó el onboarding'",
+        )
+
         enviados = await _entra(
             _texto(
                 _NUMERO_ANA, _wamid("04"),
@@ -299,10 +381,15 @@ async def main() -> None:
             "le propone el registro con botones",
         )
 
-        huertas = await obtener_pool().fetchval(
-            "select count(*) from huerta where usuario_id = $1", ana_id
+        cultivos = await obtener_pool().fetchval(
+            """
+            select count(*) from cultivo c
+              join huerta h on h.id = c.huerta_id
+             where h.usuario_id = $1
+            """,
+            ana_id,
         )
-        _comprobar(huertas == 0, "todavía NO hay huerta: solo se propuso")
+        _comprobar(cultivos == 0, "todavía NO hay cultivos: solo se propuso")
 
         enviados = await _entra(
             _boton(_NUMERO_ANA, _wamid("07"), textos.BOTON_REGISTRO_CONFIRMO),
@@ -315,10 +402,15 @@ async def main() -> None:
             "ahora sí confirma que quedó guardado",
         )
 
-        huertas = await obtener_pool().fetchval(
-            "select count(*) from huerta where usuario_id = $1", ana_id
+        cultivos = await obtener_pool().fetchval(
+            """
+            select count(*) from cultivo c
+              join huerta h on h.id = c.huerta_id
+             where h.usuario_id = $1
+            """,
+            ana_id,
         )
-        _comprobar(huertas == 1, "la huerta existe solo después del botón")
+        _comprobar(cultivos >= 1, "el cultivo existe solo después del botón")
 
         # -----------------------------------------------------------------
         print("\n" + "=" * 70)

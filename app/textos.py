@@ -61,9 +61,13 @@ Su número de celular y su nombre no se le muestran a nadie.
 ¿Me da su autorización?"""
 
 
-CONSENTIMIENTO_ACEPTADO = """Gracias. Ya puede usar el asistente.
+# Solo el acuse. Las preguntas las hace el onboarding, una por mensaje
+# (ADR-0016). Hasta el 17/08/2026 este texto pedía las tres cosas a la vez
+# —nombre de huerta, barrio y sembrado— y de ahí salía una extracción
+# pobre: era la causa raíz del CU3 que el ADR-0016 corrige.
+CONSENTIMIENTO_ACEPTADO = """Gracias, ya quedó autorizado.
 
-Cuénteme de su huerta: cómo se llama, en qué barrio queda y qué tiene sembrado. Puede escribirlo o mandarme una nota de voz."""
+Le voy a hacer tres preguntas cortas para conocer su huerta."""
 
 
 # La nota de voz llegó pero no se pudo convertir en texto: fallo de la
@@ -82,12 +86,13 @@ Si prefiere, también me lo puede escribir."""
 # datos extraídos, no un modelo: tiene que decir exactamente lo que se va a
 # guardar. Aquí están solo las partes fijas.
 
-# El barrio es obligatorio en la base y sin él no se puede crear la huerta.
-# Se pregunta en lenguaje natural, sin lista de opciones: un menú de ocho
-# barrios es justo la barrera que el diseño evita (Fase 2, §1).
-REGISTRO_FALTA_BARRIO = """Anoté lo que me contó de su huerta.
+# No tiene huerta, es decir, no completó el onboarding (ADR-0016). No
+# debería llegar aquí: el despachador atiende el onboarding antes que el
+# agente. Se responde de todos modos porque un envío que no ocurre deja en
+# la memoria un hueco que el agente no puede detectar (ADR-0012).
+REGISTRO_SIN_HUERTA = """Antes de anotar lo que sembró necesito unos datos de su huerta.
 
-Para guardarlo me falta el barrio. ¿En qué barrio queda su huerta?"""
+Empecemos por ahí y ya seguimos."""
 
 
 # El agente vio que contaba algo de su huerta, pero la extracción no sacó
@@ -216,3 +221,110 @@ CONSENTIMIENTO_RECHAZADO = """Entiendo, no hay problema.
 Sin su autorización no puedo guardar ni consultar información, así que no le voy a insistir.
 
 Si cambia de parecer, escríbame cuando quiera. Mientras tanto puede escribir "ayuda" para ver qué hago."""
+
+
+# --- Onboarding de tres preguntas (CU3, ADR-0016) ---------------------
+# Tres preguntas cerradas, una por mensaje: nombre de pila, barrio y
+# nombre de la huerta. Antes se pedían las tres a la vez en un solo
+# mensaje libre, y de ahí salía la extracción pobre que este onboarding
+# corrige.
+#
+# El eco de lo contestado va DENTRO de la pregunta siguiente, sin pedir un
+# "sí" aparte: tres confirmaciones seguidas convertirían tres preguntas en
+# seis mensajes. La única confirmación explícita es la del final, con los
+# botones que ya existen del CU3.
+
+# "guardé" y "anoté" NO son sinónimos aquí. El nombre se persiste en el
+# acto —la fila de `usuario` existe desde el consentimiento—, así que
+# "guardé" es verdad. El barrio y el nombre de la huerta esperan en el
+# borrador hasta el botón final, y decirle "guardé" sería falso en ese
+# instante. "Guardado" queda reservado para después del botón.
+ONBOARDING_ECO_NOMBRE = "Entendido, guardé {nombre}."
+ONBOARDING_ECO_BARRIO = "Entendido, anoté el barrio {barrio}."
+
+
+# Solo el nombre de pila: el apellido no se usa en ninguna parte del
+# sistema, y pedirlo sería recoger un dato personal sin finalidad
+# (Ley 1581 de 2012; Fase 3, §5).
+ONBOARDING_PREGUNTA_NOMBRE = """Para empezar, ¿cómo se llama usted?
+
+Con el nombre me basta, no necesito el apellido."""
+
+
+# Segundo intento: se le ofrece una salida. No es un reproche, es una
+# puerta para quien no quiera dar su nombre.
+ONBOARDING_NOMBRE_REINTENTO = """Perdone, no le entendí el nombre.
+
+¿Cómo la llaman? Si prefiere no decirlo, escriba vecina."""
+
+
+ONBOARDING_PREGUNTA_BARRIO = "¿En qué barrio de Bosa queda su huerta?"
+
+
+ONBOARDING_BARRIO_REINTENTO = """Perdone, no le entendí el barrio.
+
+¿En qué barrio de Bosa queda su huerta? Escriba solo el nombre del barrio."""
+
+
+# El modelo no encontró ningún barrio parecido en el catálogo.
+ONBOARDING_BARRIO_SIN_CANDIDATOS = """No encontré ese barrio en mi lista.
+
+¿Me lo escribe otra vez, por favor?"""
+
+
+# Encabezado de la lista numerada de candidatos. El cuerpo con los nombres
+# lo compone `onboarding.py`, porque es dinámico.
+ONBOARDING_BARRIO_ENCABEZADO = "¿Cuál de estos es su barrio? Escriba solo el número."
+
+
+# Rótulos de las opciones fijas de esa lista. Se redactan por lo que
+# HACEN y no por lo que significan: "Ninguno" y "Otro" son casi sinónimos
+# en español y la usuaria no sabría cuál escoger.
+ONBOARDING_OPCION_NINGUNO = "Ninguno de estos"
+ONBOARDING_OPCION_OTRO = "Mi barrio no está en la lista"
+
+
+# Ella respondió algo que no es un número. Acepta el dígito y la palabra
+# (uno, dos, tres...), porque una nota de voz se transcribe literalmente y
+# diría "tres" en letras, nunca un dígito: con un lector de solo dígitos,
+# quien responde por voz no podría terminar nunca el onboarding.
+ONBOARDING_NUMERO_NO_ENTENDIDO = """No entendí.
+
+Por favor escriba solo el número de su opción, por ejemplo: 2"""
+
+
+ONBOARDING_PREGUNTA_HUERTA = "¿Cómo se llama su huerta?"
+
+
+# Segundo intento: la salida para quien no le haya puesto nombre.
+ONBOARDING_HUERTA_REINTENTO = """Perdone, no le entendí el nombre de la huerta.
+
+¿Cómo la llama? Si no tiene nombre, escriba Mi huerta."""
+
+
+# Cierre del onboarding, después del botón. Aquí sí se dice "guardado",
+# porque aquí sí lo está.
+ONBOARDING_GUARDADO = """Listo, ya quedó guardada su huerta.
+
+Cuénteme qué tiene sembrado y lo voy anotando. También puede preguntarme lo que necesite sobre su huerta."""
+
+
+# Pulsó [No]. Se repiten las tres preguntas desde el principio: es lo que
+# ella pidió al descartar.
+ONBOARDING_DESCARTADO = """Listo, no guardé nada.
+
+Volvamos a empezar."""
+
+
+# Fallo al escribir en la base. Importa que quede claro que NO se guardó.
+ONBOARDING_FALLO = """Perdone, no pude guardar la información en este momento.
+
+No se guardó nada. ¿Lo intentamos de nuevo en un ratico?"""
+
+
+# --- Saludo personalizado (ADR-0016) ----------------------------------
+# Se antepone a la respuesta una vez cada 24 horas. Lo pone `memoria.py`
+# al ENVIAR y **no entra en la memoria**: el nombre va cifrado en
+# `usuario.nombre_usuario_cifrado` y `mensaje.contenido` va en claro
+# (ADR-0012), así que guardarlo ahí anularía el cifrado.
+SALUDO_PERSONALIZADO = "Hola, {nombre}."

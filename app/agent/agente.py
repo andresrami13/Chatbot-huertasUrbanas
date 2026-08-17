@@ -61,7 +61,6 @@ from app.services.extraccion import extraer_huerta
 from app.services.memoria import responder, ventana
 from app.services.orientacion import consultar_orientacion
 from app.services.registro import proponer_registro
-from app.services.repositorio import listar_barrios
 
 logger = logging.getLogger(__name__)
 
@@ -291,17 +290,13 @@ async def _ejecutar(
             await responder(numero, usuario_id, textos.REGISTRO_NADA_QUE_ANOTAR)
             return True
 
-        barrios = await listar_barrios()
         logger.info("Herramienta %s | cultivos=%d", nombre, len(extraida.cultivos))
 
         # Envía por su cuenta: el resumen lleva botones y lo compone el
-        # código, no el modelo (ADR-0008).
-        await proponer_registro(
-            numero,
-            usuario_id,
-            extraida,
-            {barrio.codigo: barrio.nombre for barrio in barrios},
-        )
+        # código, no el modelo (ADR-0008). El barrio y el nombre de la
+        # huerta los lee del registro, no del catálogo: los fijó el
+        # onboarding (ADR-0016).
+        await proponer_registro(numero, usuario_id, extraida)
         return True
 
     logger.warning("El modelo pidió una función que no existe | nombre=%s", nombre)

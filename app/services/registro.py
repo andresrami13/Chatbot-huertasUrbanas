@@ -1,8 +1,7 @@
 """Flujo de registro de la huerta (CU3).
 
 Extraer -> mostrar -> confirmar con botones -> persistir. Los cuatro pasos,
-en ese orden, y **nada se guarda en `huerta` antes del botón**
-(CLAUDE.md §4.7).
+en ese orden, y **nada se guarda antes del botón** (CLAUDE.md §4.7).
 
 El resumen que se le muestra lo compone este módulo con los datos
 extraídos, **sin pasar por el modelo**. Es deliberado: la usuaria confirma
@@ -13,6 +12,13 @@ añadir, y ella estaría autorizando algo distinto de lo que vio.
 Entre el resumen y el botón hay dos mensajes de WhatsApp, y la respuesta de
 un botón solo trae su identificador. Lo extraído espera en
 `registro_pendiente`, no en memoria (ADR-0008).
+
+**Este es el CU3 conversacional**, el que atiende lo que ella cuente sobre
+la marcha. La entrada al sistema la lleva el onboarding (ADR-0016), que ya
+fijó el barrio y el nombre de la huerta; aquí solo se añaden cultivos. Por
+eso el borrador guarda únicamente cultivos y desapareció la rama de "sin
+barrio no hay botones" de la decisión 5 del ADR-0008: con el onboarding
+cumplido, el barrio siempre está.
 """
 
 import logging
@@ -24,10 +30,12 @@ from app.services.extraccion import CultivoExtraido, HuertaExtraida
 from app.services.fragmento_comunitario import regenerar_fragmento
 from app.services.memoria import responder, responder_con_botones
 from app.services.repositorio import (
+    HuertaDeUsuaria,
+    agregar_cultivos,
     borrar_borrador,
     guardar_borrador,
-    guardar_huerta,
     obtener_borrador,
+    obtener_huerta_de_usuaria,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +51,6 @@ _MESES = (
 def _serializar(extraida: HuertaExtraida) -> dict:
     """Convierte la extracción en el jsonb del borrador."""
     return {
-        "nombre_huerta": extraida.nombre_huerta,
-        "barrio_codigo": extraida.barrio_codigo,
         "cultivos": [
             {
                 "especie": cultivo.especie,
@@ -58,10 +64,14 @@ def _serializar(extraida: HuertaExtraida) -> dict:
 
 
 def _deserializar(datos: dict) -> HuertaExtraida:
-    """Reconstruye la extracción desde el jsonb del borrador."""
+    """Reconstruye la extracción desde el jsonb del borrador.
+
+    Tolera los borradores del formato anterior, que llevaban además
+    `nombre_huerta` y `barrio_codigo`: se ignoran esas claves y se conservan
+    los cultivos. Sin esa tolerancia, un borrador escrito antes del
+    ADR-0016 y confirmado después perdería lo que la usuaria ya contó.
+    """
     return HuertaExtraida(
-        nombre_huerta=datos.get("nombre_huerta"),
-        barrio_codigo=datos.get("barrio_codigo"),
         cultivos=[
             CultivoExtraido(
                 especie=c["especie"],
@@ -78,28 +88,20 @@ def fusionar(previa: HuertaExtraida, nueva: HuertaExtraida) -> HuertaExtraida:
     """Combina un borrador anterior con lo que la usuaria acaba de decir.
 
     Hace falta porque la conversación llega a trozos: "sembré tomate" y,
-    cuando se le pregunta el barrio, "en Holanda". Sin fusionar, la segunda
-    frase perdería el tomate.
+    en el mensaje siguiente, "ah, y también lechuga". Sin fusionar, la
+    segunda frase perdería el tomate.
 
-    Criterios:
-
-    - El dato nuevo gana; el que falta en el nuevo se conserva del anterior.
-      Nunca se borra algo que ya se sabía porque esta frase no lo repita.
-    - Los cultivos **se acumulan**, evitando repetir la misma especie. Es lo
-      que corresponde a cómo se habla: "también sembré lechuga" añade, no
-      sustituye. Y si se colara algo indeseado, ella lo ve en el resumen y
-      puede descartar el registro completo.
+    Los cultivos **se acumulan**, evitando repetir la misma especie. Es lo
+    que corresponde a cómo se habla: "también sembré lechuga" añade, no
+    sustituye. Y si se colara algo indeseado, ella lo ve en el resumen y
+    puede descartar el registro completo.
     """
-    especies_previas = {c.especie.lower() for c in nueva.cultivos}
+    especies_nuevas = {c.especie.lower() for c in nueva.cultivos}
     cultivos = list(nueva.cultivos) + [
-        c for c in previa.cultivos if c.especie.lower() not in especies_previas
+        c for c in previa.cultivos if c.especie.lower() not in especies_nuevas
     ]
 
-    return HuertaExtraida(
-        nombre_huerta=nueva.nombre_huerta or previa.nombre_huerta,
-        barrio_codigo=nueva.barrio_codigo or previa.barrio_codigo,
-        cultivos=cultivos,
-    )
+    return HuertaExtraida(cultivos=cultivos)
 
 
 def _describir_fecha(cultivo: CultivoExtraido) -> str:
@@ -118,17 +120,21 @@ def _describir_fecha(cultivo: CultivoExtraido) -> str:
     return f"{texto} (más o menos)" if cultivo.fecha_imprecisa else texto
 
 
-def componer_resumen(extraida: HuertaExtraida, nombre_barrio: str) -> str:
+def componer_resumen(extraida: HuertaExtraida, huerta: HuertaDeUsuaria) -> str:
     """El texto que se le muestra antes de los botones.
 
     Frases cortas y trato de usted (CLAUDE.md §11). Se cierra con una
     pregunta para que quede claro que hace falta su respuesta.
+
+    El nombre de la huerta y el barrio salen de `huerta`, que es lo que ella
+    confirmó en el onboarding, y se muestran para que sepa dónde va a quedar
+    lo que se anote. No se le vuelven a pedir.
     """
     lineas = ["Esto es lo que entendí:", ""]
 
-    if extraida.nombre_huerta:
-        lineas.append(f"Huerta: {extraida.nombre_huerta}")
-    lineas.append(f"Barrio: {nombre_barrio}")
+    if huerta.nombre_huerta:
+        lineas.append(f"Huerta: {huerta.nombre_huerta}")
+    lineas.append(f"Barrio: {huerta.barrio_nombre}")
 
     if extraida.cultivos:
         lineas.append("")
@@ -146,29 +152,24 @@ async def proponer_registro(
     numero: str,
     usuario_id: UUID,
     extraida: HuertaExtraida,
-    nombres_barrios: dict[str, str],
 ) -> None:
-    """Guarda el borrador y le pide confirmación a la usuaria.
+    """Guarda el borrador y le pide confirmación a la usuaria."""
+    huerta = await obtener_huerta_de_usuaria(usuario_id)
 
-    Si falta el barrio no ofrece los botones: sin barrio no se puede crear
-    la huerta, porque la columna es obligatoria. Pregunta por él y deja el
-    borrador esperando, de modo que la respuesta se fusione con lo ya
-    entendido.
-    """
+    if huerta is None:
+        # No completó el onboarding. No debería ocurrir: el despachador lo
+        # atiende antes de llamar al agente. Se responde de todos modos,
+        # porque callar dejaría en la memoria un hueco que el agente no
+        # puede detectar (ADR-0012).
+        logger.warning("Registro propuesto sin huerta | usuario_id=%s", usuario_id)
+        await responder(numero, usuario_id, textos.REGISTRO_SIN_HUERTA)
+        return
+
     previa = await obtener_borrador(usuario_id)
     if previa is not None:
         extraida = fusionar(_deserializar(previa), extraida)
 
     await guardar_borrador(usuario_id, _serializar(extraida))
-
-    if extraida.barrio_codigo is None:
-        logger.info("Registro propuesto sin barrio | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.REGISTRO_FALTA_BARRIO)
-        return
-
-    nombre_barrio = nombres_barrios.get(
-        extraida.barrio_codigo, extraida.barrio_codigo
-    )
 
     logger.info(
         "Registro propuesto | usuario_id=%s | cultivos=%d",
@@ -179,7 +180,7 @@ async def proponer_registro(
     await responder_con_botones(
         numero,
         usuario_id,
-        componer_resumen(extraida, nombre_barrio),
+        componer_resumen(extraida, huerta),
         [
             (
                 textos.BOTON_REGISTRO_CONFIRMO,
@@ -194,7 +195,7 @@ async def proponer_registro(
 
 
 async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
-    """Persiste el borrador. Es el único punto que escribe en `huerta`."""
+    """Persiste el borrador. Es el único punto que escribe en `cultivo`."""
     datos = await obtener_borrador(usuario_id)
 
     if datos is None:
@@ -205,23 +206,12 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
 
     extraida = _deserializar(datos)
 
-    if extraida.barrio_codigo is None:
-        # No debería llegar aquí: sin barrio no se ofrecen los botones.
-        logger.warning("Confirmación sin barrio | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.REGISTRO_FALTA_BARRIO)
-        return
-
     cultivos: list[tuple[str, date | None, bool]] = [
         (c.especie, c.fecha_siembra(), c.fecha_imprecisa) for c in extraida.cultivos
     ]
 
     try:
-        huerta_id = await guardar_huerta(
-            usuario_id=usuario_id,
-            barrio_codigo=extraida.barrio_codigo,
-            nombre_huerta=extraida.nombre_huerta,
-            cultivos=cultivos,
-        )
+        huerta_id = await agregar_cultivos(usuario_id=usuario_id, cultivos=cultivos)
     except Exception:
         # El borrador NO se borra: así puede reintentar sin volver a
         # contarlo todo.
@@ -229,13 +219,20 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
         await responder(numero, usuario_id, textos.REGISTRO_FALLO)
         return
 
+    if huerta_id is None:
+        # La huerta desapareció entre la propuesta y la confirmación. El
+        # borrador se conserva por si vuelve a haberla.
+        logger.warning("Confirmación sin huerta | usuario_id=%s", usuario_id)
+        await responder(numero, usuario_id, textos.REGISTRO_SIN_HUERTA)
+        return
+
     # Fuera de la transacción y después de confirmar el guardado, a
     # propósito. Regenerar implica una llamada de red al modelo de
     # embeddings, y meterla dentro de la transacción tendría la base
     # bloqueada esperando a un tercero.
     #
-    # Que falle no interrumpe el CU3 ni cambia lo que se le responde: la
-    # huerta ya está guardada y el fragmento es un derivado que se puede
+    # Que falle no interrumpe el CU3 ni cambia lo que se le responde: los
+    # cultivos ya están guardados y el fragmento es un derivado que se puede
     # rehacer (ADR-0004). Lo único que se pierde entretanto es que esa
     # huerta aparezca en el CU4, y `regenerar_fragmento` deja constancia en
     # la bitácora para poder repararlo.

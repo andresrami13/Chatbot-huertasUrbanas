@@ -39,6 +39,7 @@ from app.core.identidad import huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta
 from app.services.memoria import recordar_usuaria
 from app.services.normalizacion import transcribir_audio
+from app.services.onboarding import atender_onboarding, iniciar_onboarding
 from app.services.registro import confirmar_registro, descartar_registro
 from app.services.repositorio import marcar_procesado, reclamar_wamid
 from app.services.whatsapp import enviar_texto
@@ -153,6 +154,14 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
 
     # A partir de aquí la usuaria ya autorizó.
 
+    # Acaba de aceptar: arranca el onboarding y no hay nada más que hacer
+    # con este mensaje (ADR-0016). La pulsación en sí no entra en la
+    # memoria —la memoria empieza donde termina la compuerta (ADR-0012)—,
+    # pero la primera pregunta sí, porque la envía `memoria.responder`.
+    if boton_id == textos.BOTON_ACEPTO:
+        await iniciar_onboarding(numero, usuaria.id)
+        return
+
     # Normalización de la entrada (CLAUDE.md §4.4). Una sola vez, en un
     # único sitio y antes de interpretar la intención: de aquí en adelante
     # da igual si el mensaje llegó escrito o hablado.
@@ -178,6 +187,17 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
         _tipo_entrante(media_id_audio, boton_id),
         mensaje.get("id"),
     )
+
+    # Onboarding de las tres preguntas (ADR-0016). Va **antes** que los
+    # botones del CU3 y que el agente, y el orden no es negociable: el
+    # cierre del onboarding reutiliza los mismos dos botones del registro,
+    # así que si el CU3 los atendiera primero se quedaría con la
+    # confirmación que era del onboarding.
+    #
+    # Mientras no complete las tres preguntas no hay huerta donde registrar
+    # nada, de modo que tampoco hay nada que el agente pueda enrutar.
+    if await atender_onboarding(numero, usuaria.id, texto, boton_id):
+        return
 
     # Botones del registro (CU3). Van antes de cualquier interpretación:
     # una pulsación no es un mensaje que haya que entender, es una respuesta

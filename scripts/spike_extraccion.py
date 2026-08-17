@@ -4,8 +4,9 @@ No forma parte del servicio. Se ejecuta desde la raíz del repositorio:
 
     python -m scripts.spike_extraccion
 
-Necesita el `.env` completo: lee el catálogo de barrios de Supabase y llama
-a Gemini. **No escribe nada en la base.**
+Necesita el `.env` completo: llama a Gemini. **No escribe nada en la base**,
+y desde el ADR-0016 tampoco la lee: el extractor ya no consulta el catálogo
+de barrios, porque el barrio lo fija el onboarding.
 
 Los mensajes de prueba están elegidos para tensar los puntos donde la
 extracción se puede equivocar de forma que la usuaria lo note:
@@ -13,7 +14,7 @@ extracción se puede equivocar de forma que la usuaria lo note:
 - un mensaje completo y bien dicho, que es el caso fácil;
 - una fecha vaga, que debe marcarse como imprecisa y no inventarse;
 - una pregunta, que NO es un registro y no debe producir cultivos;
-- un barrio de fuera de la UPZ, que debe caer en `otro`;
+- un mensaje que nombra el barrio, que debe **ignorarse** ahora;
 - nombres locales de plantas, que no deben "corregirse";
 - una transcripción con titubeos, como las que llegan de verdad por voz.
 """
@@ -23,14 +24,13 @@ from datetime import date
 
 from app.core.basedatos import abrir_pool, cerrar_pool
 from app.services.extraccion import extraer_huerta
-from app.services.repositorio import listar_barrios
 
 CASOS = [
     (
         "mensaje completo",
         "buenas, mi huerta se llama El Porvenir, queda en Holanda y sembré "
         "tomate y cilantro en marzo",
-        "nombre, barrio holanda, 2 cultivos con fecha precisa",
+        "2 cultivos con fecha precisa; nombre y barrio IGNORADOS",
     ),
     (
         "fecha vaga",
@@ -43,9 +43,9 @@ CASOS = [
         "todo vacío: es una consulta",
     ),
     (
-        "barrio de fuera",
-        "yo vivo en Kennedy y tengo lechuga sembrada",
-        "barrio 'otro', 1 cultivo",
+        "solo barrio, sin cultivos",
+        "yo vivo en Kennedy",
+        "todo vacío: el barrio ya no se extrae (ADR-0016)",
     ),
     (
         "nombres locales",
@@ -56,7 +56,7 @@ CASOS = [
         "voz con titubeos",
         "eh... buenas... pues yo tengo, tengo tomate, sembré en abril me "
         "parece, alla en el barrio los tres sectores",
-        "barrio los_3_sectores, 1 cultivo en abril",
+        "1 cultivo en abril; el barrio se ignora",
     ),
     (
         "sin nada de huerta",
@@ -69,10 +69,7 @@ CASOS = [
 async def main() -> None:
     await abrir_pool()
     try:
-        barrios = await listar_barrios()
-        print(f"Catálogo leído de la base: {len(barrios)} barrios activos")
-        print("  " + ", ".join(b.codigo for b in barrios))
-        print(f"\nFecha de referencia: {date.today().isoformat()}")
+        print(f"Fecha de referencia: {date.today().isoformat()}")
         print("=" * 70)
 
         for etiqueta, mensaje, esperado in CASOS:
@@ -82,8 +79,6 @@ async def main() -> None:
 
             extraida = await extraer_huerta(mensaje)
 
-            print(f"  huerta:   {extraida.nombre_huerta!r}")
-            print(f"  barrio:   {extraida.barrio_codigo!r}")
             if not extraida.cultivos:
                 print("  cultivos: (ninguno)")
             for cultivo in extraida.cultivos:

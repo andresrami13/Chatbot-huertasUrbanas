@@ -25,6 +25,7 @@ documento queda marcado como pendiente de corrección.
 | [0013](0013-agente-orquestador.md) | El agente enruta y no relata; el mensaje completo conserva su oportunidad | Aceptada | Fase 2 (§4) |
 | [0014](0014-catalogo-de-fuentes-oficiales.md) | Las fuentes oficiales se declaran en un catálogo, y sus parámetros son mediciones | Aceptada; amplía el [0009](0009-ingesta-de-fuentes-oficiales.md) | Fase 4 (§7) |
 | [0015](0015-advertencia-de-contenido-medico.md) | Toda respuesta del CU2 que hable de salud lleva advertencia, puesta por el backend | Aceptada | Sin respaldo documental |
+| [0016](0016-onboarding-de-preguntas-cerradas.md) | El registro empieza con un onboarding de preguntas cerradas | Aceptada | Fase 2 (CU3) |
 
 ## Documentos pendientes de corrección
 
@@ -79,3 +80,17 @@ Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
 - **Fase 4, §7** — el umbral se calibró sobre mensajes completos, y el
   agente puede recortar la consulta. El recorte de un mensaje de doble
   intención cayó a 0.6796, cuatro diezmilésimas por debajo (ADR-0013).
+- **Fase 2, CU3** — describe un único flujo conversacional. El registro
+  empieza ahora con un onboarding de tres preguntas cerradas, una por
+  mensaje; el flujo conversacional atiende lo que ella cuente después
+  (ADR-0016).
+- **Anteproyecto, §5.3.1** — lista `Los 3 Sectores`, que no aparece en el
+  listado oficial de barrios de Bosa. Corrige en sentido contrario al
+  ADR-0002: era el §7.1 el que acertaba al omitirlo (ADR-0016).
+- **Anteproyecto, §7.1** — acota el alcance a la UPZ 84 Bosa Occidental; el
+  catálogo de barrios pasa a cubrir la localidad de Bosa entera, 312
+  barrios (ADR-0016).
+- **Fase 3, §5.2 y Fase 4, Tabla 3** — no contemplan que el nombre de la
+  usuaria se muestre en la conversación. El saludo personalizado se
+  antepone al enviar y **no** se registra en `mensaje`, o el nombre cifrado
+  quedaría en claro allí (ADR-0016).

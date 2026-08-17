@@ -87,10 +87,15 @@ async def compuerta(
     """
     # 1. La usuaria acepta. Es el único punto del sistema donde se crea
     #    una fila a partir de un mensaje entrante.
+    #
+    #    Devuelve la usuaria, no None: quien llama tiene que arrancar el
+    #    onboarding a continuación (ADR-0016). No se arranca aquí para no
+    #    importar `onboarding`, que a su vez necesita `es_saludo_o_ayuda`
+    #    de este módulo y formaría un ciclo.
     if boton_id == textos.BOTON_ACEPTO:
-        await registrar_consentimiento(numero)
+        usuaria = await registrar_consentimiento(numero)
         await enviar_texto(numero, textos.CONSENTIMIENTO_ACEPTADO)
-        return None
+        return usuaria
 
     # 2. La usuaria rechaza. Se responde una sola vez y no se insiste
     #    (ADR-0003). No se guarda nada: el sistema no recuerda el rechazo.

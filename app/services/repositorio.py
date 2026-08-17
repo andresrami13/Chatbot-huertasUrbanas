@@ -274,6 +274,138 @@ async def limpiar_borradores() -> int:
     return borrados
 
 
+# --- Saludo personalizado (ADR-0016) ----------------------------------
+# Cada cuánto se le antepone el nombre a la respuesta. Se mide en horas
+# desde el último movimiento de la conversación, no por día calendario:
+# quien escribe a las 23:50 y vuelve a las 00:10 no está empezando una
+# conversación nueva.
+_HORAS_ENTRE_SALUDOS = 24
+
+
+async def nombre_para_saludo(usuario_id: UUID) -> str | None:
+    """El nombre de pila si toca saludarla, o None si no toca.
+
+    La condición es que el mensaje entrante **sea el único** de las últimas
+    24 horas. Se cuentan los de los dos roles a propósito: en cuanto se le
+    responde una vez queda una fila del asistente, así que dos respuestas
+    seguidas dentro del mismo turno no la saludan dos veces. Y como el
+    mensaje entrante se registra antes de atenderlo (ADR-0012), en el turno
+    de vuelta el conteo vale exactamente 1.
+
+    Devuelve None si no tiene nombre, que es lo que ocurre mientras no
+    conteste la primera pregunta del onboarding.
+
+    El nombre sale descifrado, como en el resto del módulo: fuera de aquí
+    nadie ve el texto cifrado.
+    """
+    fila = await obtener_pool().fetchrow(
+        """
+        select u.nombre_usuario_cifrado,
+               (select count(*)
+                  from mensaje m
+                 where m.usuario_id = u.id
+                   and m.creado_en > now() - make_interval(hours => $2)
+               ) as recientes
+          from usuario u
+         where u.id = $1
+        """,
+        usuario_id,
+        _HORAS_ENTRE_SALUDOS,
+    )
+
+    if fila is None or fila["recientes"] != 1:
+        return None
+
+    return descifrar_nombre(fila["nombre_usuario_cifrado"])
+
+
+# --- Onboarding en curso (ADR-0016) -----------------------------------
+# Caduca con el mismo criterio que el borrador del CU3, y con una
+# consecuencia distinta: al volver pasadas 24 horas se repiten las tres
+# preguntas y lo que conteste sobrescribe lo que hubiera. Es más simple
+# que llevar la cuenta de qué había contestado, y el coste son dos
+# preguntas cortas.
+_CADUCIDAD_ONBOARDING_HORAS = 24
+
+
+@dataclass(frozen=True)
+class OnboardingEnCurso:
+    """El punto en el que va el onboarding de una usuaria."""
+
+    paso: str
+    datos: dict
+
+
+async def guardar_onboarding(usuario_id: UUID, paso: str, datos: dict) -> None:
+    """Crea o actualiza el estado del onboarding.
+
+    `creado_en` no se toca al actualizar: la caducidad se mide sobre
+    `actualizado_en`, que es lo que refleja cuándo habló ella por última
+    vez dentro del onboarding.
+    """
+    await obtener_pool().execute(
+        """
+        insert into onboarding_pendiente (usuario_id, paso, datos)
+             values ($1, $2, $3::jsonb)
+        on conflict (usuario_id) do update
+                set paso           = excluded.paso,
+                    datos          = excluded.datos,
+                    actualizado_en = now()
+        """,
+        usuario_id,
+        paso,
+        json.dumps(datos),
+    )
+
+
+async def obtener_onboarding(usuario_id: UUID) -> OnboardingEnCurso | None:
+    """El onboarding vigente, o None si no hay o ya caducó.
+
+    Filtra por antigüedad en la propia consulta, igual que el borrador del
+    CU3: uno caducado es como si no existiera, y así no hay que acordarse
+    de comprobarlo en cada sitio que lo lea.
+    """
+    fila = await obtener_pool().fetchrow(
+        """
+        select paso, datos
+          from onboarding_pendiente
+         where usuario_id = $1
+           and actualizado_en > now() - make_interval(hours => $2)
+        """,
+        usuario_id,
+        _CADUCIDAD_ONBOARDING_HORAS,
+    )
+
+    if fila is None:
+        return None
+
+    return OnboardingEnCurso(paso=fila["paso"], datos=json.loads(fila["datos"]))
+
+
+async def borrar_onboarding(usuario_id: UUID) -> None:
+    """Cierra el onboarding, se haya completado o no."""
+    await obtener_pool().execute(
+        "delete from onboarding_pendiente where usuario_id = $1", usuario_id
+    )
+
+
+async def limpiar_onboardings() -> int:
+    """Borra los onboarding caducados. Se invoca al arrancar."""
+    resultado = await obtener_pool().execute(
+        """
+        delete from onboarding_pendiente
+         where actualizado_en < now() - make_interval(hours => $1)
+        """,
+        _CADUCIDAD_ONBOARDING_HORAS,
+    )
+
+    borrados = int(resultado.rsplit(" ", 1)[-1]) if resultado else 0
+    if borrados:
+        logger.info("Onboarding caducados borrados=%d", borrados)
+
+    return borrados
+
+
 # --- Huerta y cultivos (CU3) ------------------------------------------
 
 
@@ -375,6 +507,124 @@ async def guardar_huerta(
     # transacción cierre (ADR-0004). No se hace aquí a propósito: exige una
     # llamada de red al modelo de embeddings, y dejarla dentro tendría la
     # base bloqueada esperando a un tercero.
+    return huerta_id
+
+
+@dataclass(frozen=True)
+class HuertaDeUsuaria:
+    """La huerta de una usuaria, con su barrio ya resuelto.
+
+    Desde el ADR-0016 la existencia de esta fila significa que **completó el
+    onboarding**, no que haya registrado algún cultivo. Antes significaba lo
+    segundo, y el matiz importa: hoy una huerta sin cultivos es lo normal
+    justo después del onboarding, no una anomalía.
+    """
+
+    id: UUID
+    nombre_huerta: str | None
+    barrio_codigo: str
+    barrio_nombre: str
+
+
+async def obtener_huerta_de_usuaria(usuario_id: UUID) -> HuertaDeUsuaria | None:
+    """La huerta de la usuaria, o None si todavía no completó el onboarding.
+
+    Es el indicador de onboarding completado (ADR-0016, decisión 3), y por
+    eso lo consultan tanto el despachador —para decidir si arranca el
+    onboarding— como el CU3 conversacional, que necesita el barrio y el
+    nombre para componer el resumen sin volver a preguntarlos.
+
+    Capa 1 del modelo de seguridad: acotado por `usuario_id`.
+    """
+    fila = await obtener_pool().fetchrow(
+        """
+        select h.id,
+               h.nombre_huerta,
+               b.codigo as barrio_codigo,
+               b.nombre as barrio_nombre
+          from huerta h
+          join barrio b on b.id = h.barrio_id
+         where h.usuario_id = $1
+         order by h.creado_en
+         limit 1
+        """,
+        usuario_id,
+    )
+
+    if fila is None:
+        return None
+
+    return HuertaDeUsuaria(
+        id=fila["id"],
+        nombre_huerta=fila["nombre_huerta"],
+        barrio_codigo=fila["barrio_codigo"],
+        barrio_nombre=fila["barrio_nombre"],
+    )
+
+
+async def agregar_cultivos(
+    usuario_id: UUID,
+    cultivos: list[tuple[str, date | None, bool]],
+) -> UUID | None:
+    """Añade cultivos a la huerta que ya existe. Devuelve su id.
+
+    Es lo que persiste el CU3 conversacional desde el ADR-0016: el barrio y
+    el nombre de la huerta los fijó el onboarding, así que aquí solo entran
+    cultivos y no hace falta tocar la fila de `huerta`.
+
+    Devuelve `None` si la usuaria no tiene huerta, es decir, si no completó
+    el onboarding. No la crea: crear una huerta sin barrio confirmado por
+    ella sería saltarse el §4.7.
+
+    `cultivos` son ternas (especie, fecha o None, fecha_imprecisa).
+    """
+    pool = obtener_pool()
+
+    async with pool.acquire() as conexion:
+        async with conexion.transaction():
+            huerta_id = await conexion.fetchval(
+                """
+                select id from huerta
+                 where usuario_id = $1
+                 order by creado_en
+                 limit 1
+                """,
+                usuario_id,
+            )
+
+            if huerta_id is None:
+                return None
+
+            for especie, fecha, imprecisa in cultivos:
+                await conexion.execute(
+                    """
+                    insert into cultivo
+                           (huerta_id, especie, fecha_siembra_aprox,
+                            fecha_imprecisa)
+                         values ($1, $2, $3, $4)
+                    """,
+                    huerta_id,
+                    especie,
+                    fecha,
+                    imprecisa,
+                )
+
+            # La huerta cambió aunque su fila no: el CU4 ordena por esta
+            # marca (`listar_fragmentos_comunitarios_recientes`), y sin
+            # tocarla una huerta que acaba de sumar cultivos se hundiría en
+            # el listado.
+            await conexion.execute(
+                "update huerta set actualizado_en = now() where id = $1",
+                huerta_id,
+            )
+
+    logger.info(
+        "Cultivos añadidos | usuario_id=%s | huerta_id=%s | cultivos=%d",
+        usuario_id,
+        huerta_id,
+        len(cultivos),
+    )
+
     return huerta_id
 
 

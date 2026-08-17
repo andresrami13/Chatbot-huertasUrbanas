@@ -149,7 +149,19 @@ async def main() -> None:
             cultivos=[("fresa", None, True), ("acelga", None, True)],
         )
         await regenerar_fragmento(huerta_id)
+
+        # Ana ya completó el onboarding: tiene huerta con barrio y nombre,
+        # pero todavía sin cultivos. Desde el ADR-0016 esa fila es lo que
+        # significa "completó el onboarding", y sin ella el CU3
+        # conversacional no tiene dónde añadir lo que cuente.
+        await guardar_huerta(
+            usuario_id=ana.id,
+            barrio_codigo="holanda",
+            nombre_huerta="La Milagrosa",
+            cultivos=[],
+        )
         print("Preparado: una huerta vecina con fresa y acelga en Holanda.")
+        print("Preparado: Ana con onboarding hecho y su huerta sin cultivos.")
 
         # -----------------------------------------------------------------
         print("\n" + "=" * 70)
@@ -201,40 +213,52 @@ async def main() -> None:
         )
         texto = _todo(enviados)
 
-        # Sin barrio NO se ofrecen botones, y es lo correcto: la columna es
-        # obligatoria, así que se pregunta en lenguaje natural y el borrador
-        # espera (ADR-0008, decisión 5).
+        # Con el onboarding hecho, el barrio ya está: se ofrecen los botones
+        # de una vez. Antes del ADR-0016 aquí se preguntaba el barrio en
+        # lenguaje natural, porque la extracción podía no traerlo
+        # (ADR-0008, decisión 5, ya retirada).
         _comprobar(
-            not any(clase == "botones" for clase, _ in enviados),
-            "sin barrio no ofrece botones todavía",
-            "los pediría para confirmar algo que no se puede guardar",
+            any(clase == "botones" for clase, _ in enviados),
+            "ofrece los botones de confirmación",
+            "el barrio lo fijó el onboarding, así que no falta nada",
         )
         _comprobar(
-            textos.REGISTRO_FALTA_BARRIO in texto,
-            "pregunta el barrio en lenguaje natural, sin menú",
+            "La Milagrosa" in texto and "HOLANDA" in texto,
+            "el resumen muestra la huerta y el barrio que ella confirmó",
+            "salen de `huerta`, no de la extracción, y en mayúscula",
         )
         _comprobar(not _YA_GUARDADO.search(texto), "NO dice que ya quedó guardado")
 
-        huertas_de_ana = await obtener_pool().fetchval(
-            "select count(*) from huerta where usuario_id = $1", ana.id
+        cultivos_de_ana = await obtener_pool().fetchval(
+            """
+            select count(*)
+              from cultivo c
+              join huerta h on h.id = c.huerta_id
+             where h.usuario_id = $1
+            """,
+            ana.id,
         )
         _comprobar(
-            huertas_de_ana == 0,
-            "no creó ninguna huerta en la base",
+            cultivos_de_ana == 0,
+            "no guardó ningún cultivo en la base",
             "es la comprobación que sostiene el §4.7",
         )
 
         # -----------------------------------------------------------------
         print("\n" + "=" * 70)
-        print("4. La memoria: 'en el regalo' solo se entiende con lo anterior")
+        print("4. La memoria: 'también lechuga' solo se entiende con lo anterior")
         print("=" * 70)
-        enviados = await _turno(_NUMERO_ANA, ana.id, "en holanda")
+        # Antes del ADR-0016 este caso era "en holanda", respondiendo a la
+        # pregunta del barrio que hacía el CU3. Ese camino ya no existe: el
+        # barrio lo fija el onboarding y la extracción ni lo mira. La
+        # invariante que se comprueba es la misma —memoria y fusión del
+        # borrador— con un mensaje que hoy tiene sentido.
+        enviados = await _turno(_NUMERO_ANA, ana.id, "ah, y también sembré lechuga")
         texto = _todo(enviados)
 
         _comprobar(
-            "Holanda" in texto,
-            "entiende que responde al barrio que se le preguntó",
-            "sin memoria sería una palabra suelta sin sentido",
+            "lechuga" in texto.lower(),
+            "recoge lo que acaba de decir",
         )
         _comprobar(
             "cilantro" in texto.lower(),
@@ -243,7 +267,7 @@ async def main() -> None:
         )
         _comprobar(
             any(clase == "botones" for clase, _ in enviados),
-            "ahora sí ofrece los botones: ya tiene barrio",
+            "vuelve a ofrecer los botones con la lista completa",
         )
         _comprobar(
             "cebolla larga" in texto.lower(),

@@ -1,14 +1,28 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-15. **La Fase 6 está construida entera,
-probada contra la base y la API reales, y desplegada.** Ingesta oficial,
-CU2, CU4, memoria de conversación y agente con function calling conectado
-al despachador. **Lo único pendiente de la Fase 6 es la prueba con un
-celular real**; después empieza la Fase 7 (calibración y pruebas).
+Última actualización: 2026-08-17. **La Fase 6 se cerró el 15/08/2026 con la
+prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
+pruebas).** Los cinco casos de uso están construidos y desplegados, y la
+conversación ya se probó desde un celular real. El CU4 es el único que
+sigue sin ejercitarse de verdad, y no por un fallo: excluye la huerta de
+quien pregunta y solo hay una registrada.
+
+De la Fase 7 van hechas tres cosas, las dos primeras nacidas de esa prueba:
+
+- **El corpus oficial pasó de 81 a 774 fragmentos en nueve fuentes**
+  (ADR-0014), y dos de ellas ya no son del Jardín Botánico.
+- **El CU2 responde aunque ninguna fuente supere el umbral**, con el
+  conocimiento del modelo y sin citar a nadie, y toda respuesta que hable
+  de salud lleva advertencia (ADR-0015).
+- **El CU3 empieza con un onboarding de tres preguntas cerradas**
+  (ADR-0016, 17/08/2026), y el catálogo de barrios pasó de 8 a 313.
+
+Falta lo principal: **revalidar el umbral**, que hoy no lo respalda ninguna
+medición.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(trece decisiones tomadas durante la implementación).
+(dieciséis decisiones tomadas durante la implementación).
 
 **Si retoma en una conversación nueva, vaya directo a
 [Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
@@ -22,8 +36,8 @@ consentimiento, transcribe las notas de voz y **un agente con function
 calling decide qué hacer**: responder con la guía oficial (CU2), contar qué
 siembran otras huertas (CU4), ofrecer guardar lo que le contaron (CU3) o
 mostrar la ayuda (CU5). Recuerda los últimos diez mensajes. **Los cinco
-casos de uso están construidos y probados contra la base y la API reales**;
-falta la prueba con celular.
+casos de uso están construidos y desplegados, y la conversación se probó
+desde un celular real.** Lo que queda es medirlo y calibrarlo.
 
 ---
 
@@ -47,18 +61,25 @@ falta la prueba con celular.
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
-| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Cuatro: `agente_v1`, `extraccion_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1` |
-| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py`, `scripts/catalogo_fuentes.py` | **774 fragmentos de nueve fuentes en Supabase** |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Cinco: `agente_v1`, `extraccion_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1`, `respuesta_general_v1` |
+| Catálogo de fuentes oficiales | `scripts/catalogo_fuentes.py` | Nueve fuentes declaradas, con sus parámetros medidos (ADR-0014) |
+| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **774 fragmentos de nueve fuentes en Supabase** |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
+| Respuesta sin respaldo oficial | `respuesta_general_v1.md`, `CU2_RESPALDO_MODELO` | Activo desde el 15/08; se apaga en Railway sin desplegar |
+| Advertencia de contenido médico | `app/textos.py`, `orientacion.py` | La pone el backend, no el prompt (ADR-0015) |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
 | Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Enrutado por el agente desde el 15/08 |
-| Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | Probada contra la base real; falta el celular |
-| Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | Conectado al despachador; falta el celular |
+| Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
+| Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | **Probado en producción desde el celular** |
+| Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | Probado con los spikes; **sin probar desde el celular** (ADR-0016) |
+| Catálogo de barrios de Bosa | `db/003_catalogo_barrios_bosa.sql` | **313 filas en Supabase** desde el 17/08/2026 |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
-quedó el `telefono_hash`, nunca el número.
+quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
+15/08 encontró está más abajo, en
+[la prueba con celular](#fase-6-paso-5-la-prueba-con-celular-real-15082026).
 
 ## Infraestructura operativa
 
@@ -72,77 +93,110 @@ quedó el `telefono_hash`, nunca el número.
 - **Supabase:** PostgreSQL 17.6, esquema aplicado, RLS activo sin políticas.
   Conexión por **session pooler, puerto 5432** — la directa es solo IPv6 y el
   equipo de desarrollo no tiene IPv6; el puerto 6543 rompe `asyncpg`.
+  **774 fragmentos oficiales de nueve fuentes** desde el 15/08/2026.
+  Escribir ahí cambia lo que responde el bot **en el acto**, con o sin
+  despliegue: Railway lee esta misma base.
 - **Meta:** app `Chatbot Huertas Urbanas` (id `4332318797098432`), número de
   prueba `+1 555-136-8057`. Webhook registrado, app suscrita al WABA y campo
   `messages` suscrito. **Los tres pasos son independientes**; que el webhook
   verifique no implica que lleguen mensajes.
-- **GitHub:** repositorio **público**. `origin/main` al día en `28b5891`,
-  que es lo que `/health` reporta desplegado (comprobado el 15/08/2026).
+- **GitHub:** repositorio **público**. `origin/main` al día en `c0d2303`.
+  **Antes de dar por probado nada, compruebe con `/health` qué commit está
+  corriendo:** desde el 15/08 lo dice, y el corpus vive en Supabase, así que
+  el bot puede estar respondiendo con fragmentos nuevos y código viejo.
 
 ## Lo que NO funciona todavía (esperado)
 
-- **Falta la prueba con celular real de la Fase 6.** Es lo único pendiente.
-  Todo lo demás está probado contra la base y la API reales, pero nada de
-  4a, 4b ni 4c ha pasado todavía por WhatsApp.
+- **El umbral de 0.68 no lo respalda ninguna medición.** Se calibró contra
+  81 fragmentos y el corpus tiene 774 (ADR-0014). Sigue puesto y funciona,
+  pero es un número sin evidencia detrás hasta que se remida. Es lo primero
+  de [Por dónde seguir](#por-dónde-seguir).
+- **El corpus tiene huecos que el umbral no arregla.** La prueba real dejó
+  un tercer grupo de consultas —del dominio, pero fuera de lo que tratan
+  las fuentes— que bajar el umbral no salva: solo consigue que se respondan
+  con el fragmento equivocado. Lo que piden es más corpus, no menos umbral.
+  Están enumeradas como `DESCUBIERTA` en `scripts/calibrar_umbral_real.py`,
+  y varias ya dejaron de serlo con las nueve fuentes.
 - **Un mensaje que mezcle consulta y dato sigue ofreciendo guardar el
   cultivo por el que se preguntó.** El ADR-0008 daba esto por "cosa del
   agente" y no lo era: el agente enruta bien las dos intenciones, pero la
   extracción corre sobre el mensaje entero. La confirmación la protege;
   queda para calibrar en la Fase 7 (ADR-0013).
+- **Quedan dos defectos de extracción declarados en *Sembrando
+  Biodiversidad*** (ADR-0014, «Lo que este ADR no resuelve»): los rótulos al
+  margen que se cuelan dentro de la frase en unas 17 páginas, y cinco
+  páginas con texto rotado que `pypdf` no extrae.
 
 ---
 
 ## Por dónde seguir
 
-### 1. Cerrar la Fase 6: probarla con un celular real
+### 1. Revalidar el umbral del CU2 contra el corpus de 774 fragmentos
 
-Es lo único que falta, y no lo puede hacer la IA. Está desplegado en
-`28b5891`; compruébelo con `/health` antes de escribir, que ya dice qué
-commit corre.
+**Es lo primero, y es lo único que la Fase 7 tiene bloqueado.** El 0.68
+sigue puesto pero se calibró contra un corpus nueve veces menor, así que
+hoy es un número sin medición detrás (ADR-0014, «Lo que este ADR no
+resuelve»).
 
-Guion sugerido. El orden importa: 3 y 4 son un solo flujo, y 5 solo tiene
-sentido después.
+    python -m scripts.calibrar_umbral_real
 
-| # | Mande | Debe pasar |
-|---|---|---|
-| 1 | `hola` | La bienvenida, palabra por palabra |
-| 2 | `a mi mata de tomate le salieron unos bichitos verdes, que le echo` | Respuesta corta terminando en `Fuente: Jardín Botánico...` |
-| 3 | `sembre cilantro en marzo` | Le pregunta el barrio, **sin botones y sin menú** |
-| 4 | `en holanda` | Resumen con [Sí, guardar] / [No], **con el cilantro del mensaje 3** |
-| 5 | `que estan sembrando las otras huertas` | El CU4, que nunca ha corrido en producción |
-| 6 | Una nota de voz | Que la transcripción siga entrando bien al agente |
+Tres avisos para que la medición no salga vieja otra vez:
 
-Dos advertencias para no confundir un acierto con un fallo:
+- **Las etiquetas del script quedaron desfasadas.** Varias consultas
+  marcadas `DESCUBIERTA` con 81 fragmentos ahora sí las cubre el corpus
+  —«puedo sembrar en el parque de mi barrio» pasó de no tener respuesta a
+  recuperar 4 de 4 del Protocolo de espacio público—. Hay que reclasificar
+  antes de leer ninguna frontera.
+- **La frontera que hay que mirar es `CUBIERTA` contra `DESCUBIERTA`**, no
+  la del ADR-0010. Desde el paso 4c quien filtra la intención es el agente,
+  y con consultas reales los rangos de legítimas y ajenas se solapan
+  —0.6584 contra 0.6977—: ningún umbral los separa.
+- **El umbral ya no decide responder o callar, decide citar o no citar**
+  (`CU2_RESPALDO_MODELO`). Bajarlo tiene hoy un modo de fallo que antes no
+  existía: consultas que lo pasan, no encuentran nada útil y responden «no
+  tengo esa información» con `Fuente: Jardín Botánico` al pie.
 
-- **En el paso 5 lo esperable es el texto de "todavía no tengo qué
-  contarle".** El CU4 excluye la huerta de quien pregunta, y con una sola
-  huerta registrada no queda ninguna. Eso es correcto.
-- **El enrutamiento no es determinista.** El agente corre a 0.7. Un
-  resultado raro una vez no es una medida; repita antes de darlo por roto.
+Lo ya medido al ampliar el corpus, que es el punto de partida y no la
+revalidación: la consulta insignia del CU2 subió de 0.6911 a **0.7231**, y
+las siete consultas cubiertas de la prueba real pasan el umbral cuando
+antes la peor se quedaba en 0.6584.
 
-Si algo sale mal, la bitácora de Railway trae
-`Agente | turnos_memoria=N | funciones=[...]`, que dice a qué enrutó sin
-exponer el contenido del mensaje.
+### 2. El resto de la Fase 7
 
-### 2. Después viene la Fase 7 (calibración y pruebas)
+Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
 
-Lo que ya está identificado y esperando datos reales:
-
-- **Revalidar el umbral del CU2 con consultas reales de las usuarias**, no
-  con las que imaginó el autor. El margen es de una centésima (ADR-0010), y
-  el ADR-0013 añadió que ese margen no sobrevive a que el agente recorte la
-  consulta. La bitácora ya cuenta las dos cosas que hacen falta:
-  `literal=True/False` y `CU2 recuperado con el mensaje completo tras
-  fallar el recorte`.
+- **Probar el onboarding desde un celular real** (ADR-0016). Es lo único
+  construido que no ha pasado por un teléfono, y los spikes no pueden
+  cubrir lo que importa: si ella entiende que tiene que escribir un número,
+  si los tres candidatos aciertan con el barrio dicho a su manera, y si
+  responde por voz a la lista numerada. Ojo con **borrar antes su fila de
+  `usuario`**, o el onboarding no arranca: se salta a quien ya tiene huerta.
 - **Remedir el umbral comunitario** con 5–7 huertas de verdad (ADR-0011).
+  Sigue sin tocar desde el 04/08, y no se puede tocar antes: el CU4 excluye
+  la huerta de quien pregunta y solo hay una registrada.
+- **Cuántas veces responde el CU2 sin respaldo oficial.** Cada vez queda
+  contado en la bitácora, y es la señal honesta de dónde le falta corpus
+  —que el respaldo del modelo volvió invisible para la usuaria—.
+- **Si el vocabulario de la advertencia médica acierta** con consultas
+  reales (ADR-0015). Tira a ancho a propósito: advertir de más cuesta dos
+  renglones.
 - **La mezcla consulta + dato**, que sigue ofreciendo guardar el cultivo por
   el que se preguntó (ver arriba, y ADR-0013).
 - **Cuántas veces se cuela la etiqueta de procedencia.** La bitácora lo
   registra cada vez que `limpiar_etiquetas` actúa.
+- **Cuántas veces el recorte del agente se queda corto.** La bitácora trae
+  `literal=True/False` y avisa cuando el CU2 recuperó con el mensaje
+  completo tras fallar el recorte (ADR-0013).
 - **Ampliar las listas de saludos** con los que las usuarias usen de verdad
   y el sistema no reconozca (ADR-0006).
 - **Calibrar** temperaturas, top-k y la ventana de memoria. Todo por
   variables de entorno menos la extracción, que es fija a propósito.
+
+Para diagnosticar una sesión hecha desde el celular, `python -m
+scripts.revisar_prueba_real` reconstruye la conversación desde `mensaje` y
+remide cada consulta. Hace falta porque la bitácora dice `fragmentos=0`
+pero no a qué pregunta (CLAUDE.md §11). **Su salida no va al repositorio,
+que es público.**
 
 ### 3. Acciones suyas, que no puede hacer la IA
 
@@ -150,8 +204,9 @@ Lo que ya está identificado y esperando datos reales:
   al 30/07/2026 contienen su número de teléfono.
 - **Migrar a número propio con SIM nueva antes de la Fase 8.** El
   `PHONE_NUMBER_ID` cambia; nunca escribirlo en el código.
-- **Pasar al documento de grado los trece ADR y las dieciocho correcciones**
-  de [`docs/adr/README.md`](adr/README.md).
+- **Pasar al documento de grado los quince ADR y las veinte correcciones**
+  de [`docs/adr/README.md`](adr/README.md). Los ADR-0014 y 0015 todavía no
+  han aportado las suyas a esa lista consolidada.
 - **Revisar el DNS del equipo.** El resolutor configurado rechaza el host de
   Supabase de forma intermitente (ver más abajo). No rompe nada en
   producción, pero cuesta tiempo en cada sesión de desarrollo.
@@ -170,9 +225,13 @@ la fila real del autor no se toca.
 | `spike_memoria` | La ventana, la deduplicación y el aislamiento entre usuarias |
 | `spike_comunidad`, `spike_orientacion` | El CU4 y el CU2 por separado |
 | `spike_extraccion`, `spike_transcripcion`, `spike_embeddings` | Piezas de la Fase 5 |
-| `calibrar_umbral`, `calibrar_fragmento_comunitario` | Las mediciones de los ADR-0010 y 0011 |
-| `ingesta_fuente` | La ingesta oficial. `--simular` y `--reingerir` |
+| `calibrar_umbral`, `calibrar_fragmento_comunitario` | Las mediciones de los ADR-0010 y 0011, con consultas imaginadas por el autor |
+| `calibrar_umbral_real` | **La revalidación de la Fase 7**, con las consultas de la prueba real |
+| `revisar_prueba_real` | Reconstruye una sesión hecha desde el celular y remide cada consulta. Solo lee |
+| `ingesta_fuente` | La ingesta oficial. `--listar`, `--fuente`, `--detectar-folio`, `--medir-tokens`, `--simular`, `--reingerir` |
+| `catalogo_fuentes` | No se ejecuta: es la declaración de las nueve fuentes y sus parámetros medidos |
 | `regenerar_fragmentos` | Rehace los fragmentos comunitarios |
+| `generar_catalogo_barrios` | Escribe `db/003_catalogo_barrios_bosa.sql` desde el listado oficial. No toca la base |
 
 ---
 
@@ -546,8 +605,11 @@ no duplica, los nulos que conviven, el aislamiento entre usuarias, la
 huella de 64 hex donde antes iba el `wamid` y el tipo que distingue la voz
 de lo escrito.
 
-**Falta la prueba con celular real**, que se hará junto con la del agente:
-la memoria no cambia por sí sola nada de lo que la usuaria ve.
+La prueba con celular llegó en el paso 5, junto con la del agente: la
+memoria no cambia por sí sola nada de lo que la usuaria ve. Lo que sí
+cambió es su papel — **`mensaje` es hoy la única fuente de la que se puede
+reconstruir una prueba real**, porque la bitácora no guarda ni la pregunta
+ni la respuesta (`scripts/revisar_prueba_real.py`).
 
 ### Fase 6, paso 4b: el agente orquestador, hecho el 15/08/2026
 
@@ -631,8 +693,203 @@ los prompts y con una red en `recuperacion.limpiar_etiquetas`, que retira
 el rótulo conservando la atribución. Los dos spikes llevan ya una
 comprobación que lo atrapa.
 
-**Falta la prueba con celular real**, que es lo único pendiente de la Fase
-6. Exige desplegar en Railway.
+### Fase 6, paso 5: la prueba con celular real, 15/08/2026
+
+**Con esto cierra la Fase 6.** Se hizo desde el celular de pruebas del
+autor, contra el servicio desplegado, y lo que encontró cambió una decisión
+tomada y abrió el trabajo de la Fase 7 entera. Conviene contarlo así en el
+documento de grado: la prueba no confirmó lo construido, lo corrigió.
+
+**El hallazgo: seis de diez consultas terminaron en «no le puedo
+responder».** Varias eran del dominio. El criterio de éxito del proyecto es
+un SUS ≥ 68 con usuarias de la comunidad, y un asistente que se bloquea seis
+veces en una sesión no llega a esa cifra.
+
+De ahí salieron dos correcciones, y ninguna de las dos era el ajuste obvio
+—bajar el umbral—:
+
+1. **El CU2 responde con el conocimiento del modelo cuando nada supera el
+   umbral**, sin citar a nadie. Revierte la decisión 2 del
+   [ADR-0010](adr/0010-umbral-de-similitud-recalibrado.md) usando el tercer
+   nivel de la jerarquía de CLAUDE.md §6, que siempre estuvo contemplado.
+   La objeción de aquel ADR sigue en pie —la usuaria no distingue un consejo
+   respaldado de uno advertido **dentro del mismo mensaje**—, y por eso el
+   diseño es **o se cita toda la respuesta, o no se cita absolutamente
+   nada**, y el camino lo elige el código mirando si la recuperación trajo
+   algo. `CU2_RESPALDO_MODELO=false` en Railway devuelve el comportamiento
+   anterior sin desplegar.
+2. **El corpus era el problema, no el umbral.** Lo cual llevó a la
+   ampliación del ADR-0014, que es la Fase 7.
+
+**El umbral se queda en 0.68 pero ya no significa lo mismo**: antes decidía
+responder o callar, ahora decide **citar o no citar**. Se probó bajarlo a
+0.65 y apareció un modo de fallo que a 0.68 no existe —consultas que pasan
+el filtro, no encuentran nada útil y responden «no tengo la información»
+con `Fuente: Jardín Botánico` al pie—. Una cita al pie de una frase vacía
+es peor que no responder.
+
+Dos mediciones que contradicen al ADR-0010 aunque el número no cambie, y
+que están anotadas en `app/config.py` para que no se pierdan:
+
+- **La frontera que aquel ADR midió ya no existe.** Con consultas reales, la
+  peor legítima puntúa 0.6584 y el mejor mensaje que **no** es del CU2,
+  0.6977. Los rangos se solapan y ningún umbral los separa. Quien filtra la
+  intención hoy es el agente (ADR-0013).
+- **Su control negativo difícil** —«dónde me inscribo para que me regalen
+  una compostera», 0.6752— **puntúa más alto que una consulta legítima de la
+  prueba real** —«qué recomendaciones me das para sembrar papa», 0.6729—.
+
+**Y las consultas no se parten en dos grupos sino en tres**, que es el
+hallazgo con más recorrido: `CUBIERTA` (del dominio y el documento la
+responde), `DESCUBIERTA` (del dominio y el corpus no la trata) y `NO_ES_CU2`
+(saludo, ayuda, registro, comunidad, botón; hoy las atrapa el agente antes).
+**Bajar el umbral no salva a las `DESCUBIERTA`**: solo consigue que se
+respondan con el fragmento equivocado y la fuente citada al pie. Esas piden
+corpus.
+
+Dos herramientas nuevas, las dos de la Fase 7:
+[`scripts/revisar_prueba_real.py`](../scripts/revisar_prueba_real.py), que
+reconstruye la sesión desde `mensaje` y remide cada consulta —hacía falta
+porque la bitácora dice `fragmentos=0` sin decir a qué pregunta—, y
+[`scripts/calibrar_umbral_real.py`](../scripts/calibrar_umbral_real.py),
+el compañero de `calibrar_umbral.py` con las consultas que escribió una
+persona sin saber qué había en el corpus.
+
+**Del repositorio quedan fuera la conversación y los mensajes que nombran
+el barrio**, además de uno de emergencia familiar: el repositorio es
+público. Sus similitudes van de 0.5618 a 0.5917, muy por debajo de
+cualquier umbral candidato, así que no cambian ninguna conclusión.
+
+### Fase 7, en curso: el corpus pasó de 81 a 774 fragmentos
+
+Hecho el 15/08/2026 en tres tandas, con el catálogo del
+[ADR-0014](adr/0014-catalogo-de-fuentes-oficiales.md). Nueve fuentes, y
+**dos ya no son del Jardín Botánico**: es la primera vez que pasa, y la
+línea que lee la usuaria dirá «FAO» o «Universidad Nacional Abierta y a
+Distancia» porque sale de la tabla `fuente` por la clave foránea.
+
+| Fragmentos | Fuente | Entidad |
+|---|---|---|
+| 220 | Sembrando biodiversidad Vol. 1 | Jardín Botánico |
+| 125 | Catálogo de plantas usadas en agricultura urbana | Jardín Botánico |
+| 92 | Producción agroecológica urbana y periurbana | UNAD |
+| 81 | Pasos básicos para establecer y manejar tu huerta | Jardín Botánico |
+| 68 | Manual de compostaje del agricultor | FAO |
+| 62 | Prácticas para establecer y manejar tu huerta | Jardín Botánico |
+| 46 | Cartilla 1. Agricultura urbana | Jardín Botánico |
+| 46 | Protocolo de espacio público, Decreto 315/2024 | Jardín Botánico |
+| 34 | Manejo integrado de fertilización y plagas | Jardín Botánico |
+| **774** | **nueve fuentes** | |
+
+**Esos nueve números son la prueba de regresión.** Cualquier cambio en la
+tubería de ingesta tiene que seguir dándolos, porque ese corpus es el que
+sostiene lo que se mida a partir de ahora.
+
+Lo medido al ampliar, que no sustituye a la revalidación:
+
+| Consulta | 81 fragmentos | 774 |
+|---|---|---|
+| «a mi mata de tomate le salieron unos bichitos verdes» | 0.6911 | **0.7231** |
+| «puedo sembrar en el parque de mi barrio» | sin respuesta | **4 de 4 del Protocolo** |
+| «cuándo cambio el aceite del carro» | descarta | descarta |
+
+Las siete consultas cubiertas de la prueba real pasan hoy el umbral; antes
+la peor se quedaba en 0.6584.
+
+**El criterio de recorte, acordado el 15/08/2026:** entra lo que le dice a
+una líder de huerta **cómo** hacer algo en Bogotá; sale lo que describe
+dónde más se hace, la política nacional o tecnología que ella no va a usar.
+Ante la duda, se recorta. Por eso del libro de la UNAD entró un capítulo de
+cinco y de la FAO se quitaron las experiencias en otros países.
+
+Lo que la ampliación enseñó, y está detallado en el ADR-0014: que un buen
+indicador puede estar midiendo lo que no es —con la extracción desordenada,
+el troceo daba el 99 % dentro del intervalo mientras el contenido estaba
+revuelto—; que para buscar defectos en un texto extraído hay que
+**inventariar y no buscar sospechosos**; y que la regla del extremo denso
+del ADR-0009 no vale para todos los documentos.
+
+**En medio de esto apareció el ADR-0015.** Las fuentes traen usos
+medicinales y toxicidad, y la respuesta terminaba en `Fuente: Jardín
+Botánico`, que es el sello del nivel verificado de la jerarquía. La
+advertencia la pone el backend como texto fijo, no una regla de prompt
+—a 0.4 las reglas de prompt se incumplen de forma intermitente, y está
+medido aquí mismo con la etiqueta `[OFICIAL – ...]`—, y **se mira el texto
+que sale, no el fragmento que entra**, porque el camino sin respaldo no
+tiene ningún fragmento que marcar. Comprobado 7 de 7. No filtra el
+contenido: lo que corrige es el sello, no lo que la guía dice.
+
+### Fase 7: el onboarding de tres preguntas, 17/08/2026
+
+**El CU3 capturaba mal la información, y la causa no era la extracción.**
+Al aceptar el consentimiento, el bot mandaba un solo mensaje libre pidiendo
+tres cosas a la vez —nombre de huerta, barrio y qué tenía sembrado— y de
+una respuesta parcial a tres preguntas no sale una extracción buena. Lo
+corrige el [ADR-0016](adr/0016-onboarding-de-preguntas-cerradas.md).
+
+Piezas: `app/services/onboarding.py`, `db/007_onboarding_pendiente.sql`,
+`app/agent/prompts/barrio_v1.md`, `extraccion_v2.md`, el cambio de firma de
+`memoria.responder`, y `db/003_catalogo_barrios_bosa.sql` con
+`scripts/generar_catalogo_barrios.py`.
+
+- **Tres preguntas cerradas, una por mensaje**, con el eco de la anterior
+  dentro de la siguiente. La única confirmación explícita es la del final,
+  con los botones que ya existían del CU3.
+- **`huerta` cambió de significado**, y es lo que más hay que tener
+  presente: existir en esa tabla ya no es «registró algo» sino «completó el
+  onboarding». Una huerta sin cultivos es hoy lo normal.
+- **El barrio se desambigua con lista numerada de texto, no con botones.**
+  La medición lo decidió: el rótulo de un botón admite 20 caracteres,
+  **76 de los 312 barrios de Bosa (24 %) pasan de ahí** —máximo 38— y
+  `whatsapp.enviar_botones` **lanza `ValueError`**, no degrada. Recortar
+  tampoco vale: a 20 caracteres seis grupos quedan con el rótulo idéntico,
+  y los cuatro `SAN BERNARDINO SECTOR …` colapsan en el mismo texto.
+  **Consecuencia buena: no hubo que enmendar el §4.3 de CLAUDE.md.** El
+  diseño con botones sí lo exigía.
+- **Los candidatos los busca el modelo, no `pg_trgm`.** El catálogo trae
+  variantes que comparten el arranque —`HOLANDA`, `HOLANDA I SECTOR`,
+  `HOLANDA SECTOR CAMINITO`— y la similitud de cadenas no distingue el
+  barrio base; el modelo sí. Comprobado en el spike: ante «Holanda»
+  devolvió `HOLANDA`, `HOLANDA I SECTOR`, `HOLANDA II SECTOR`, en ese
+  orden. Y se ahorra un umbral que calibrar en una fase que ya arrastra
+  la revalidación del 0.68.
+- **El número se lee sin modelo, y acepta la palabra.** `3` y `tres`, nada
+  más. La palabra no es una concesión: `normalizacion.py` transcribe
+  literalmente a 0.0, así que una nota de voz diciendo «tres» llega en
+  letras y nunca como dígito. Con un lector de solo dígitos, quien responde
+  por voz **no podría terminar el onboarding jamás**, y el barrio es
+  obligatorio.
+- **La quinta opción aparece al tercer «Ninguno»**, no antes: ofrecer la
+  salida de entrada degradaría el dato del barrio, que sostiene la
+  atribución del CU4. Y el contador es el de «Ninguno», no el de respuestas
+  ininteligibles: si no consigue escribir `3`, tampoco escribirá `5`.
+- **El saludo personalizado se antepone al enviar y no se recuerda.** Es el
+  motivo del cambio de firma de `memoria.responder`: el nombre va cifrado
+  en `usuario` y `mensaje.contenido` va en claro (ADR-0012), así que meter
+  el saludo en la memoria anularía el cifrado. Primera vez que se usa
+  `nombre_usuario_cifrado`.
+
+**El catálogo pasó de 8 a 313 barrios** (312 de Bosa más `otro`), en
+mayúscula y sin recortar. `Los 3 Sectores` **no entró**: no está en el
+listado oficial, lo que corrige el ADR-0002 en sentido contrario —era el
+§7.1 del anteproyecto el que acertaba al omitirlo, no el §5.3.1—.
+
+Antes de sembrar se vaciaron `huerta`, `cultivo`, `fragmento_comunitario`,
+`registro_pendiente`, `idempotencia_webhook` y `barrio`. **No se tocaron
+`usuario`, `mensaje`, `fuente` ni `fragmento_oficial`**: contienen la fila
+real del autor, los 126 mensajes de la prueba con celular y los 774
+fragmentos que sostienen la calibración. Un borrado general se los habría
+llevado sin ninguna necesidad, porque ninguna de esas cuatro tablas tiene
+relación con `barrio`.
+
+Probado con `spike_despachador` (25 comprobaciones), `spike_agente` (21) y
+`spike_extraccion`, los tres contra la base y la API reales. **Sin probar
+todavía desde un celular.**
+
+Lo que quedó declarado como pendiente de medir, en el propio ADR: si tres
+candidatos bastan, si tres rondas antes de ofrecer `otro` son demasiadas, y
+si `EL BOSQUE DE BOSA` es el mismo barrio que el `El Bosque` del
+anteproyecto.
 
 ### Primera fuente oficial, ya verificada
 
@@ -747,6 +1004,19 @@ consigue.
 - **`GEMINI_GENERATIVE_MODEL` es opcional** y se puede cambiar en Railway
   sin desplegar. Si no se define, vale el valor por defecto de
   `app/config.py`. Para el agente, la extracción y la redacción del RAG.
+- **`CU2_RESPALDO_MODELO` es un interruptor a propósito.** En `false`
+  devuelve el comportamiento del ADR-0010 —el CU2 calla si nada supera el
+  umbral— sin desplegar y sin tocar código. Es lo que hay que hacer si la
+  evaluación con usuarias dice que un consejo sin respaldo confunde más de
+  lo que ayuda.
+- **El corpus vive en Supabase, no en el despliegue.** Ingerir una fuente
+  cambia lo que responde el bot en el acto, con o sin despliegue, y por eso
+  una respuesta rara puede venir de código viejo con corpus nuevo. `/health`
+  dice qué commit corre.
+- **Ninguna fuente oficial se ingiere a mano.** Se declara en
+  `scripts/catalogo_fuentes.py` y se ingiere con `--fuente <clave>`. Los
+  parámetros del catálogo son mediciones: `ratio_medida=False` bloquea la
+  ingesta real hasta que se mida.
 - **El modelo de embeddings NO es una variable de entorno**, y es
   deliberado ([ADR-0007](adr/0007-modelo-de-embeddings-fijo-en-codigo.md)):
   cambiarlo invalida todos los vectores guardados **sin dar ningún error**,
@@ -755,7 +1025,13 @@ consigue.
 
 ## Correcciones pendientes en los `.docx`
 
-Consolidadas en [`docs/adr/README.md`](adr/README.md). Son dieciocho, e
+Consolidadas en [`docs/adr/README.md`](adr/README.md). Son veinte, e
 incluyen la contradicción sobre el RLS entre las Fases 2 y 3, el modelo de
 embeddings dado de baja, la entrada por voz, el presupuesto de Railway y lo
 que la Fase 3 no dice sobre la conversación almacenada.
+
+**Los ADR-0014 y 0015 aún no han aportado las suyas a esa lista**, y son
+al menos cuatro: que el corpus oficial son nueve documentos y no uno, que
+dos no son del Jardín Botánico, la desviación declarada del intervalo de
+300–500 tokens en el catálogo de plantas, y que ninguna fase previó que una
+fuente de agricultura urbana atribuyera usos medicinales.
