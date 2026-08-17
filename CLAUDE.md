@@ -36,11 +36,14 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Trece decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Quince decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 
-**Fase actual: 6 terminada de construir y desplegada; falta probarla con un
-celular real. Después empieza la Fase 7 (calibración y pruebas).** El
-detalle está en `docs/ESTADO.md`, sección «Por dónde seguir».
+**Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
+15/08/2026 con la prueba en un celular real. De la 7 va hecha la ampliación
+del corpus —de 81 a **774 fragmentos en nueve fuentes**— y falta lo
+principal: **revalidar el umbral**, que se calibró contra un corpus nueve
+veces menor. El detalle está en `docs/ESTADO.md`, sección «Por dónde
+seguir».
 
 ---
 
@@ -79,9 +82,18 @@ encuesta (Fase 1, n=11). No las revises ni las "mejores" por tu cuenta.
    es compartible y alimenta el RAG. Lo personal (teléfono, nombre) nunca se
    expone a otras usuarias ni entra al RAG.
 6. **Jerarquía de fuentes:** fuente oficial curada > dato comunitario (siempre
-   atribuido, nunca como instrucción técnica) > conocimiento del modelo (con
-   advertencia explícita de que no está verificado). Búsqueda en internet fuera
-   de alcance.
+   atribuido, nunca como instrucción técnica) > conocimiento del modelo (sin
+   atribución ninguna, que es lo que le permite a ella distinguirlo).
+   Búsqueda en internet fuera de alcance.
+   **El tercer nivel está activo desde el 15/08/2026:** si nada supera el
+   umbral, el CU2 responde con el modelo y sin citar a nadie
+   (`CU2_RESPALDO_MODELO`). Eso revierte la decisión del ADR-0010 de callar
+   sin respaldo. El umbral dejó entonces de decidir *responder o callar* y
+   pasa a decidir **citar o no citar**.
+   Y **toda respuesta del CU2 que hable de salud lleva advertencia**, la
+   ponga el camino que la ponga (ADR-0015): las fuentes oficiales traen usos
+   medicinales y toxicidad, y el documento avala la botánica, no un consejo
+   médico para una persona concreta.
 7. **Confirmar antes de guardar.** Toda extracción de entidades se muestra a la
    usuaria y se persiste solo tras su confirmación.
 8. **Identidad por número de celular.** Sin cédula, sin dirección
@@ -182,7 +194,7 @@ llevan el ADR que lo justifica.
 | Recuperación comunitaria | Umbral propio | **0.65** (ADR-0011) |
 | Recuperación | top-k | 4 por colección |
 | Memoria | Ventana de mensajes | 10 mensajes, no turnos; el último es el de ella |
-| Ingesta | Fragmento / solape | 300–500 / 50 tokens, midiendo tokens de verdad (ADR-0009) |
+| Ingesta | Fragmento / solape | 300–500 / 50 tokens, midiendo tokens de verdad (ADR-0009). La ratio car./token es **por documento** y vive en el catálogo (ADR-0014) |
 
 Salvo la extracción, todos son calibrables durante las pruebas (Fase 7).
 Los umbrales, el top-k, la ventana y el modelo generativo son variables de
@@ -191,9 +203,19 @@ Railway sin desplegar. **El modelo de embeddings no**, y es deliberado
 (ADR-0007).
 
 **Los dos umbrales están medidos contra el corpus real y no sobreviven a un
-cambio de corpus.** El del CU2 tiene un margen de **una centésima**, y el
+cambio de corpus.** El del CU2 tenía un margen de **una centésima**, y el
 ADR-0013 añadió que ese margen no aguanta que el agente recorte la
-consulta. Hay que revalidarlos en la Fase 7 con consultas reales.
+consulta.
+
+**Y el corpus cambió: de 81 a 774 fragmentos (ADR-0014).** El 0.68 sigue
+puesto pero **está calibrado contra un corpus nueve veces menor**, así que
+hoy no lo respalda ninguna medición. Lo que sí se midió al ampliar es que
+la consulta insignia del CU2 subió de 0.6911 a 0.7231 y que las siete
+consultas cubiertas de la prueba real pasan el umbral, cuando antes la peor
+se quedaba en 0.6584. **Revalidarlo es lo primero que falta de la Fase 7**,
+con `scripts/calibrar_umbral_real.py`, cuyas etiquetas
+`CUBIERTA`/`DESCUBIERTA` también quedaron viejas: varias consultas que el
+corpus no cubría ahora sí las cubre.
 
 ---
 
@@ -234,6 +256,24 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
    que el sistema **pide**, no lo que ella decide contar.
 8. **`gemini-2.5-flash` se retira el 16/10/2026**, antes de la Fase 8. El
    modelo generativo debe ser de la serie 3.
+9. **El corpus oficial ya no es un documento, son nueve** (ADR-0014), y
+   **dos no son del Jardín Botánico**: el manual de compostaje de la FAO y
+   un libro de la UNAD. Las fases dan por supuesto una sola entidad; la
+   línea que lee la usuaria dirá «Fuente: FAO» cuando toque, y sale de la
+   tabla `fuente` por la clave foránea, no del texto vectorizado.
+10. **Criterio de recorte al ingerir, fijado el 15/08/2026:** entra lo que
+    le dice a una líder de huerta **cómo** hacer algo en Bogotá; sale lo
+    que describe dónde más se hace, la política nacional o tecnología que
+    ella no va a usar. **Ante la duda, se recorta.** Por eso del libro de
+    la UNAD entró solo un capítulo de cinco, y del manual de la FAO se
+    quitaron las experiencias en otros países.
+11. **El intervalo de 300–500 tokens de la Fase 4 tiene una desviación
+    declarada.** Los fragmentos del catálogo de plantas miden unos 183,
+    porque una ficha de especie mide eso y respetar el intervalo exigiría
+    meter dos plantas en el mismo fragmento. En un documento que atribuye
+    usos medicinales, esa mezcla es el peor fallo posible. El intervalo es
+    un medio para que el fragmento sea una unidad con sentido; ahí la
+    unidad con sentido es más corta.
 
 ---
 
@@ -247,6 +287,9 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   `PHONE_NUMBER_ID` cambia al migrar — **nunca lo escribas en el código**.
 - **Supabase:** operativo. PostgreSQL 17.6, seis migraciones aplicadas, RLS
   activo sin políticas. Conexión por **session pooler, puerto 5432**.
+  **774 fragmentos oficiales en nueve fuentes** desde el 15/08/2026.
+  Escribir ahí cambia lo que responde el bot **en el acto**, con o sin
+  despliegue: Railway lee esta misma base.
 - **Railway:** desplegado y con el servicio en marcha. `/health` dice qué
   commit está corriendo, así que confirmar un despliegue no exige mandar un
   WhatsApp.
@@ -271,7 +314,8 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
 - Los prompts viven en `app/agent/prompts/` como archivos versionados
   (`agente_v1.md`, `extraccion_v1.md`, `redaccion_rag_v1.md`,
-  `redaccion_comunidad_v1.md`), conforme a la práctica de versionamiento
+  `redaccion_comunidad_v1.md`, `respuesta_general_v1.md`), conforme a la
+  práctica de versionamiento
   declarada en la metodología. **Se rellenan con `str.format`: una llave
   literal rompe la carga con un `KeyError`.** El del agente no lleva huecos
   y se carga tal cual, a propósito.
@@ -285,6 +329,21 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   temporales y los borran en un `finally`**, con teléfonos que empiezan por
   `57000000`. Hay **una fila real** en `usuario`, la del celular de pruebas
   del autor: no la toques.
+- **Ninguna fuente oficial se ingiere a mano.** Se declara en
+  `scripts/catalogo_fuentes.py` y se ingiere con
+  `python -m scripts.ingesta_fuente --fuente <clave>` (ADR-0014). Los PDF
+  no se versionan: `fuentes/` está en el `.gitignore` y el script los
+  vuelve a descargar de la URL registrada. **Sin URL no se ingiere**, y el
+  script lo comprueba.
+- **Los parámetros del catálogo son mediciones, no gustos.** Antes de
+  ingerir algo nuevo: `--detectar-folio`, `--simular` y `--medir-tokens`.
+  La ratio caracteres/token de un documento **no transfiere a otro**, y
+  `ratio_medida=False` bloquea la ingesta real hasta que se mida.
+- **Reingerir siempre con `--reingerir`,** que reemplaza en una sola
+  transacción. Y comprueba la regresión: cualquier cambio en la tubería de
+  ingesta tiene que seguir dando los mismos fragmentos en las fuentes ya
+  ingeridas —81, 62, 220, 34, 46, 125, 68, 92, 46— porque ese corpus es el
+  que sostiene la calibración.
 
 ---
 
@@ -307,7 +366,20 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   completos, pero el agente puede recortar la consulta (ADR-0013). **Un
   número medido sobre un montaje que no es producción no vale.** Y su
   recíproco: si ya existe una medición, producción tiene que conservar las
-  condiciones en las que se hizo.
+  condiciones en las que se hizo. **Van cuatro:** el 15/08/2026 la ingesta
+  del ADR-0014 multiplicó el corpus por nueve y dejó vieja la calibración
+  del umbral que se acababa de medir con consultas reales.
+- **Un buen indicador puede estar midiendo lo que no es.** Con la
+  extracción de *Sembrando Biodiversidad* desordenada, el troceo daba 232
+  fragmentos y **99 % dentro del intervalo objetivo** —la mejor
+  distribución de todo el corpus— mientras el nombre de la especie salía
+  detrás de su propio contenido. Antes de celebrar un número, mira el
+  texto.
+- **Para buscar defectos en un texto extraído, inventaría; no busques
+  sospechosos.** En el Protocolo de espacio público, buscar caracteres
+  raros encontró tres de ocho. Arreglados esos tres el texto ya *parecía*
+  correcto y seguía diciendo «a travØs». Solo el inventario completo de
+  caracteres destapó el resto.
 - **No des por bueno un resultado del agente a la primera.** Corre a
   temperatura 0.7 y el enrutamiento no es determinista. Un fallo aislado en
   un spike no es una medida; repite antes de diagnosticar.
