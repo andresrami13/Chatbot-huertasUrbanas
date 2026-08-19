@@ -120,7 +120,7 @@ async def _huerta(usuario_id: UUID) -> dict | None:
 
     cultivos = await obtener_pool().fetch(
         """
-        select especie, fecha_siembra_aprox, fecha_imprecisa, creado_en
+        select especie, creado_en
           from cultivo
          where huerta_id = $1
          order by creado_en asc
@@ -251,13 +251,7 @@ async def main() -> None:
             )
             print(f"  cultivos ....... {len(registro['cultivos'])}")
             for cultivo in registro["cultivos"]:
-                if cultivo["fecha_siembra_aprox"]:
-                    fecha = f"{cultivo['fecha_siembra_aprox']:%d/%m/%Y}"
-                    if cultivo["fecha_imprecisa"]:
-                        fecha += " (aprox.)"
-                else:
-                    fecha = "sin fecha"
-                print(f"      - {cultivo['especie']:<24} {fecha}")
+                print(f"      - {cultivo['especie']}")
             print()
 
         if argumentos.sin_remedir:

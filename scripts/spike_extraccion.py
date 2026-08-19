@@ -30,12 +30,12 @@ CASOS = [
         "mensaje completo",
         "buenas, mi huerta se llama El Porvenir, queda en Holanda y sembré "
         "tomate y cilantro en marzo",
-        "2 cultivos con fecha precisa; nombre y barrio IGNORADOS",
+        "2 cultivos: tomate y cilantro. Nombre, barrio y fecha IGNORADOS",
     ),
     (
         "fecha vaga",
         "tengo unas maticas de cebolla larga desde hace rato",
-        "1 cultivo 'cebolla larga', fecha_imprecisa=True",
+        "1 cultivo 'cebolla larga'. El 'desde hace rato' se ignora (ADR-0018)",
     ),
     (
         "pregunta, no registro",
@@ -82,12 +82,7 @@ async def main() -> None:
             if not extraida.cultivos:
                 print("  cultivos: (ninguno)")
             for cultivo in extraida.cultivos:
-                fecha = cultivo.fecha_siembra()
-                marca = "aproximada" if cultivo.fecha_imprecisa else "precisa"
-                print(
-                    f"  cultivo:  {cultivo.especie!r} | "
-                    f"fecha={fecha} ({marca})"
-                )
+                print(f"  cultivo:  {cultivo.especie!r}")
             print(f"  tiene_datos: {extraida.tiene_datos}")
 
         print("\n" + "=" * 70)

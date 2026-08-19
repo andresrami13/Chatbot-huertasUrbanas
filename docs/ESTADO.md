@@ -1,13 +1,13 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-17. **La Fase 6 se cerró el 15/08/2026 con la
+Última actualización: 2026-08-18. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
 pruebas).** Los cinco casos de uso están construidos y desplegados, y la
 conversación ya se probó desde un celular real. El CU4 es el único que
 sigue sin ejercitarse de verdad, y no por un fallo: excluye la huerta de
 quien pregunta y solo hay una registrada.
 
-De la Fase 7 van hechas tres cosas, las dos primeras nacidas de esa prueba:
+De la Fase 7 van hechas cinco cosas, las dos primeras nacidas de esa prueba:
 
 - **El corpus oficial pasó de 81 a 774 fragmentos en nueve fuentes**
   (ADR-0014), y dos de ellas ya no son del Jardín Botánico.
@@ -16,13 +16,18 @@ De la Fase 7 van hechas tres cosas, las dos primeras nacidas de esa prueba:
   de salud lleva advertencia (ADR-0015).
 - **El CU3 empieza con un onboarding de tres preguntas cerradas**
   (ADR-0016, 17/08/2026), y el catálogo de barrios pasó de 8 a 313.
+  **Probado desde un celular real el 17/08/2026, y funcionó.**
+- **La usuaria ya no espera en silencio** los trece segundos del camino con
+  RAG: se le manda un aviso, que se envía y no se recuerda (ADR-0017).
+- **La fecha de siembra salió del CU3 entero** —del prompt, del resumen y de
+  la tabla `cultivo`— por ser un dato de solo escritura (ADR-0018).
 
 Falta lo principal: **revalidar el umbral**, que hoy no lo respalda ninguna
 medición.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(dieciséis decisiones tomadas durante la implementación).
+(dieciocho decisiones tomadas durante la implementación).
 
 **Si retoma en una conversación nueva, vaya directo a
 [Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
@@ -61,7 +66,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
-| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Cinco: `agente_v1`, `extraccion_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1`, `respuesta_general_v1` |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v1`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1`, `respuesta_general_v1` |
 | Catálogo de fuentes oficiales | `scripts/catalogo_fuentes.py` | Nueve fuentes declaradas, con sus parámetros medidos (ADR-0014) |
 | Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **774 fragmentos de nueve fuentes en Supabase** |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
@@ -72,7 +77,9 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Enrutado por el agente desde el 15/08 |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
 | Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | **Probado en producción desde el celular** |
-| Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | Probado con los spikes; **sin probar desde el celular** (ADR-0016) |
+| Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
+| Aviso de espera | `app/services/espera.py` | Probado con siete escenarios simulados; **sin probar desde el celular** (ADR-0017) |
+| CU3 sin fecha de siembra | `extraccion_v3.md`, `db/008_*.sql` | Código listo; **la migración `008` está sin correr** (ADR-0018) |
 | Catálogo de barrios de Bosa | `db/003_catalogo_barrios_bosa.sql` | **313 filas en Supabase** desde el 17/08/2026 |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
@@ -93,9 +100,16 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
 - **Supabase:** PostgreSQL 17.6, esquema aplicado, RLS activo sin políticas.
   Conexión por **session pooler, puerto 5432** — la directa es solo IPv6 y el
   equipo de desarrollo no tiene IPv6; el puerto 6543 rompe `asyncpg`.
-  **774 fragmentos oficiales de nueve fuentes** desde el 15/08/2026.
-  Escribir ahí cambia lo que responde el bot **en el acto**, con o sin
-  despliegue: Railway lee esta misma base.
+  **774 fragmentos oficiales de nueve fuentes** desde el 15/08/2026, y
+  **313 barrios** desde el 17/08. Escribir ahí cambia lo que responde el
+  bot **en el acto**, con o sin despliegue: Railway lee esta misma base.
+  **`usuario`, `mensaje`, `huerta`, `cultivo` y `fragmento_comunitario`
+  están en cero filas** desde el 18/08/2026: se borró a propósito la fila
+  real del autor para volver a recorrer el camino completo. Con eso
+  desapareció también la conversación de la prueba del 15/08, que solo
+  sobrevive exportada en `fuentes/conversacion_prueba_real.json` —fuera del
+  repositorio, que es público—. **`scripts/revisar_prueba_real.py` ya no
+  tiene qué reconstruir** hasta que haya una prueba nueva.
 - **Meta:** app `Chatbot Huertas Urbanas` (id `4332318797098432`), número de
   prueba `+1 555-136-8057`. Webhook registrado, app suscrita al WABA y campo
   `messages` suscrito. **Los tres pasos son independientes**; que el webhook
@@ -126,6 +140,10 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
   Biodiversidad*** (ADR-0014, «Lo que este ADR no resuelve»): los rótulos al
   margen que se cuelan dentro de la frase en unas 17 páginas, y cinco
   páginas con texto rotado que `pypdf` no extrae.
+- **La migración `008` está sin correr**, y es deliberado (ADR-0018). El
+  código ya no escribe `fecha_siembra_aprox` ni `fecha_imprecisa`, pero las
+  columnas siguen en Supabase hasta que se despliegue. **Primero el
+  despliegue, después la migración**, o el CU3 falla en el intervalo.
 
 ---
 
@@ -155,6 +173,11 @@ Tres avisos para que la medición no salga vieja otra vez:
   (`CU2_RESPALDO_MODELO`). Bajarlo tiene hoy un modo de fallo que antes no
   existía: consultas que lo pasan, no encuentran nada útil y responden «no
   tengo esa información» con `Fuente: Jardín Botánico` al pie.
+  **Dejó de ser hipótesis el 17/08/2026:** se observó con el 0.68 puesto,
+  en una consulta que puntuó **0.7232** y aun así respondió «no tengo
+  información específica» y firmó con el Jardín Botánico. O sea que el modo
+  de fallo no aparece solo al bajar el umbral, y por lo tanto la
+  revalidación tiene que mirarlo aunque el número no se mueva.
 
 Lo ya medido al ampliar el corpus, que es el punto de partida y no la
 revalidación: la consulta insignia del CU2 subió de 0.6911 a **0.7231**, y
@@ -165,12 +188,14 @@ antes la peor se quedaba en 0.6584.
 
 Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
 
-- **Probar el onboarding desde un celular real** (ADR-0016). Es lo único
-  construido que no ha pasado por un teléfono, y los spikes no pueden
-  cubrir lo que importa: si ella entiende que tiene que escribir un número,
-  si los tres candidatos aciertan con el barrio dicho a su manera, y si
-  responde por voz a la lista numerada. Ojo con **borrar antes su fila de
-  `usuario`**, o el onboarding no arranca: se salta a quien ya tiene huerta.
+- **Probar el aviso de espera desde un celular real** (ADR-0017). Es lo
+  único construido que no ha pasado por un teléfono. Lo que hay que mirar
+  no es que salga, que eso ya se probó simulado, sino si dos segundos son
+  el momento correcto y si las frases suenan bien dichas a una señora.
+  Para repetir cualquier prueba del onboarding basta con **borrar su fila
+  de `huerta`**: el siguiente mensaje lo relanza solo, sin repetir el
+  consentimiento. Borrar `usuario` también sirve, pero se lleva por
+  cascada la conversación de `mensaje`, que es el material de esta fase.
 - **Remedir el umbral comunitario** con 5–7 huertas de verdad (ADR-0011).
   Sigue sin tocar desde el 04/08, y no se puede tocar antes: el CU4 excluye
   la huerta de quien pregunta y solo hay una registrada.
@@ -179,7 +204,10 @@ Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
   —que el respaldo del modelo volvió invisible para la usuaria—.
 - **Si el vocabulario de la advertencia médica acierta** con consultas
   reales (ADR-0015). Tira a ancho a propósito: advertir de más cuesta dos
-  renglones.
+  renglones. **Ya hay un caso observado:** se disparó con una consulta de
+  plagas —«bichitos verdes»—, que no es de salud. Puede ser el
+  comportamiento buscado o puede ser demasiado ancho; hace falta medirlo,
+  no decidirlo de memoria.
 - **La mezcla consulta + dato**, que sigue ofreciendo guardar el cultivo por
   el que se preguntó (ver arriba, y ADR-0013).
 - **Cuántas veces se cuela la etiqueta de procedencia.** La bitácora lo
@@ -883,13 +911,67 @@ llevado sin ninguna necesidad, porque ninguna de esas cuatro tablas tiene
 relación con `barrio`.
 
 Probado con `spike_despachador` (25 comprobaciones), `spike_agente` (21) y
-`spike_extraccion`, los tres contra la base y la API reales. **Sin probar
-todavía desde un celular.**
+`spike_extraccion`, los tres contra la base y la API reales, y **desde un
+celular real el 17/08/2026, donde funcionó de punta a punta**. La salvedad
+que dejó esa prueba: se recorrió con una usuaria que lee lo que le llega y
+contesta a lo que se le pregunta. Que el onboarding aguante a quien no lo
+hace es lo que la evaluación con 5–7 usuarias tiene que decir.
 
 Lo que quedó declarado como pendiente de medir, en el propio ADR: si tres
 candidatos bastan, si tres rondas antes de ofrecer `otro` son demasiadas, y
 si `EL BOSQUE DE BOSA` es el mismo barrio que el `El Bosque` del
 anteproyecto.
+
+### Fase 7: el aviso de espera y la salida de la fecha, 18/08/2026
+
+Dos cambios del mismo día, ninguno de los dos nacido de un fallo.
+
+**El aviso de espera** ([ADR-0017](adr/0017-aviso-de-espera.md)). El camino
+con RAG tarda unos trece segundos, y ese silencio es la peor parte de la
+conversación para quien no sabe si su mensaje llegó. Ahora se le manda un
+«deme un momentico» antes de la respuesta de verdad.
+
+- **Se envía y no se recuerda.** Es la única excepción al CLAUDE.md §11, y
+  está razonada: el aviso no dice nada que el agente necesite después, pero
+  recordarlo dejaría la ventana de diez mensajes en poco más de tres
+  intercambios útiles.
+- **Solo en los caminos lentos.** El de la ayuda y los pasos del onboarding
+  tardan dos o tres segundos; ahí un aviso llega pegado a la respuesta y se
+  lee como que el bot se trabó.
+- **Dos disparadores, y no uno**, porque los dos caminos se saben en
+  momentos distintos: que sea audio viene en el webhook, que vaya al RAG lo
+  decide el agente después. Un audio que además va al RAG manda uno solo.
+- El umbral es `ESPERA_AVISO_SEGUNDOS`, 2.0 por defecto, ajustable en
+  Railway. Además de retrasar el aviso lo **suprime** si el turno entero
+  acaba antes.
+- Diez frases para el RAG y seis para el audio, repartidas barajadas. La
+  primera versión repetía al cambiar de tanda, y salió probando.
+
+Probado con siete escenarios simulados —envío interceptado, sin tocar la
+API ni WhatsApp—, los siete correctos. **Sin probar desde un celular.**
+
+**La fecha de siembra salió del CU3**
+([ADR-0018](adr/0018-sin-fecha-de-siembra.md)). Era un dato de solo
+escritura: la escribían dos `INSERT` y no la leía ningún caso de uso. El
+CU4 ya la excluía a propósito y **con medición** —el ADR-0011 comparó cuatro
+formatos y «solo especies» separaba 0.1166 frente a 0.0735 de «cultivos con
+fecha»—, así que esto extiende al CU3 lo que el CU4 concluyó el 04/08.
+
+- Fuera del prompt (`extraccion_v3.md`, de 2620 a **1783 caracteres**), del
+  esquema de salida, del resumen de confirmación y de la tabla `cultivo`.
+- El modelo queda con **un solo campo que acertar** por cultivo.
+- El resumen que ella aprueba pasa de `- tomate, marzo de 2026 (más o
+  menos)` a `- tomate`.
+- El ejemplo de la bienvenida cambió: enseñaba `"sembré cilantro en marzo"`,
+  una fecha que el sistema iba a ignorar.
+- `_deserializar` tolera los borradores de los dos formatos anteriores, para
+  que uno escrito antes del despliegue y confirmado después no se pierda.
+
+**La migración `db/008_sin_fecha_de_siembra.sql` está escrita y sin correr,
+a propósito.** El orden importa: primero se despliega el código que deja de
+escribir esas columnas y solo después se borran. Al revés, cada
+confirmación del CU3 falla mientras dure la ventana, porque Railway lee esta
+misma base.
 
 ### Primera fuente oficial, ya verificada
 

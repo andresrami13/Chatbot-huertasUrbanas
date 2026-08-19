@@ -36,7 +36,7 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Dieciséis decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Dieciocho decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
 15/08/2026 con la prueba en un celular real. De la 7 van hechas dos cosas:
@@ -143,8 +143,7 @@ llamadas**: una sola pasada por el modelo.
 
 **Multi-intención:** un mensaje puede disparar varias funciones. Regla de
 orquestación: (i) responder primero la necesidad urgente; (ii) ofrecer el
-registro como confirmación, sin persistir; (iii) tratar fechas vagas como
-aproximadas y afinarlas en la confirmación. El orden lo impone el código,
+registro como confirmación, sin persistir. El orden lo impone el código,
 no el modelo: el registro va siempre el último, porque lleva botones.
 
 **Bienvenida:** el disparador es la intención, no que la usuaria sea nueva. Se
@@ -290,13 +289,18 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
     ella no va a usar. **Ante la duda, se recorta.** Por eso del libro de
     la UNAD entró solo un capítulo de cinco, y del manual de la FAO se
     quitaron las experiencias en otros países.
-11. **El extractor ya no saca el barrio ni el nombre de la huerta**
-    (`extraccion_v2.md`, ADR-0016). La Fase 4, Tabla 3, los incluye porque
-    entonces no había otro momento para preguntarlos; hoy los fija el
-    onboarding y volver a extraerlos del texto libre solo arriesgaría
-    pisar lo que ella confirmó. El extractor devuelve **cultivos y
-    fechas**, y por eso ya no lee el catálogo de barrios: su enum de 313
-    valores viajaba en cada mensaje.
+11. **El extractor devuelve solo especies** (`extraccion_v3.md`). Perdió
+    el barrio y el nombre de la huerta con el ADR-0016 —los fija el
+    onboarding, y volver a extraerlos del texto libre solo arriesgaría
+    pisar lo que ella confirmó—, y perdió **la fecha de siembra** con el
+    ADR-0018. La Fase 4, Tabla 3, incluye las tres cosas. Por lo primero
+    ya no lee el catálogo de barrios, cuyo enum de 313 valores viajaba en
+    cada mensaje.
+    **La fecha salió porque era un dato de solo escritura:** no la leía
+    ningún caso de uso, y el ADR-0011 ya había medido que dentro del
+    fragmento comunitario empeoraba la recuperación (0.0735 frente a
+    0.1166 de separación). Las columnas `fecha_siembra_aprox` y
+    `fecha_imprecisa` salieron de `cultivo` en la migración `008`.
 12. **El intervalo de 300–500 tokens de la Fase 4 tiene una desviación
     declarada.** Los fragmentos del catálogo de plantas miden unos 183,
     porque una ficha de especie mide eso y respetar el intervalo exigiría

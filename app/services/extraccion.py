@@ -1,9 +1,8 @@
 """Extracción de los cultivos de la huerta (Fase 4, Tabla 3).
 
-Convierte lo que la usuaria escribió —o dictó— en los cultivos del CU3, con
-su fecha aproximada de siembra.
+Convierte lo que la usuaria escribió —o dictó— en los cultivos del CU3.
 
-Tres decisiones que vienen de las fases y no deben cambiarse aquí:
+Cuatro decisiones que vienen de las fases y no deben cambiarse aquí:
 
 - **Temperatura 0.1, fija** (CLAUDE.md §8). Es la única de la tabla que no
   se calibra: el formato es estricto y la variabilidad solo puede
@@ -13,6 +12,10 @@ Tres decisiones que vienen de las fases y no deben cambiarse aquí:
   están guardados cuando este extractor entra en juego. Antes sí se
   extraían, por la decisión 5 del ADR-0008: `huerta.barrio_id` es NOT NULL
   y no había otro momento donde preguntarlo.
+- **La fecha de siembra tampoco se extrae** (ADR-0018). Era un dato de
+  solo escritura: nadie lo leía, y el ADR-0011 ya había medido que metido
+  en el fragmento comunitario empeoraba la recuperación. Las columnas
+  salieron de `cultivo` en la migración 008.
 - **Nada se persiste aquí.** Esta función solo lee y devuelve; el CU3 tiene
   que mostrar el resultado y esperar la confirmación de la usuaria antes de
   guardar (CLAUDE.md §4.7).
@@ -22,14 +25,15 @@ pasó de 8 a 313 barrios (ADR-0016), y su enum viajaba en **cada** llamada de
 extracción, que ocurre en cada mensaje. La desambiguación del barrio lo
 paga una sola vez, en el onboarding.
 
-Sobre la salida estructurada: el esquema garantiza el tipo, no el rango. Que
-el mes esté entre 1 y 12 y que el año sea razonable se comprueba abajo.
+Con la fecha fuera, el modelo tiene un solo campo que acertar por cultivo y
+el prompt se quedó en la mitad. Es el mismo efecto que buscaba el ADR-0016
+al sacarle el barrio: cada campo que se le quita es un campo menos que
+puede equivocar.
 """
 
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import date
 
 from google.genai import types
 
@@ -38,14 +42,10 @@ from app.core.gemini import MODELO_GENERATIVO, obtener_cliente
 
 logger = logging.getLogger(__name__)
 
-_PROMPT = "extraccion_v2.md"
+_PROMPT = "extraccion_v3.md"
 
 # Fija por decisión documentada, no calibrable (CLAUDE.md §8).
 _TEMPERATURA = 0.1
-
-# Margen de cordura para el año. Una huerta sembrada antes de esto, o en el
-# futuro, es un error de extracción, no un dato.
-_ANIO_MINIMO = 2015
 
 _ESQUEMA = types.Schema(
     type=types.Type.OBJECT,
@@ -56,15 +56,8 @@ _ESQUEMA = types.Schema(
                 type=types.Type.OBJECT,
                 properties={
                     "especie": types.Schema(type=types.Type.STRING),
-                    "anio": types.Schema(type=types.Type.INTEGER, nullable=True),
-                    "mes": types.Schema(
-                        type=types.Type.INTEGER,
-                        nullable=True,
-                        description="Mes de siembra, de 1 a 12.",
-                    ),
-                    "fecha_imprecisa": types.Schema(type=types.Type.BOOLEAN),
                 },
-                required=["especie", "anio", "mes", "fecha_imprecisa"],
+                required=["especie"],
             ),
         ),
     },
@@ -77,21 +70,6 @@ class CultivoExtraido:
     """Un cultivo tal como lo entendió el modelo, todavía sin confirmar."""
 
     especie: str
-    anio: int | None
-    mes: int | None
-    # "Marca de imprecisión" de la Fase 4, Tabla 3: distingue lo que la
-    # usuaria precisó de lo que el modelo aproximó. Se usa para afinar la
-    # fecha en la confirmación del CU3.
-    fecha_imprecisa: bool
-
-    def fecha_siembra(self) -> date | None:
-        """La fecha como la espera `cultivo.fecha_siembra_aprox`.
-
-        La Fase 4 normaliza a mes y año, así que se guarda el día 1.
-        """
-        if self.anio is None or self.mes is None:
-            return None
-        return date(self.anio, self.mes, 1)
 
 
 @dataclass(frozen=True)
@@ -112,52 +90,27 @@ class HuertaExtraida:
         return bool(self.cultivos)
 
 
-def _limpiar_cultivo(bruto: dict, hoy: date) -> CultivoExtraido | None:
+def _limpiar_cultivo(bruto: dict) -> CultivoExtraido | None:
     """Valida un cultivo del modelo. Devuelve None si no es aprovechable."""
     especie = (bruto.get("especie") or "").strip()
     if not especie:
         # Sin especie no hay cultivo que guardar.
         return None
 
-    anio = bruto.get("anio")
-    mes = bruto.get("mes")
-    imprecisa = bool(bruto.get("fecha_imprecisa", True))
-
-    # El esquema garantiza el tipo, no el rango. Una fecha fuera de rango se
-    # descarta y el cultivo se conserva sin fecha: perder la especie porque
-    # el mes vino mal sería peor.
-    if mes is not None and not 1 <= mes <= 12:
-        logger.warning("Mes fuera de rango en la extracción | mes=%s", mes)
-        anio, mes, imprecisa = None, None, True
-
-    if anio is not None and not _ANIO_MINIMO <= anio <= hoy.year:
-        logger.warning("Año fuera de rango en la extracción | anio=%s", anio)
-        anio, mes, imprecisa = None, None, True
-
-    # Un mes sin año, o al contrario, no forma una fecha utilizable.
-    if (anio is None) != (mes is None):
-        anio, mes, imprecisa = None, None, True
-
-    return CultivoExtraido(
-        especie=especie, anio=anio, mes=mes, fecha_imprecisa=imprecisa
-    )
+    return CultivoExtraido(especie=especie)
 
 
-async def extraer_huerta(mensaje: str, hoy: date | None = None) -> HuertaExtraida:
+async def extraer_huerta(mensaje: str) -> HuertaExtraida:
     """Extrae los cultivos que haya en el mensaje.
 
     Devuelve una `HuertaExtraida` vacía si el mensaje no habla de cultivos
     o si el modelo falla. Nunca lanza: quien llama sigue el flujo del CU3, y
     un fallo de extracción no debe tumbar la conversación.
 
-    `hoy` es inyectable para poder probar las fechas relativas.
+    Ya no recibe `hoy`: se inyectaba para poder probar las fechas
+    relativas, y no hay fechas que resolver (ADR-0018).
     """
-    hoy = hoy or date.today()
-
-    prompt = cargar_prompt(_PROMPT).format(
-        hoy=hoy.isoformat(),
-        mensaje=mensaje,
-    )
+    prompt = cargar_prompt(_PROMPT).format(mensaje=mensaje)
 
     try:
         respuesta = await obtener_cliente().aio.models.generate_content(
@@ -184,7 +137,7 @@ async def extraer_huerta(mensaje: str, hoy: date | None = None) -> HuertaExtraid
     cultivos = []
     for bruto in datos.get("cultivos") or []:
         if isinstance(bruto, dict):
-            cultivo = _limpiar_cultivo(bruto, hoy)
+            cultivo = _limpiar_cultivo(bruto)
             if cultivo is not None:
                 cultivos.append(cultivo)
 
@@ -192,10 +145,6 @@ async def extraer_huerta(mensaje: str, hoy: date | None = None) -> HuertaExtraid
 
     # Nunca el contenido (CLAUDE.md §11): se registra la forma de lo
     # extraído, no lo extraído.
-    logger.info(
-        "Extracción | cultivos=%d | sin_fecha=%d",
-        len(extraida.cultivos),
-        sum(1 for c in extraida.cultivos if c.fecha_siembra() is None),
-    )
+    logger.info("Extracción | cultivos=%d", len(extraida.cultivos))
 
     return extraida

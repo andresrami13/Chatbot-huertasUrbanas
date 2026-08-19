@@ -111,6 +111,30 @@ def _normalizar(texto: str) -> str:
     )
 
 
+# Emoji de teclado para numerar las opciones. Se ven como un número
+# metido en una tecla, y a simple vista dicen "aquí toca escribir un
+# número" mejor que un "1." al principio del renglón.
+#
+# Ella sigue escribiendo el dígito normal de su teclado, y eso es lo que
+# le pide `ONBOARDING_NUMERO_NO_ENTENDIDO`. Pero si copia el emoji de la
+# lista y lo manda, también vale: `_normalizar` le quita el envolvente
+# (categoría Me) y el selector de variación (Mn) y deja el dígito solo.
+# Comprobado: "3", "tres" y "3️⃣" dan los tres 3.
+_DIGITOS_EMOJI = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣",
+                  "6️⃣", "7️⃣", "8️⃣", "9️⃣")
+
+
+def _vineta(indice: int) -> str:
+    """El número de una opción, como emoji de teclado.
+
+    Por encima de nueve no hay emoji y se cae al texto de siempre. Hoy no
+    puede ocurrir —tres candidatos más las dos salidas son cinco—, pero
+    subir el número de candidatos es justo de lo que la Fase 7 tiene que
+    decidir, y no vale que reviente por eso.
+    """
+    return _DIGITOS_EMOJI[indice - 1] if 1 <= indice <= 9 else f"{indice}."
+
+
 def leer_numero(texto: str | None, maximo: int) -> int | None:
     """Interpreta la respuesta a una lista numerada. None si no es un número.
 
@@ -230,14 +254,14 @@ def componer_opciones(
     lineas = [textos.ONBOARDING_BARRIO_ENCABEZADO, ""]
 
     for indice, (_, nombre) in enumerate(candidatos, 1):
-        lineas.append(f"{indice}. {nombre}")
+        lineas.append(f"{_vineta(indice)} {nombre}")
 
     total = len(candidatos) + 1
-    lineas.append(f"{total}. {textos.ONBOARDING_OPCION_NINGUNO}")
+    lineas.append(f"{_vineta(total)} {textos.ONBOARDING_OPCION_NINGUNO}")
 
     if ofrecer_otro:
         total += 1
-        lineas.append(f"{total}. {textos.ONBOARDING_OPCION_OTRO}")
+        lineas.append(f"{_vineta(total)} {textos.ONBOARDING_OPCION_OTRO}")
 
     return "\n".join(lineas), total
 
@@ -624,7 +648,7 @@ async def _atender_confirmacion(
             nombre_huerta=datos.get("nombre_huerta"),
             # Sin cultivos: el onboarding no los pregunta. Los va contando
             # ella después y los atiende el CU3 conversacional.
-            cultivos=[],
+            especies=[],
         )
     except Exception:
         # El estado NO se borra: así puede reintentar el botón sin volver a

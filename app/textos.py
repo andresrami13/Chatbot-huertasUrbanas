@@ -41,14 +41,14 @@ ROTULOS_BOTONES_REGISTRO = {
 # CU5. Sirve de bienvenida y de ayuda: la Fase 2 define un solo texto para
 # ambos casos. Los ejemplos están en lenguaje natural, para enseñar cómo
 # se pide sin convertir el bot en un menú.
-BIENVENIDA = """Buenas. Soy el asistente virtual de huertas urbanas de Bosa Occidental.
+BIENVENIDA = """👋 Buenas. Soy el asistente virtual de huertas urbanas de Bosa Occidental.
 
 Le puedo ayudar a:
-- Cuidar su huerta: "mi tomate tiene bichos"
-- Guardar los datos de su huerta: "sembré cilantro en marzo"
-- Saber qué siembran cerca: "qué siembran por mi barrio"
+🌱 Cuidar su huerta: "mi tomate tiene bichos"
+📝 Guardar los datos de su huerta: "tengo sembrado cilantro"
+🏘️ Saber qué siembran cerca: "qué siembran por mi barrio"
 
-Escríbame con sus propias palabras, o mándeme una nota de voz."""
+Escríbame con sus propias palabras, o mándeme una nota de voz 🎤."""
 
 
 # CU1. Cuerpo del mensaje con los botones [Acepto] / [No acepto].
@@ -103,7 +103,7 @@ REGISTRO_NADA_QUE_ANOTAR = """Me quedé con las ganas de anotarlo, pero no le en
 ¿Me cuenta qué fue y por ahí cuándo lo sembró?"""
 
 
-REGISTRO_GUARDADO = """Listo, ya quedó guardado.
+REGISTRO_GUARDADO = """✅ Listo, ya quedó guardado.
 
 Cuando siembre algo nuevo me cuenta y lo agrego."""
 
@@ -178,7 +178,7 @@ ORIENTACION_NO_DISPONIBLE = """Perdone, en este momento no pude consultar la inf
 # copiar la etiqueta `[OFICIAL – ...]` está en los dos prompts y aun así se
 # cuela—. Una advertencia que falte una vez de cada diez es peor que no
 # tenerla, porque falta justo cuando hace falta.
-ADVERTENCIA_MEDICA = """Eso que le conté es lo que dice la guía sobre la planta, no es un consejo médico.
+ADVERTENCIA_MEDICA = """⚠️ Eso que le conté es lo que dice la guía sobre la planta, no es un consejo médico.
 
 Antes de tomar cualquier planta como remedio, consúltelo con su médico o en el centro de salud, sobre todo si usted toma alguna droga formulada."""
 
@@ -191,7 +191,7 @@ Antes de tomar cualquier planta como remedio, consúltelo con su médico o en el
 #
 # Se aprovecha para invitarla a registrar la suya, que es lo que hace
 # crecer el dato comunitario. Sin presionar: se le cuenta para qué sirve.
-COMUNIDAD_SIN_DATOS = """Todavía no tengo qué contarle de otras huertas por esa pregunta.
+COMUNIDAD_SIN_DATOS = """🌱 Todavía no tengo qué contarle de otras huertas por esa pregunta.
 
 Esto se va llenando a medida que cada quien cuenta lo suyo. Si me cuenta qué tiene sembrado, las demás también pueden verlo.
 
@@ -239,14 +239,14 @@ Si cambia de parecer, escríbame cuando quiera. Mientras tanto puede escribir "a
 # "guardé" es verdad. El barrio y el nombre de la huerta esperan en el
 # borrador hasta el botón final, y decirle "guardé" sería falso en ese
 # instante. "Guardado" queda reservado para después del botón.
-ONBOARDING_ECO_NOMBRE = "Entendido, guardé {nombre}."
-ONBOARDING_ECO_BARRIO = "Entendido, anoté el barrio {barrio}."
+ONBOARDING_ECO_NOMBRE = "✅ Entendido, guardé {nombre}."
+ONBOARDING_ECO_BARRIO = "✅ Entendido, anoté el barrio {barrio}."
 
 
 # Solo el nombre de pila: el apellido no se usa en ninguna parte del
 # sistema, y pedirlo sería recoger un dato personal sin finalidad
 # (Ley 1581 de 2012; Fase 3, §5).
-ONBOARDING_PREGUNTA_NOMBRE = """Para empezar, ¿cómo se llama usted?
+ONBOARDING_PREGUNTA_NOMBRE = """👤 Para empezar, ¿cómo se llama usted?
 
 Con el nombre me basta, no necesito el apellido."""
 
@@ -258,7 +258,7 @@ ONBOARDING_NOMBRE_REINTENTO = """Perdone, no le entendí el nombre.
 ¿Cómo la llaman? Si prefiere no decirlo, escriba vecina."""
 
 
-ONBOARDING_PREGUNTA_BARRIO = "¿En qué barrio de Bosa queda su huerta?"
+ONBOARDING_PREGUNTA_BARRIO = "🏡 ¿En qué barrio de Bosa queda su huerta?"
 
 
 ONBOARDING_BARRIO_REINTENTO = """Perdone, no le entendí el barrio.
@@ -274,7 +274,7 @@ ONBOARDING_BARRIO_SIN_CANDIDATOS = """No encontré ese barrio en mi lista.
 
 # Encabezado de la lista numerada de candidatos. El cuerpo con los nombres
 # lo compone `onboarding.py`, porque es dinámico.
-ONBOARDING_BARRIO_ENCABEZADO = "¿Cuál de estos es su barrio? Escriba solo el número."
+ONBOARDING_BARRIO_ENCABEZADO = "🏡 ¿Cuál de estos es su barrio? Escriba solo el número."
 
 
 # Rótulos de las opciones fijas de esa lista. Se redactan por lo que
@@ -293,7 +293,7 @@ ONBOARDING_NUMERO_NO_ENTENDIDO = """No entendí.
 Por favor escriba solo el número de su opción, por ejemplo: 2"""
 
 
-ONBOARDING_PREGUNTA_HUERTA = "¿Cómo se llama su huerta?"
+ONBOARDING_PREGUNTA_HUERTA = "🌱 ¿Cómo se llama su huerta?"
 
 
 # Segundo intento: la salida para quien no le haya puesto nombre.
@@ -304,9 +304,17 @@ ONBOARDING_HUERTA_REINTENTO = """Perdone, no le entendí el nombre de la huerta.
 
 # Cierre del onboarding, después del botón. Aquí sí se dice "guardado",
 # porque aquí sí lo está.
-ONBOARDING_GUARDADO = """Listo, ya quedó guardada su huerta.
+#
+# El ejemplo va entre comillas y dentro de una frase, no como lista de
+# especies: una lista se lee como un menú del que escoger y parte de las
+# usuarias la copiaría, mete un dato falso en `cultivo`, que es lo que
+# alimenta el CU4. Así se lee como "así se dice", que es lo que hace falta:
+# es el primer texto libre que ella escribe tras tres preguntas cerradas.
+ONBOARDING_GUARDADO = """✅ Listo, ya quedó guardada su huerta.
 
-Cuénteme qué tiene sembrado y lo voy anotando. También puede preguntarme lo que necesite sobre su huerta."""
+Ahora cuénteme qué tiene sembrado. Puede decirlo sencillo, por ejemplo: "tengo tomate, cilantro y una mata de sábila".
+
+Si ahora no se acuerda de todo, me va contando cuando quiera. También puede mandarme una nota de voz 🎤, si le queda más fácil."""
 
 
 # Pulsó [No]. Se repiten las tres preguntas desde el principio: es lo que
@@ -328,3 +336,44 @@ No se guardó nada. ¿Lo intentamos de nuevo en un ratico?"""
 # `usuario.nombre_usuario_cifrado` y `mensaje.contenido` va en claro
 # (ADR-0012), así que guardarlo ahí anularía el cifrado.
 SALUDO_PERSONALIZADO = "Hola, {nombre}."
+
+
+# --- Avisos de espera (Fase 7) ----------------------------------------
+# Se mandan mientras el modelo trabaja, y **no entran en la memoria**: son
+# la única excepción a "enviar y recordar van juntos" (CLAUDE.md §11).
+# El motivo de esa regla —que un envío sin registrar deja un hueco que el
+# agente no puede detectar— no aplica aquí, porque el aviso no dice nada
+# que el agente vaya a necesitar. Recordarlos, en cambio, sí haría daño:
+# cada intercambio pasaría de dos mensajes a tres y la ventana de diez se
+# quedaría en menos de siete útiles, llena de "deme un momentico".
+#
+# Son varias y se reparten barajadas para que no suene a máquina. El emoji
+# sí es siempre el mismo, que es lo que la hace reconocer el aviso de un
+# vistazo sin leerlo.
+
+# Camino con RAG: el agente enrutó a orientación o comunidad. Unos 13
+# segundos medidos.
+ESPERA_RAG = (
+    "⏳ Deme un momentico, por favor. Ya le respondo.",
+    "⏳ Permítame un momentico que estoy averiguando.",
+    "⏳ Espéreme tantico, ya le cuento.",
+    "⏳ Regáleme un momentico, por favor.",
+    "⏳ Esa no me la sé, pero ya estoy buscando.",
+    "⏳ Ya le averiguo. Deme un segundito.",
+    "⏳ Permítame tantico, que ya casi.",
+    "⏳ Un momentico que estoy mirando eso.",
+    "⏳ Espere un momentico, ya mismo le respondo.",
+    "⏳ Deme un chancecito y ya le cuento.",
+)
+
+
+# Camino con nota de voz. Llevan 🎤 y no ⏳ a propósito: lo que más
+# tranquiliza ahí no es "espere", es saber que la nota de voz sí llegó.
+ESPERA_AUDIO = (
+    "🎤 Ya le estoy oyendo la nota de voz. Deme un momentico.",
+    "🎤 Estoy escuchando lo que me mandó. Permítame tantico.",
+    "🎤 Deme un momentico que estoy oyendo su mensaje.",
+    "🎤 Ya mismo le oigo la razón que me dejó. Espéreme tantico.",
+    "🎤 Permítame un momentico, que estoy oyendo su nota de voz.",
+    "🎤 Estoy oyendo lo que me contó. Deme un segundito.",
+)

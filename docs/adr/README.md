@@ -26,6 +26,8 @@ documento queda marcado como pendiente de corrección.
 | [0014](0014-catalogo-de-fuentes-oficiales.md) | Las fuentes oficiales se declaran en un catálogo, y sus parámetros son mediciones | Aceptada; amplía el [0009](0009-ingesta-de-fuentes-oficiales.md) | Fase 4 (§7) |
 | [0015](0015-advertencia-de-contenido-medico.md) | Toda respuesta del CU2 que hable de salud lleva advertencia, puesta por el backend | Aceptada | Sin respaldo documental |
 | [0016](0016-onboarding-de-preguntas-cerradas.md) | El registro empieza con un onboarding de preguntas cerradas | Aceptada | Fase 2 (CU3) |
+| [0017](0017-aviso-de-espera.md) | El aviso de espera se envía y no se recuerda | Aceptada | Sin respaldo documental |
+| [0018](0018-sin-fecha-de-siembra.md) | La fecha de siembra sale del CU3 | Aceptada; extiende el [0011](0011-fragmento-comunitario-solo-especies.md) al CU3 | Fase 4 (Tabla 3) / Fase 3 |
 
 ## Documentos pendientes de corrección
 
@@ -90,6 +92,17 @@ Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
 - **Anteproyecto, §7.1** — acota el alcance a la UPZ 84 Bosa Occidental; el
   catálogo de barrios pasa a cubrir la localidad de Bosa entera, 312
   barrios (ADR-0016).
+- **Fase 3, §2 (C4)** — el procesamiento asíncrono se describe desde el lado
+  del webhook, para que Meta no reintente, y no desde el lado de quien
+  espera: nada dice qué ve la usuaria durante los trece segundos que tarda
+  el camino con RAG (ADR-0017).
+- **Fase 4, Tabla 3** — la extracción ya no devuelve la fecha de siembra ni
+  la marca de imprecisión. Era un dato de solo escritura, y el ADR-0011 ya
+  había medido que empeoraba la recuperación (ADR-0018).
+- **Fase 3, §3** — `cultivo` pierde `fecha_siembra_aprox` y
+  `fecha_imprecisa` en la migración `008` (ADR-0018).
+- **Fase 2, CU3** — el resumen de confirmación ya no muestra la fecha de
+  cada cultivo, solo el nombre de la planta (ADR-0018).
 - **Fase 3, §5.2 y Fase 4, Tabla 3** — no contemplan que el nombre de la
   usuaria se muestre en la conversación. El saludo personalizado se
   antepone al enviar y **no** se registra en `mensaje`, o el nombre cifrado

@@ -413,7 +413,7 @@ async def guardar_huerta(
     usuario_id: UUID,
     barrio_codigo: str,
     nombre_huerta: str | None,
-    cultivos: list[tuple[str, date | None, bool]],
+    especies: list[str],
 ) -> UUID:
     """Persiste el registro confirmado y devuelve el id de la huerta.
 
@@ -426,7 +426,8 @@ async def guardar_huerta(
     cultivo le fragmentaría los datos y rompería la atribución del CU4, que
     es por huerta.
 
-    `cultivos` son ternas (especie, fecha o None, fecha_imprecisa).
+    `especies` son los nombres de las plantas, y nada más: la fecha de
+    siembra salió de `cultivo` en la migración 008 (ADR-0018).
     """
     pool = obtener_pool()
 
@@ -480,18 +481,11 @@ async def guardar_huerta(
                 )
                 creada = False
 
-            for especie, fecha, imprecisa in cultivos:
+            for especie in especies:
                 await conexion.execute(
-                    """
-                    insert into cultivo
-                           (huerta_id, especie, fecha_siembra_aprox,
-                            fecha_imprecisa)
-                         values ($1, $2, $3, $4)
-                    """,
+                    "insert into cultivo (huerta_id, especie) values ($1, $2)",
                     huerta_id,
                     especie,
-                    fecha,
-                    imprecisa,
                 )
 
     logger.info(
@@ -564,7 +558,7 @@ async def obtener_huerta_de_usuaria(usuario_id: UUID) -> HuertaDeUsuaria | None:
 
 async def agregar_cultivos(
     usuario_id: UUID,
-    cultivos: list[tuple[str, date | None, bool]],
+    especies: list[str],
 ) -> UUID | None:
     """Añade cultivos a la huerta que ya existe. Devuelve su id.
 
@@ -576,7 +570,7 @@ async def agregar_cultivos(
     el onboarding. No la crea: crear una huerta sin barrio confirmado por
     ella sería saltarse el §4.7.
 
-    `cultivos` son ternas (especie, fecha o None, fecha_imprecisa).
+    `especies` son los nombres de las plantas (ADR-0018).
     """
     pool = obtener_pool()
 
@@ -595,18 +589,11 @@ async def agregar_cultivos(
             if huerta_id is None:
                 return None
 
-            for especie, fecha, imprecisa in cultivos:
+            for especie in especies:
                 await conexion.execute(
-                    """
-                    insert into cultivo
-                           (huerta_id, especie, fecha_siembra_aprox,
-                            fecha_imprecisa)
-                         values ($1, $2, $3, $4)
-                    """,
+                    "insert into cultivo (huerta_id, especie) values ($1, $2)",
                     huerta_id,
                     especie,
-                    fecha,
-                    imprecisa,
                 )
 
             # La huerta cambió aunque su fila no: el CU4 ordena por esta

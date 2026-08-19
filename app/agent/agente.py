@@ -57,6 +57,7 @@ from app import textos
 from app.agent.plantillas import cargar_prompt
 from app.core.gemini import MODELO_GENERATIVO, obtener_cliente
 from app.services.comunidad import consultar_comunidad
+from app.services.espera import RAG, programar_aviso
 from app.services.extraccion import extraer_huerta
 from app.services.memoria import responder, ventana
 from app.services.orientacion import consultar_orientacion
@@ -249,6 +250,12 @@ async def _ejecutar(
             pregunta == mensaje,
             len(pregunta),
         )
+        # Primer instante en que se sabe que esto va a tardar: falta la
+        # recuperación y una segunda pasada por el modelo para redactar. No
+        # bloquea, y si el mensaje llegó por voz ya salió el aviso de audio
+        # y este no manda nada.
+        programar_aviso(RAG)
+
         # El mensaje entero va de respaldo: si el recorte del modelo no
         # recupera nada, el CU2 reintenta con lo que ella escribió, que es
         # la formulación sobre la que existe la calibración del umbral.
@@ -265,6 +272,8 @@ async def _ejecutar(
             pregunta == mensaje,
             usuario_id,
         )
+        programar_aviso(RAG)
+
         await responder(
             numero, usuario_id, await consultar_comunidad(pregunta, usuario_id)
         )

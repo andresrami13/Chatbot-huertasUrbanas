@@ -131,6 +131,21 @@ class Settings(BaseSettings):
     # nada de lo guardado, solo cuánto de ello se lee.
     MEMORIA_VENTANA_MENSAJES: int = 10
 
+    # --- Aviso de espera ---
+    # Segundos que se dejan pasar antes de decirle "deme un momentico". Se
+    # cuentan desde que el mensaje entra por el webhook, no desde que se
+    # llama al modelo.
+    #
+    # Existe porque el camino con RAG tarda unos 13 segundos medidos, y ese
+    # silencio con una usuaria que no sabe si el mensaje llegó es la peor
+    # parte de la conversación.
+    #
+    # Configurable por el mismo criterio que los umbrales: la Fase 7 tiene
+    # que medir cuánto tarda de verdad cada camino, y ese número puede
+    # mover este. A 0 el aviso sale de inmediato; no hay forma de apagarlo
+    # desde aquí, se apaga quitando la llamada a `espera.programar_aviso`.
+    ESPERA_AVISO_SEGUNDOS: float = 2.0
+
     # --- Identificación del despliegue ---
     # Las rellena Railway sola en cada despliegue desde GitHub
     # (comprobado en su documentación el 15/08/2026). No hay que definirlas

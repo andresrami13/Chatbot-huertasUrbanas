@@ -13,6 +13,11 @@ Entre el resumen y el botón hay dos mensajes de WhatsApp, y la respuesta de
 un botón solo trae su identificador. Lo extraído espera en
 `registro_pendiente`, no en memoria (ADR-0008).
 
+**Desde el ADR-0018 el borrador lleva solo especies.** La fecha de siembra
+salió del CU3 entero —del prompt, del esquema, del resumen y de la tabla
+`cultivo`, en la migración 008—, así que el resumen nombra las plantas y
+nada más.
+
 **Este es el CU3 conversacional**, el que atiende lo que ella cuente sobre
 la marcha. La entrada al sistema la lleva el onboarding (ADR-0016), que ya
 fijó el barrio y el nombre de la huerta; aquí solo se añaden cultivos. Por
@@ -22,7 +27,6 @@ cumplido, el barrio siempre está.
 """
 
 import logging
-from datetime import date
 from uuid import UUID
 
 from app import textos
@@ -40,46 +44,29 @@ from app.services.repositorio import (
 
 logger = logging.getLogger(__name__)
 
-# Sin locale: `calendar.month_name` depende de la configuración del sistema
-# y en Railway saldría en inglés.
-_MESES = (
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-)
-
 
 def _serializar(extraida: HuertaExtraida) -> dict:
     """Convierte la extracción en el jsonb del borrador."""
-    return {
-        "cultivos": [
-            {
-                "especie": cultivo.especie,
-                "anio": cultivo.anio,
-                "mes": cultivo.mes,
-                "fecha_imprecisa": cultivo.fecha_imprecisa,
-            }
-            for cultivo in extraida.cultivos
-        ],
-    }
+    return {"cultivos": [{"especie": c.especie} for c in extraida.cultivos]}
 
 
 def _deserializar(datos: dict) -> HuertaExtraida:
     """Reconstruye la extracción desde el jsonb del borrador.
 
-    Tolera los borradores del formato anterior, que llevaban además
-    `nombre_huerta` y `barrio_codigo`: se ignoran esas claves y se conservan
-    los cultivos. Sin esa tolerancia, un borrador escrito antes del
-    ADR-0016 y confirmado después perdería lo que la usuaria ya contó.
+    Tolera los borradores de los dos formatos anteriores: el de antes del
+    ADR-0016, que llevaba además `nombre_huerta` y `barrio_codigo`, y el de
+    antes del ADR-0018, que llevaba `anio`, `mes` y `fecha_imprecisa`. Se
+    ignoran esas claves y se conservan los cultivos.
+
+    Sin esa tolerancia, un borrador escrito antes del cambio y confirmado
+    después perdería lo que la usuaria ya contó. Duran 24 horas, así que la
+    ventana en la que puede pasar es justo la del despliegue.
     """
     return HuertaExtraida(
         cultivos=[
-            CultivoExtraido(
-                especie=c["especie"],
-                anio=c.get("anio"),
-                mes=c.get("mes"),
-                fecha_imprecisa=c.get("fecha_imprecisa", True),
-            )
+            CultivoExtraido(especie=c["especie"])
             for c in datos.get("cultivos") or []
+            if c.get("especie")
         ],
     )
 
@@ -104,22 +91,6 @@ def fusionar(previa: HuertaExtraida, nueva: HuertaExtraida) -> HuertaExtraida:
     return HuertaExtraida(cultivos=cultivos)
 
 
-def _describir_fecha(cultivo: CultivoExtraido) -> str:
-    """La fecha en palabras, marcando lo que se aproximó.
-
-    La marca de imprecisión de la Fase 4, Tabla 3, se le muestra a la
-    usuaria en lugar de esconderla: es la ocasión de que corrija una fecha
-    que el modelo estimó.
-    """
-    fecha = cultivo.fecha_siembra()
-
-    if fecha is None:
-        return "sin fecha"
-
-    texto = f"{_MESES[fecha.month - 1]} de {fecha.year}"
-    return f"{texto} (más o menos)" if cultivo.fecha_imprecisa else texto
-
-
 def componer_resumen(extraida: HuertaExtraida, huerta: HuertaDeUsuaria) -> str:
     """El texto que se le muestra antes de los botones.
 
@@ -140,7 +111,7 @@ def componer_resumen(extraida: HuertaExtraida, huerta: HuertaDeUsuaria) -> str:
         lineas.append("")
         lineas.append("Sembrado:")
         for cultivo in extraida.cultivos:
-            lineas.append(f"- {cultivo.especie}, {_describir_fecha(cultivo)}")
+            lineas.append(f"- {cultivo.especie}")
 
     lineas.append("")
     lineas.append("¿Lo guardo así?")
@@ -206,12 +177,10 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
 
     extraida = _deserializar(datos)
 
-    cultivos: list[tuple[str, date | None, bool]] = [
-        (c.especie, c.fecha_siembra(), c.fecha_imprecisa) for c in extraida.cultivos
-    ]
+    especies = [c.especie for c in extraida.cultivos]
 
     try:
-        huerta_id = await agregar_cultivos(usuario_id=usuario_id, cultivos=cultivos)
+        huerta_id = await agregar_cultivos(usuario_id=usuario_id, especies=especies)
     except Exception:
         # El borrador NO se borra: así puede reintentar sin volver a
         # contarlo todo.
