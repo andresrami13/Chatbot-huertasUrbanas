@@ -494,7 +494,7 @@ async def guardar_huerta(
         usuario_id,
         huerta_id,
         creada,
-        len(cultivos),
+        len(especies),
     )
 
     # El fragmento comunitario lo regenera quien llama, después de que esta
@@ -609,7 +609,7 @@ async def agregar_cultivos(
         "Cultivos añadidos | usuario_id=%s | huerta_id=%s | cultivos=%d",
         usuario_id,
         huerta_id,
-        len(cultivos),
+        len(especies),
     )
 
     return huerta_id
