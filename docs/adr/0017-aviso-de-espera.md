@@ -1,6 +1,7 @@
 # ADR-0017. El aviso de espera se envía y no se recuerda
 
-- **Estado:** Aceptada
+- **Estado:** Aceptada **solo para la nota de voz**. El aviso del camino
+  con RAG se puso y se retiró el mismo día; ver la revisión al final
 - **Fecha:** 2026-08-18
 - **Fase:** 7
 - **Origen:** sin respaldo documental
@@ -156,3 +157,45 @@ de voz sí llegó.
 - **Guardar el aviso en la memoria y filtrarlo al leerla.** Deja la decisión
   repartida en dos sitios, y la ventana de diez seguiría contándolo salvo
   que también se filtre en la consulta. Más piezas para el mismo efecto.
+
+## Revisión del 18/08/2026: el aviso del RAG se retira
+
+Probado desde el celular el mismo día, **la conversación se sintió más
+lenta con el aviso que sin él** y se quitó. Queda solo el acuse de la nota
+de voz.
+
+**El aviso no añadía tiempo de reloj.** Sale en una tarea aparte
+(`asyncio.create_task`), así que la respuesta no lo espera. Lo que cambió
+no fue la duración sino la percepción: un mensaje que dice «deme un
+momentico» **marca el comienzo de la espera** y la vuelve algo que se
+mide, cuando antes era un rato indefinido en el que ella podía estar
+haciendo otra cosa. Trece segundos anunciados se hacen más largos que
+trece segundos sin anunciar.
+
+Eso vale como hallazgo de la Fase 7 y no como fracaso de la implementación,
+porque es justo lo que no se podía saber sin un teléfono. La decisión 2
+—avisar solo en los caminos lentos— resulta ser más restrictiva de lo que
+se creyó: **el camino con RAG tampoco lo quería.**
+
+Qué queda en pie y qué no:
+
+| | |
+|---|---|
+| Decisión 1, enviar sin recordar | **Vigente**, ahora para el acuse de voz |
+| Decisión 2, solo caminos lentos | **Vigente y más estrecha**: solo el audio |
+| Decisión 3, dos disparadores | **Retirada.** Queda uno, y se sabe en el webhook |
+| Decisión 4, umbral de 2 s | **Retirada.** `ESPERA_AVISO_SEGUNDOS` sale de `config.py`: para un acuse que confirma la recepción, esperar es lo contrario de lo que se busca |
+| Decisión 5, `ContextVar` | **Retirada.** Sin dos disparadores no hay estado que cruzar entre módulos |
+| Decisión 6, frases barajadas | **Vigente** para las seis de voz; las diez del RAG salen de `textos.py` |
+
+El acuse de la nota de voz se conserva porque **hace otra cosa**: no pide
+paciencia, confirma que el audio llegó. Ahí el mensaje aporta información
+que ella no tiene por ningún otro medio, y por eso se manda ya sin esperar
+ningún umbral.
+
+**Lo que este ADR deja abierto sigue abierto**, menos lo de los dos
+segundos, que dejó de tener sentido. En particular, el indicador de
+«escribiendo…» de la Cloud API vuelve a ser la alternativa que habría que
+verificar si el silencio del camino con RAG se quiere resolver: no manda
+ningún mensaje, así que no marca el comienzo de la espera como lo hacía
+este.

@@ -26,7 +26,7 @@ documento queda marcado como pendiente de corrección.
 | [0014](0014-catalogo-de-fuentes-oficiales.md) | Las fuentes oficiales se declaran en un catálogo, y sus parámetros son mediciones | Aceptada; amplía el [0009](0009-ingesta-de-fuentes-oficiales.md) | Fase 4 (§7) |
 | [0015](0015-advertencia-de-contenido-medico.md) | Toda respuesta del CU2 que hable de salud lleva advertencia, puesta por el backend | Aceptada | Sin respaldo documental |
 | [0016](0016-onboarding-de-preguntas-cerradas.md) | El registro empieza con un onboarding de preguntas cerradas | Aceptada | Fase 2 (CU3) |
-| [0017](0017-aviso-de-espera.md) | El aviso de espera se envía y no se recuerda | Aceptada | Sin respaldo documental |
+| [0017](0017-aviso-de-espera.md) | El aviso de espera se envía y no se recuerda | Aceptada solo para la nota de voz; el del RAG se retiró el mismo día | Sin respaldo documental |
 | [0018](0018-sin-fecha-de-siembra.md) | La fecha de siembra sale del CU3 | Aceptada; extiende el [0011](0011-fragmento-comunitario-solo-especies.md) al CU3 | Fase 4 (Tabla 3) / Fase 3 |
 
 ## Documentos pendientes de corrección

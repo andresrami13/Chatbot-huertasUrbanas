@@ -338,37 +338,22 @@ No se guardó nada. ¿Lo intentamos de nuevo en un ratico?"""
 SALUDO_PERSONALIZADO = "Hola, {nombre}."
 
 
-# --- Avisos de espera (Fase 7) ----------------------------------------
-# Se mandan mientras el modelo trabaja, y **no entran en la memoria**: son
-# la única excepción a "enviar y recordar van juntos" (CLAUDE.md §11).
+# --- Acuse de la nota de voz (Fase 7) ---------------------------------
+# Se manda en cuanto llega un audio, y **no entra en la memoria**: es la
+# excepción declarada a "enviar y recordar van juntos" (CLAUDE.md §11).
 # El motivo de esa regla —que un envío sin registrar deja un hueco que el
-# agente no puede detectar— no aplica aquí, porque el aviso no dice nada
-# que el agente vaya a necesitar. Recordarlos, en cambio, sí haría daño:
-# cada intercambio pasaría de dos mensajes a tres y la ventana de diez se
-# quedaría en menos de siete útiles, llena de "deme un momentico".
+# agente no puede detectar— no aplica aquí, porque el acuse no dice nada
+# que el agente vaya a necesitar. Recordarlo sí haría daño: gastaría uno
+# de los diez huecos de la ventana en cada nota de voz.
 #
-# Son varias y se reparten barajadas para que no suene a máquina. El emoji
-# sí es siempre el mismo, que es lo que la hace reconocer el aviso de un
-# vistazo sin leerlo.
+# Son varias y se reparten barajadas para que no suene a máquina.
+#
+# **Hubo diez frases más, para el camino con RAG, y se retiraron el
+# 18/08/2026** (ADR-0017, revisión): en la prueba con celular la
+# conversación se sintió más lenta con el aviso que sin él.
 
-# Camino con RAG: el agente enrutó a orientación o comunidad. Unos 13
-# segundos medidos.
-ESPERA_RAG = (
-    "⏳ Deme un momentico, por favor. Ya le respondo.",
-    "⏳ Permítame un momentico que estoy averiguando.",
-    "⏳ Espéreme tantico, ya le cuento.",
-    "⏳ Regáleme un momentico, por favor.",
-    "⏳ Esa no me la sé, pero ya estoy buscando.",
-    "⏳ Ya le averiguo. Deme un segundito.",
-    "⏳ Permítame tantico, que ya casi.",
-    "⏳ Un momentico que estoy mirando eso.",
-    "⏳ Espere un momentico, ya mismo le respondo.",
-    "⏳ Deme un chancecito y ya le cuento.",
-)
-
-
-# Camino con nota de voz. Llevan 🎤 y no ⏳ a propósito: lo que más
-# tranquiliza ahí no es "espere", es saber que la nota de voz sí llegó.
+# Llevan 🎤 a propósito: lo que más tranquiliza no es "espere", es saber
+# que la nota de voz sí llegó.
 ESPERA_AUDIO = (
     "🎤 Ya le estoy oyendo la nota de voz. Deme un momentico.",
     "🎤 Estoy escuchando lo que me mandó. Permítame tantico.",

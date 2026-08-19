@@ -1,55 +1,41 @@
-"""Aviso de espera mientras el modelo trabaja (Fase 7).
+"""Acuse de la nota de voz (Fase 7, ADR-0017 revisado el 18/08/2026).
 
-El camino con RAG tarda unos 13 segundos medidos, y una nota de voz más
-todavía. Ese silencio es la peor parte de la conversación para alguien que
-no sabe si su mensaje llegó, así que se le manda un "deme un momentico"
-antes de la respuesta de verdad.
+Cuando llega un audio se le dice en el acto que la nota de voz se está
+oyendo. Es lo único que queda del aviso de espera: **el del camino con RAG
+se retiró el mismo día que se puso**, porque en la prueba con celular la
+conversación se sintió más lenta con él que sin él.
 
-Cuatro cosas que conviene tener claras antes de tocar este módulo:
+Tres cosas que conviene tener claras antes de tocar este módulo:
 
-- **El aviso no entra en la memoria.** Es la única excepción a "enviar y
-  recordar van juntos" (CLAUDE.md §11), y por eso aquí se llama a
-  `whatsapp.enviar_texto` y no a `memoria.responder`. El motivo está en
-  `textos.ESPERA_RAG`.
-- **Solo se avisa en los caminos lentos.** El de la ayuda y los pasos del
-  onboarding tardan dos o tres segundos: ahí un aviso llegaría pegado a la
-  respuesta y se leería como que el bot se trabó, no como atención.
-- **Los dos caminos se saben en momentos distintos.** Que sea audio viene
-  en el propio webhook; que vaya al RAG lo decide el agente después. De ahí
-  que haya dos disparadores y no uno.
-- **Un aviso por mensaje.** Un audio que además va al RAG manda solo el de
-  la voz, que es el que ya salió.
-
-El estado viaja en un `ContextVar` y no en las firmas. Es lo que asyncio
-tiene para esto —estado por petición, propagado solo dentro de la tarea que
-atiende ese mensaje— y evita pasar un objeto de mano en mano por
-`dispatcher -> agente -> orientacion`, que son tres módulos que no tienen
-nada que ver con esto.
+- **El acuse no entra en la memoria.** Es la excepción declarada a "enviar
+  y recordar van juntos" (CLAUDE.md §11): aquí se llama a
+  `whatsapp.enviar_texto` y no a `memoria.responder`. El motivo de esa
+  regla —que un envío sin registrar deja un hueco que el agente no puede
+  detectar— no aplica, porque el acuse no dice nada que el agente vaya a
+  necesitar. Recordarlo sí haría daño: gastaría un hueco de los diez de la
+  ventana en cada nota de voz.
+- **No bloquea.** Sale en una tarea aparte, así que la transcripción
+  arranca sin esperar a que Meta conteste.
+- **Sin umbral.** Se manda en cuanto se sabe que el mensaje es un audio,
+  que es lo que viene en el propio webhook. El retraso configurable que
+  tenía se fue con el aviso del RAG: para un acuse que confirma la
+  recepción, esperar es justo lo contrario de lo que se busca.
 """
 
 import asyncio
-import contextvars
 import logging
 import random
-import time
-from dataclasses import dataclass, field
 
 from app import textos
-from app.config import settings
 from app.services.whatsapp import enviar_texto
 
 logger = logging.getLogger(__name__)
-
-AUDIO = "audio"
-RAG = "rag"
-
-_FRASES = {AUDIO: textos.ESPERA_AUDIO, RAG: textos.ESPERA_RAG}
 
 
 class _Baraja:
     """Reparte las frases barajadas y no repite hasta agotarlas.
 
-    Con un sorteo simple, una de cada diez veces le llegaría dos veces
+    Con un sorteo simple, una de cada seis veces le llegaría dos veces
     seguida la misma frase, que es justo lo que delata a una máquina.
 
     El estado es del proceso, no de la usuaria: en Railway corre una sola
@@ -77,85 +63,25 @@ class _Baraja:
         return self._ultima
 
 
-_BARAJAS = {tipo: _Baraja(frases) for tipo, frases in _FRASES.items()}
+_BARAJA_AUDIO = _Baraja(textos.ESPERA_AUDIO)
+
+# Sin esto el recolector puede llevarse una tarea antes de que llegue a
+# mandar nada: `create_task` no guarda una referencia fuerte.
+_EN_VUELO: set[asyncio.Task] = set()
 
 
-@dataclass
-class _Aviso:
-    """Lo que hace falta saber para avisar, durante un solo mensaje."""
-
-    numero: str
-    recibido_en: float = field(default_factory=time.monotonic)
-    tarea: asyncio.Task | None = None
-    enviado: bool = False
-
-
-_actual: contextvars.ContextVar[_Aviso | None] = contextvars.ContextVar(
-    "aviso_de_espera", default=None
-)
-
-
-def iniciar_aviso(numero: str) -> None:
-    """Marca el comienzo del mensaje. Todavía no programa nada.
-
-    Se llama al empezar a atender, para que el retraso se cuente desde que
-    el mensaje entró y no desde que se supo que iba a tardar.
-    """
-    _actual.set(_Aviso(numero=numero))
-
-
-async def _avisar(aviso: _Aviso, tipo: str) -> None:
-    """Espera lo que falte para el umbral y manda una frase."""
-    restante = settings.ESPERA_AVISO_SEGUNDOS - (time.monotonic() - aviso.recibido_en)
-    if restante > 0:
-        await asyncio.sleep(restante)
-
-    # Antes del envío: si algo falla en la red, el aviso se da por gastado
-    # igual. Reintentarlo llegaría después de la respuesta de verdad.
-    aviso.enviado = True
-
+async def _enviar_acuse(numero: str) -> None:
     try:
-        await enviar_texto(aviso.numero, _BARAJAS[tipo].siguiente())
-        logger.info("Aviso de espera enviado | tipo=%s", tipo)
+        await enviar_texto(numero, _BARAJA_AUDIO.siguiente())
+        logger.info("Acuse de nota de voz enviado")
     except Exception:
-        # Que no salga el aviso no puede tumbar la respuesta: es un
+        # Que no salga el acuse no puede tumbar la respuesta: es un
         # acompañamiento, no el contenido.
-        logger.exception("Falló el aviso de espera | tipo=%s", tipo)
+        logger.exception("Falló el acuse de la nota de voz")
 
 
-def programar_aviso(tipo: str) -> None:
-    """Programa el aviso del camino `tipo`, si procede.
-
-    No bloquea: deja una tarea corriendo en paralelo al trabajo de verdad.
-    Se ignora en silencio si ya hay un aviso en marcha o ya salió uno, que
-    es lo que hace que un audio con RAG mande uno solo.
-    """
-    aviso = _actual.get()
-
-    if aviso is None or aviso.enviado or aviso.tarea is not None:
-        return
-
-    # La referencia se guarda en el propio aviso, que vive en el
-    # ContextVar: sin ella el recolector podría llevarse la tarea antes de
-    # que llegue a mandar nada.
-    aviso.tarea = asyncio.create_task(_avisar(aviso, tipo))
-
-
-def cancelar_aviso() -> None:
-    """Cierra el aviso del mensaje en curso.
-
-    Se llama cuando ya se respondió. Si la tarea seguía esperando el
-    umbral, se cancela y la usuaria no ve nada: el trabajo terminó antes de
-    lo que se temía y el aviso ya no tiene sentido.
-
-    Queda una rendija de milisegundos: si la respuesta sale justo mientras
-    el aviso está viajando, pueden cruzarse y ella lee "deme un momentico"
-    después de la respuesta. Es raro y no rompe nada.
-    """
-    aviso = _actual.get()
-
-    if aviso is None or aviso.tarea is None:
-        return
-
-    aviso.tarea.cancel()
-    aviso.tarea = None
+def acusar_audio(numero: str) -> None:
+    """Le confirma que la nota de voz llegó. No bloquea."""
+    tarea = asyncio.create_task(_enviar_acuse(numero))
+    _EN_VUELO.add(tarea)
+    tarea.add_done_callback(_EN_VUELO.discard)

@@ -37,7 +37,7 @@ from app import textos
 from app.agent.agente import atender
 from app.core.identidad import huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta
-from app.services.espera import AUDIO, cancelar_aviso, iniciar_aviso, programar_aviso
+from app.services.espera import acusar_audio
 from app.services.memoria import recordar_usuaria
 from app.services.normalizacion import transcribir_audio
 from app.services.onboarding import atender_onboarding, iniciar_onboarding
@@ -101,10 +101,6 @@ async def _procesar_mensaje(mensaje: dict) -> None:
         # Se deja a propósito en 'recibido': es lo que permite recuperarlo.
         logger.exception("Fallo atendiendo el mensaje | ref=%s", ref)
         return
-    finally:
-        # El turno terminó, con respuesta o con fallo. Si el aviso seguía
-        # esperando su umbral, ya no tiene sentido mandarlo.
-        cancelar_aviso()
 
     await marcar_procesado(huella)
 
@@ -123,10 +119,6 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     if not numero:
         logger.warning("Mensaje sin remitente; se descarta | ref=%s", ref)
         return
-
-    # El reloj del aviso de espera arranca aquí, no cuando se sepa que va
-    # a tardar: su umbral se cuenta desde que el mensaje entró.
-    iniciar_aviso(numero)
 
     texto: str | None = None
     boton_id: str | None = None
@@ -175,11 +167,9 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     # único sitio y antes de interpretar la intención: de aquí en adelante
     # da igual si el mensaje llegó escrito o hablado.
     if media_id_audio is not None:
-        # Aquí sí se sabe de antemano que va a tardar: la transcripción
-        # llama al modelo antes que nadie. El del RAG lo programa el
-        # agente más tarde, cuando decide la ruta, y si este ya salió
-        # aquel no manda nada.
-        programar_aviso(AUDIO)
+        # Se le confirma que la nota de voz llegó antes de ponerse a
+        # transcribirla, que es lo más lento del flujo. No bloquea.
+        acusar_audio(numero)
         texto = await transcribir_audio(media_id_audio)
         if texto is None:
             # No se registra nada en la memoria: no hay contenido que

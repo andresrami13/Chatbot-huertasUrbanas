@@ -17,8 +17,10 @@ De la Fase 7 van hechas cinco cosas, las dos primeras nacidas de esa prueba:
 - **El CU3 empieza con un onboarding de tres preguntas cerradas**
   (ADR-0016, 17/08/2026), y el catálogo de barrios pasó de 8 a 313.
   **Probado desde un celular real el 17/08/2026, y funcionó.**
-- **La usuaria ya no espera en silencio** los trece segundos del camino con
-  RAG: se le manda un aviso, que se envía y no se recuerda (ADR-0017).
+- **La nota de voz se acusa en el acto**, para que ella sepa que llegó. Se
+  envía y no se recuerda (ADR-0017). El aviso equivalente para el camino
+  con RAG se puso y **se retiró el mismo día**: anunciar la espera la hacía
+  sentir más larga.
 - **La fecha de siembra salió del CU3 entero** —del prompt, del resumen y de
   la tabla `cultivo`— por ser un dato de solo escritura (ADR-0018).
 
@@ -78,7 +80,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
 | Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | **Probado en producción desde el celular** |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
-| Aviso de espera | `app/services/espera.py` | Probado con siete escenarios simulados; **sin probar desde el celular** (ADR-0017) |
+| Acuse de la nota de voz | `app/services/espera.py` | Se manda al recibir el audio, sin umbral (ADR-0017, revisado) |
 | CU3 sin fecha de siembra | `extraccion_v3.md`, `db/008_*.sql` | Código listo; **la migración `008` está sin correr** (ADR-0018) |
 | Catálogo de barrios de Bosa | `db/003_catalogo_barrios_bosa.sql` | **313 filas en Supabase** desde el 17/08/2026 |
 
@@ -188,10 +190,12 @@ antes la peor se quedaba en 0.6584.
 
 Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
 
-- **Probar el aviso de espera desde un celular real** (ADR-0017). Es lo
-  único construido que no ha pasado por un teléfono. Lo que hay que mirar
-  no es que salga, que eso ya se probó simulado, sino si dos segundos son
-  el momento correcto y si las frases suenan bien dichas a una señora.
+- **Los trece segundos del camino con RAG siguen sin resolverse**
+  (ADR-0017, revisión). El aviso de texto se probó y se retiró: no añadía
+  tiempo, pero anunciar la espera la hacía sentir más larga. Si se quiere
+  atacar, la vía es el **indicador de «escribiendo…» de la Cloud API**, que
+  no manda ningún mensaje —y que hay que verificar antes contra la
+  documentación vigente, porque no se ha hecho—.
   Para repetir cualquier prueba del onboarding basta con **borrar su fila
   de `huerta`**: el siguiente mensaje lo relanza solo, sin repetir el
   consentimiento. Borrar `usuario` también sirve, pero se lleva por
@@ -926,29 +930,32 @@ anteproyecto.
 
 Dos cambios del mismo día, ninguno de los dos nacido de un fallo.
 
-**El aviso de espera** ([ADR-0017](adr/0017-aviso-de-espera.md)). El camino
-con RAG tarda unos trece segundos, y ese silencio es la peor parte de la
-conversación para quien no sabe si su mensaje llegó. Ahora se le manda un
-«deme un momentico» antes de la respuesta de verdad.
+**El aviso de espera** ([ADR-0017](adr/0017-aviso-de-espera.md)), del que
+**solo sobrevivió el acuse de la nota de voz**. Se probó desde el celular
+el mismo día y el aviso del camino con RAG se retiró: no añadía tiempo de
+reloj —sale en una tarea aparte— pero anunciar la espera la volvía algo que
+se mide, y trece segundos anunciados se hacen más largos que trece sin
+anunciar. Con él salieron el umbral, el `ContextVar` y las diez frases del
+RAG. Lo que queda es un acuse que confirma que el audio llegó, que es otra
+cosa: no pide paciencia, da una información que ella no tiene por ningún
+otro medio.
 
 - **Se envía y no se recuerda.** Es la única excepción al CLAUDE.md §11, y
-  está razonada: el aviso no dice nada que el agente necesite después, pero
-  recordarlo dejaría la ventana de diez mensajes en poco más de tres
-  intercambios útiles.
-- **Solo en los caminos lentos.** El de la ayuda y los pasos del onboarding
-  tardan dos o tres segundos; ahí un aviso llega pegado a la respuesta y se
-  lee como que el bot se trabó.
-- **Dos disparadores, y no uno**, porque los dos caminos se saben en
-  momentos distintos: que sea audio viene en el webhook, que vaya al RAG lo
-  decide el agente después. Un audio que además va al RAG manda uno solo.
-- El umbral es `ESPERA_AVISO_SEGUNDOS`, 2.0 por defecto, ajustable en
-  Railway. Además de retrasar el aviso lo **suprime** si el turno entero
-  acaba antes.
-- Diez frases para el RAG y seis para el audio, repartidas barajadas. La
-  primera versión repetía al cambiar de tanda, y salió probando.
+  está razonada: el acuse no dice nada que el agente necesite después, pero
+  recordarlo gastaría uno de los diez huecos de la ventana en cada nota de
+  voz.
+- **Sin umbral y sin bloquear.** Sale en cuanto el webhook dice que el
+  mensaje es un audio, en una tarea aparte, así que la transcripción no lo
+  espera. Para un acuse que confirma la recepción, retrasarlo es lo
+  contrario de lo que se busca.
+- **Seis frases repartidas barajadas.** La primera versión repetía al
+  cambiar de tanda, y salió probando.
 
-Probado con siete escenarios simulados —envío interceptado, sin tocar la
-API ni WhatsApp—, los siete correctos. **Sin probar desde un celular.**
+**Lo que se retiró el mismo día**, tras la prueba con celular: el aviso del
+camino con RAG, el umbral `ESPERA_AVISO_SEGUNDOS`, el `ContextVar` que
+cruzaba el estado entre el despachador y el agente, y las diez frases de
+`ESPERA_RAG`. La revisión del ADR-0017 detalla qué decisión cae y cuál
+queda en pie.
 
 **La fecha de siembra salió del CU3**
 ([ADR-0018](adr/0018-sin-fecha-de-siembra.md)). Era un dato de solo
