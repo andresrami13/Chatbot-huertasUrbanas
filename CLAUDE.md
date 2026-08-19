@@ -321,7 +321,7 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   `PHONE_NUMBER_ID` cambia al migrar — **nunca lo escribas en el código**.
 - **Supabase:** operativo. PostgreSQL 17.6, seis migraciones aplicadas, RLS
   activo sin políticas. Conexión por **session pooler, puerto 5432**.
-  **774 fragmentos oficiales en nueve fuentes** desde el 15/08/2026.
+  **765 fragmentos oficiales en nueve fuentes** desde el 19/08/2026.
   Escribir ahí cambia lo que responde el bot **en el acto**, con o sin
   despliegue: Railway lee esta misma base.
 - **Railway:** desplegado y con el servicio en marcha. `/health` dice qué
@@ -377,8 +377,13 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - **Reingerir siempre con `--reingerir`,** que reemplaza en una sola
   transacción. Y comprueba la regresión: cualquier cambio en la tubería de
   ingesta tiene que seguir dando los mismos fragmentos en las fuentes ya
-  ingeridas —81, 62, 220, 34, 46, 125, 68, 92, 46— porque ese corpus es el
+  ingeridas —81, 62, 220, 30, 46, 120, 68, 92, 46— porque ese corpus es el
   que sostiene la calibración.
+  **`jbb_practicas_2022` está desviada y no es culpa de nadie de hoy:** en
+  la base hay 62 fragmentos y el código actual produce 83, comprobado el
+  19/08/2026 revirtiendo el árbol a `b159cd2`. No se ha reingerido para no
+  cambiar el corpus más de lo pedido, pero **ese 62 no se puede reproducir**
+  y hay que resolverlo antes de dar la calibración por buena.
 
 ---
 

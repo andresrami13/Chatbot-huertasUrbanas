@@ -99,6 +99,21 @@ _FIN_DE_FRASE = ".:;?!»”)"
 
 _PIE_DE_FIGURA = re.compile(r"^\s*(fig\.|figura|tabla|fuente:)\s", re.IGNORECASE)
 
+# Renglón de índice o tabla de contenido: "Cilantro ........... 51". Los
+# puntos de relleno son la señal, y no aparecen en prosa.
+#
+# Se descartan porque son veneno para la recuperación, y está medido: son
+# 10 de 774 fragmentos (1.3 % del corpus) y salían entre los cuatro mejores
+# en el 25 % de las consultas reales, como el MEJOR en el 10 %. Un índice
+# es una lista de nombres de plantas, así que puntúa altísimo contra
+# cualquier pregunta sobre plantas y no responde absolutamente nada.
+#
+# Ese es el modo de fallo que la usuaria notó en la prueba del 15/08, con
+# un mensaje que decía "sino me estas respondiendo nada, porque citas
+# información?". Ningún umbral lo arregla: un fragmento inútil que puntúa
+# 0.7185 pasa cualquier umbral razonable.
+_LINEA_DE_INDICE = re.compile(r"\.{4,}")
+
 
 # =========================================================================
 # Obtención del PDF
@@ -563,7 +578,12 @@ def _reconstruir_parrafos(paginas: list[str], plantilla: set[str]) -> list[str]:
         for cruda in texto.split("\n"):
             linea = " ".join(cruda.split())
 
-            if not linea or linea in plantilla or _PIE_DE_FIGURA.match(linea):
+            if (
+                not linea
+                or linea in plantilla
+                or _PIE_DE_FIGURA.match(linea)
+                or _LINEA_DE_INDICE.search(linea)
+            ):
                 # Un pie de figura remite a una imagen que la usuaria no va
                 # a ver por WhatsApp: como fragmento recuperable no dice
                 # nada. Cerrar el párrafo aquí, además, evita que el pie se
