@@ -98,9 +98,15 @@ Empecemos por ahí y ya seguimos."""
 # El agente vio que contaba algo de su huerta, pero la extracción no sacó
 # ningún dato aprovechable ("sembré algo el otro día"). Se le pregunta en
 # vez de proponerle guardar un borrador vacío.
+#
+# **Solo se le pregunta la planta.** Pedirle además la fecha sería pedirle
+# un dato que el sistema ya no guarda (ADR-0018), y encima en el mensaje
+# que existe precisamente porque no se le entendió: cuantas menos cosas se
+# le pidan a la vez, más probable es que la segunda vez salga bien. Es el
+# mismo criterio del onboarding (ADR-0016).
 REGISTRO_NADA_QUE_ANOTAR = """Me quedé con las ganas de anotarlo, pero no le entendí bien qué sembró.
 
-¿Me cuenta qué fue y por ahí cuándo lo sembró?"""
+¿Me cuenta qué planta es? Con el nombre me basta."""
 
 
 REGISTRO_GUARDADO = """✅ Listo, ya quedó guardado.
