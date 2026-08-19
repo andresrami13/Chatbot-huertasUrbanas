@@ -55,34 +55,55 @@ class Settings(BaseSettings):
     # El valor por defecto vive aquí, no solo en Railway, para que el
     # repositorio deje constancia de con qué se probó.
     #
-    # Se queda en 0.68 (ADR-0010), pero **ya no significa lo mismo**, y eso
-    # importa más que el número.
+    # **Baja de 0.68 a 0.66 el 19/08/2026**, después de limpiar el corpus.
     #
-    # Hasta ahora el umbral decidía responder o callar. Con el respaldo del
-    # modelo activo (`CU2_RESPALDO_MODELO`, aquí debajo) decide otra cosa:
-    # **citar o no citar**. Por encima se responde con la guía oficial y su
-    # atribución; por debajo responde el modelo, sin fuente ninguna.
+    # Lo primero, porque importa más que el número: el umbral **ya no
+    # significa lo mismo**. Hasta el ADR-0010 decidía responder o callar;
+    # con el respaldo del modelo activo (`CU2_RESPALDO_MODELO`, aquí
+    # debajo) decide **citar o no citar**. Por encima se responde con la
+    # guía oficial y su atribución; por debajo responde el modelo, sin
+    # fuente ninguna.
     #
-    # Y para ese oficio 0.68 es mejor que bajarlo. Medido con
-    # `scripts/calibrar_umbral_real.py` sobre las consultas de la primera
-    # prueba con celular, y comprobado con el CU2 corriendo de verdad: al
-    # bajar a 0.65 aparecía un modo de fallo que a 0.68 no existe —consultas
-    # que pasan el filtro, no encuentran nada útil y terminan respondiendo
-    # "no tengo la información sobre eso" con `Fuente: Jardín Botánico` al
-    # pie—. Una cita al pie de una frase vacía es peor que no responder.
+    # Por qué baja. Quitar los renglones de índice del corpus **bajó las
+    # similitudes** de las consultas que los recuperaban, porque lo que
+    # ganaba era el índice. Medido sobre las 81 consultas de las dos
+    # pruebas con celular:
     #
-    # Dos mediciones que conviene no perder, porque contradicen al ADR-0010
-    # aunque el número no cambie:
+    #     Cuánto se demora en dar cosecha la papa   0.6883 -> 0.6865
+    #     pero que plantas me sirven para interior  0.6755 -> 0.6643
+    #     Que recomendaciones das para sembrar papa 0.7282 -> 0.7044
     #
-    # - La frontera que ese ADR midió ya no existe. Con consultas reales, la
-    #   peor consulta legítima puntúa 0.6584 y el mejor mensaje que NO es
-    #   del CU2, 0.6977: los rangos se solapan y ningún umbral los separa.
-    #   Quien filtra la intención hoy es el agente (ADR-0013), no esto.
-    # - Su control negativo difícil —"dónde me inscribo para que me regalen
-    #   una compostera", 0.6752— puntúa MÁS ALTO que una consulta legítima
-    #   de la prueba real —"qué recomendaciones me das para sembrar papa",
-    #   0.6729—. No hay umbral que admita una y rechace la otra.
-    RAG_UMBRAL_SIMILITUD: float = 0.68
+    # Consultas legítimas quedaron rozando el 0.68 o por debajo, así que
+    # mantenerlo dejaría sin citar cosas que el corpus sí responde.
+    #
+    # Y bajar es menos arriesgado que antes. El motivo por el que 0.65 se
+    # descartó en su día era un modo de fallo concreto —consultas que pasan
+    # el filtro, no encuentran nada útil y responden "no tengo la
+    # información sobre eso" con `Fuente: Jardín Botánico` al pie—. Su
+    # causa principal eran justo esos índices: un fragmento que puntúa alto
+    # contra cualquier pregunta sobre plantas y no dice nada. Con ellos
+    # fuera, el riesgo de bajar es menor.
+    #
+    # Tres mediciones que conviene no perder, porque contradicen al
+    # ADR-0010:
+    #
+    # - La frontera que ese ADR midió no existe. Con 81 consultas reales,
+    #   los rangos de legítimas y ajenas se solapan y **ningún umbral los
+    #   separa**: "Que conocimiento en agricultura sabes" (no es CU2)
+    #   puntúa 0.6779 y "Qué puedo hacer si mis plantas no dan frutos"
+    #   (sí lo es) puntúa 0.6775. Quien filtra la intención hoy es el
+    #   agente (ADR-0013), no esto.
+    # - Los mensajes del CU3 y del CU4 puntúan **entre los mejores** —"Y
+    #   que están sembrando las otras huertas" da 0.7194—. Subir el umbral
+    #   no protegería de ellos; solo el enrutamiento lo hace.
+    # - Lo que sí separa solo es lo verdaderamente ajeno: "Que carro está
+    #   barato hoy en día" 0.5782, y los barrios entre 0.587 y 0.612.
+    #
+    # **Esto sigue sin ser una calibración cerrada.** Falta etiquetar
+    # leyendo el fragmento recuperado de cada consulta, y queda pendiente
+    # la desviación de `jbb_practicas_2022` (CLAUDE.md §11), que impide
+    # reproducir el corpus entero.
+    RAG_UMBRAL_SIMILITUD: float = 0.66
     RAG_TOP_K: int = 4
 
     # La colección comunitaria lleva umbral propio, y no por capricho de

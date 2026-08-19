@@ -123,29 +123,13 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
 
 ## Lo que NO funciona todavía (esperado)
 
-- **El umbral de 0.68 no lo respalda ninguna medición.** Se calibró contra
-  81 fragmentos y el corpus tiene 774 (ADR-0014). Sigue puesto y funciona,
-  pero es un número sin evidencia detrás hasta que se remida. Es lo primero
-  de [Por dónde seguir](#por-dónde-seguir).
-- **El corpus tiene huecos que el umbral no arregla.** La prueba real dejó
-  un tercer grupo de consultas —del dominio, pero fuera de lo que tratan
-  las fuentes— que bajar el umbral no salva: solo consigue que se respondan
-  con el fragmento equivocado. Lo que piden es más corpus, no menos umbral.
-  Están enumeradas como `DESCUBIERTA` en `scripts/calibrar_umbral_real.py`,
-  y varias ya dejaron de serlo con las nueve fuentes.
-- **Un mensaje que mezcle consulta y dato sigue ofreciendo guardar el
-  cultivo por el que se preguntó.** El ADR-0008 daba esto por "cosa del
-  agente" y no lo era: el agente enruta bien las dos intenciones, pero la
-  extracción corre sobre el mensaje entero. La confirmación la protege;
-  queda para calibrar en la Fase 7 (ADR-0013).
-- **Quedan dos defectos de extracción declarados en *Sembrando
-  Biodiversidad*** (ADR-0014, «Lo que este ADR no resuelve»): los rótulos al
-  margen que se cuelan dentro de la frase en unas 17 páginas, y cinco
-  páginas con texto rotado que `pypdf` no extrae.
-- **La migración `008` está sin correr**, y es deliberado (ADR-0018). El
-  código ya no escribe `fecha_siembra_aprox` ni `fecha_imprecisa`, pero las
-  columnas siguen en Supabase hasta que se despliegue. **Primero el
-  despliegue, después la migración**, o el CU3 falla en el intervalo.
+- **El umbral está en 0.66 desde el 19/08/2026**, medido contra 81
+  consultas reales y el corpus ya limpio de índices. **No es una
+  calibración cerrada:** los rangos de consultas legítimas y ajenas se
+  solapan y ningún umbral los separa —quien filtra la intención es el
+  agente—, así que lo que el número decide hoy es solo **citar o no
+  citar**. Falta etiquetar leyendo el fragmento recuperado de cada
+  consulta, y falta resolver la desviación de `jbb_practicas_2022`.
 
 ---
 

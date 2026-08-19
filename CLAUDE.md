@@ -212,7 +212,7 @@ llevan el ADR que lo justifica.
 | Desambiguación de barrio | Temperatura | 0.1 (ADR-0016, mismo criterio) |
 | Redacción RAG y comunidad | Temperatura | 0.4 |
 | Transcripción de voz | Temperatura | 0.0 — **no está en la Fase 4**, es anterior a la entrada por voz |
-| Recuperación oficial | Umbral de similitud (coseno) | **0.68**, no 0.7 (ADR-0010) |
+| Recuperación oficial | Umbral de similitud (coseno) | **0.66** desde el 19/08/2026; fue 0.7 y luego 0.68 (ADR-0010) |
 | Recuperación comunitaria | Umbral propio | **0.65** (ADR-0011) |
 | Recuperación | top-k | 4 por colección |
 | Memoria | Ventana de mensajes | 10 mensajes, no turnos; el último es el de ella |
@@ -229,9 +229,12 @@ cambio de corpus.** El del CU2 tenía un margen de **una centésima**, y el
 ADR-0013 añadió que ese margen no aguanta que el agente recorte la
 consulta.
 
-**Y el corpus cambió: de 81 a 774 fragmentos (ADR-0014).** El 0.68 sigue
-puesto pero **está calibrado contra un corpus nueve veces menor**, así que
-hoy no lo respalda ninguna medición. Lo que sí se midió al ampliar es que
+**El umbral bajó a 0.66 el 19/08/2026**, tras medir las 81 consultas
+reales de las dos pruebas con celular contra el corpus ya limpio de
+índices. Baja porque quitar los índices bajó las similitudes de las
+consultas que los recuperaban, y varias legítimas quedaron rozando el
+0.68. **Sigue sin ser una calibración cerrada:** falta etiquetar leyendo
+el fragmento de cada consulta, y `jbb_practicas_2022` está desviada. Lo que sí se midió al ampliar es que
 la consulta insignia del CU2 subió de 0.6911 a 0.7231 y que las siete
 consultas cubiertas de la prueba real pasan el umbral, cuando antes la peor
 se quedaba en 0.6584. **Revalidarlo es lo primero que falta de la Fase 7**,
