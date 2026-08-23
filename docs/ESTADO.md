@@ -1,22 +1,28 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-18. **La Fase 6 se cerró el 15/08/2026 con la
+Última actualización: 2026-08-19. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
 pruebas).** Los cinco casos de uso están construidos y desplegados, y la
 conversación ya se probó desde un celular real. El CU4 es el único que
 sigue sin ejercitarse de verdad, y no por un fallo: excluye la huerta de
 quien pregunta y solo hay una registrada.
 
-De la Fase 7 van hechas cinco cosas, las dos primeras nacidas de esa prueba:
+De la Fase 7 van hechas siete cosas, las dos primeras nacidas de esa prueba:
 
-- **El corpus oficial pasó de 81 a 774 fragmentos en nueve fuentes**
-  (ADR-0014), y dos de ellas ya no son del Jardín Botánico.
+- **El corpus oficial pasó de 81 a 765 fragmentos en nueve fuentes**
+  (ADR-0014), y dos de ellas ya no son del Jardín Botánico. Fueron 774
+  hasta el 19/08, cuando se quitaron diez fragmentos que eran índices.
 - **El CU2 responde aunque ninguna fuente supere el umbral**, con el
   conocimiento del modelo y sin citar a nadie, y toda respuesta que hable
   de salud lleva advertencia (ADR-0015).
 - **El CU3 empieza con un onboarding de tres preguntas cerradas**
   (ADR-0016, 17/08/2026), y el catálogo de barrios pasó de 8 a 313.
   **Probado desde un celular real el 17/08/2026, y funcionó.**
+- **El corpus se limpió de índices y el umbral bajó a 0.66**, medido
+  contra 81 consultas reales de las dos pruebas con celular (19/08/2026).
+- **El modelo generativo pasó a `gemini-3.5-flash-lite`** en Railway: los
+  de la familia flash completa daban 503 por sobrecarga y tardaban entre
+  10 y 138 segundos.
 - **La nota de voz se acusa en el acto**, para que ella sepa que llegó. Se
   envía y no se recuerda (ADR-0017). El aviso equivalente para el camino
   con RAG se puso y **se retiró el mismo día**: anunciar la espera la hacía
@@ -70,7 +76,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
 | Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v1`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1`, `respuesta_general_v1` |
 | Catálogo de fuentes oficiales | `scripts/catalogo_fuentes.py` | Nueve fuentes declaradas, con sus parámetros medidos (ADR-0014) |
-| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **774 fragmentos de nueve fuentes en Supabase** |
+| Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **765 fragmentos de nueve fuentes en Supabase**; descarta los renglones de índice |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
 | Orientación agroecológica (CU2) | `app/services/orientacion.py` | **Probado en producción** |
 | Respuesta sin respaldo oficial | `respuesta_general_v1.md`, `CU2_RESPALDO_MODELO` | Activo desde el 15/08; se apaga en Railway sin desplegar |
@@ -102,7 +108,7 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
 - **Supabase:** PostgreSQL 17.6, esquema aplicado, RLS activo sin políticas.
   Conexión por **session pooler, puerto 5432** — la directa es solo IPv6 y el
   equipo de desarrollo no tiene IPv6; el puerto 6543 rompe `asyncpg`.
-  **774 fragmentos oficiales de nueve fuentes** desde el 15/08/2026, y
+  **765 fragmentos oficiales de nueve fuentes** desde el 19/08/2026, y
   **313 barrios** desde el 17/08. Escribir ahí cambia lo que responde el
   bot **en el acto**, con o sin despliegue: Railway lee esta misma base.
   **`usuario`, `mensaje`, `huerta`, `cultivo` y `fragmento_comunitario`
@@ -124,51 +130,88 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
 ## Lo que NO funciona todavía (esperado)
 
 - **El umbral está en 0.66 desde el 19/08/2026**, medido contra 81
-  consultas reales y el corpus ya limpio de índices. **No es una
-  calibración cerrada:** los rangos de consultas legítimas y ajenas se
-  solapan y ningún umbral los separa —quien filtra la intención es el
-  agente—, así que lo que el número decide hoy es solo **citar o no
-  citar**. Falta etiquetar leyendo el fragmento recuperado de cada
-  consulta, y falta resolver la desviación de `jbb_practicas_2022`.
+  consultas reales y el corpus ya limpio. **No es una calibración
+  cerrada:** falta etiquetar leyendo el fragmento recuperado de cada
+  consulta, y falta resolver la desviación de `jbb_practicas_2022`. Ver
+  [Por dónde seguir](#por-dónde-seguir).
+- **`jbb_practicas_2022` no se puede reproducir.** En la base hay 62
+  fragmentos y el código produce 83, comprobado el 19/08 revirtiendo a
+  `b159cd2`, así que no lo causó la limpieza de índices. Mientras siga
+  así, el corpus entero no es reproducible y toda calibración hereda esa
+  debilidad.
+- **El defecto por defecto del modelo generativo está desalineado.**
+  `app/config.py` dice `gemini-3.6-flash` y Railway corre
+  `gemini-3.5-flash-lite`. El propio comentario de ese archivo dice que el
+  valor por defecto existe para dejar constancia de con qué se probó, así
+  que hay que decidirlo: o se baja el defecto, o se documenta por qué no.
+- **El `flash-lite` responde peor.** Observado por el autor al cambiarlo:
+  mucho más rápido —3 s frente a 10-19 s— pero de menor calidad en la
+  redacción del CU2. Está sin medir; es material de la Fase 7.
+- **El corpus tiene huecos que el umbral no arregla.** La prueba real dejó
+  un tercer grupo de consultas —del dominio, pero fuera de lo que tratan
+  las fuentes— que bajar el umbral no salva: solo consigue que se respondan
+  con el fragmento equivocado. Lo que piden es más corpus, no menos umbral.
+  Están enumeradas como `DESCUBIERTA` en `scripts/calibrar_umbral_real.py`,
+  y varias ya dejaron de serlo con las nueve fuentes.
+- **Un mensaje que mezcle consulta y dato sigue ofreciendo guardar el
+  cultivo por el que se preguntó.** El ADR-0008 daba esto por "cosa del
+  agente" y no lo era: el agente enruta bien las dos intenciones, pero la
+  extracción corre sobre el mensaje entero. La confirmación la protege;
+  queda para calibrar en la Fase 7 (ADR-0013).
+- **Quedan dos defectos de extracción declarados en *Sembrando
+  Biodiversidad*** (ADR-0014, «Lo que este ADR no resuelve»): los rótulos al
+  margen que se cuelan dentro de la frase en unas 17 páginas, y cinco
+  páginas con texto rotado que `pypdf` no extrae. **Y uno más, encontrado
+  el 19/08 en el catálogo de plantas:** un fragmento contiene la cadena
+  `ENREDADERA KJBNVBJNBHJ BHJ Gulupa`, basura de la extracción del PDF.
 
 ---
 
 ## Por dónde seguir
 
-### 1. Revalidar el umbral del CU2 contra el corpus de 774 fragmentos
+### 1. Cerrar la calibración del umbral del CU2
 
-**Es lo primero, y es lo único que la Fase 7 tiene bloqueado.** El 0.68
-sigue puesto pero se calibró contra un corpus nueve veces menor, así que
-hoy es un número sin medición detrás (ADR-0014, «Lo que este ADR no
-resuelve»).
+**Ya no está en cero, pero tampoco cerrada.** El 19/08/2026 se midieron
+**81 consultas reales** —las 63 de la usuaria de la prueba del 15/08 más
+las 32 de las pruebas del 18 y el 19— contra el corpus ya limpio, y de ahí
+salió el **0.66** que está puesto hoy. Lo que falta son dos cosas
+concretas.
 
-    python -m scripts.calibrar_umbral_real
+**Falta 1: la desviación de `jbb_practicas_2022`.** En la base hay 62
+fragmentos de esa fuente y el código produce **83**, comprobado revirtiendo
+el árbol a `b159cd2`, así que no lo causó la limpieza de índices. Mientras
+siga así, **el corpus entero no es reproducible** y cualquier calibración
+hereda esa debilidad. Es lo primero que hay que resolver, y hay que
+decidirlo con cuidado: reingerir esa fuente cambia el corpus otra vez y
+obliga a remedir.
 
-Tres avisos para que la medición no salga vieja otra vez:
+**Falta 2: etiquetar leyendo el fragmento.** La frontera que importa no es
+«del dominio o no», es «el fragmento recuperado responde de verdad o no».
+Eso exige leer los 81 textos recuperados uno por uno. Es criterio del
+autor, no automatizable, y sin ello el 0.66 es un número razonable pero no
+demostrado.
 
-- **Las etiquetas del script quedaron desfasadas.** Varias consultas
-  marcadas `DESCUBIERTA` con 81 fragmentos ahora sí las cubre el corpus
-  —«puedo sembrar en el parque de mi barrio» pasó de no tener respuesta a
-  recuperar 4 de 4 del Protocolo de espacio público—. Hay que reclasificar
-  antes de leer ninguna frontera.
-- **La frontera que hay que mirar es `CUBIERTA` contra `DESCUBIERTA`**, no
-  la del ADR-0010. Desde el paso 4c quien filtra la intención es el agente,
-  y con consultas reales los rangos de legítimas y ajenas se solapan
-  —0.6584 contra 0.6977—: ningún umbral los separa.
-- **El umbral ya no decide responder o callar, decide citar o no citar**
-  (`CU2_RESPALDO_MODELO`). Bajarlo tiene hoy un modo de fallo que antes no
-  existía: consultas que lo pasan, no encuentran nada útil y responden «no
-  tengo esa información» con `Fuente: Jardín Botánico` al pie.
-  **Dejó de ser hipótesis el 17/08/2026:** se observó con el 0.68 puesto,
-  en una consulta que puntuó **0.7232** y aun así respondió «no tengo
-  información específica» y firmó con el Jardín Botánico. O sea que el modo
-  de fallo no aparece solo al bajar el umbral, y por lo tanto la
-  revalidación tiene que mirarlo aunque el número no se mueva.
+Lo que sí quedó medido y no hay que repetir:
 
-Lo ya medido al ampliar el corpus, que es el punto de partida y no la
-revalidación: la consulta insignia del CU2 subió de 0.6911 a **0.7231**, y
-las siete consultas cubiertas de la prueba real pasan el umbral cuando
-antes la peor se quedaba en 0.6584.
+- **Ningún umbral separa la intención.** Los rangos se solapan: «Que
+  conocimiento en agricultura sabes» (no es CU2) puntúa **0.6779** y «Qué
+  puedo hacer si mis plantas no dan frutos» (sí lo es) puntúa **0.6775**.
+  Quien filtra la intención es el agente (ADR-0013), no esto.
+- **Los mensajes del CU3 y del CU4 puntúan entre los mejores.** «Y que
+  están sembrando las otras huertas» da **0.7194**. Subir el umbral no
+  protegería de ellos.
+- **Lo verdaderamente ajeno se separa solo:** «Que carro está barato hoy en
+  día» **0.5782**, los barrios entre 0.587 y 0.612, y el mensaje de
+  emergencia familiar **0.5687**.
+- **El umbral decide citar o no citar**, no responder o callar
+  (`CU2_RESPALDO_MODELO`). El modo de fallo de citar sin contenido se
+  observó en producción el 17/08 con el 0.68 puesto, en una consulta de
+  **0.7232**, así que no aparecía solo al bajar el umbral.
+
+**Las etiquetas de `scripts/calibrar_umbral_real.py` siguen desfasadas** y
+el script se quedó corto: mide 21 consultas escritas a mano contra las 81
+reales que ya existen. Conviene rehacerlo leyendo de `mensaje` y del
+export, que es lo que hizo la medición del 19/08.
 
 ### 2. El resto de la Fase 7
 
@@ -300,8 +343,9 @@ tareas pendientes.
      `001` previsto para el 14/05/2028, muy posterior a la Fase 8. Recogido
      en [ADR-0007](adr/0007-modelo-de-embeddings-fijo-en-codigo.md).
    - **`gemini-2.5-flash` se retira el 16/10/2026**, probablemente antes de
-     la Fase 8. El modelo generativo por defecto es `gemini-3.6-flash`, de
-     la serie 3.
+     la Fase 8. El valor por defecto de `app/config.py` es
+     `gemini-3.6-flash`, **pero Railway corre `gemini-3.5-flash-lite`**
+     desde el 19/08: ver la sección del 19/08 más abajo.
 3. **Servicio de normalización.** Hecho y **probado en producción** el
    30/07/2026 con una nota de voz real desde un celular: descarga, mime
    `audio/ogg`, 15 515 bytes, transcripción de 69 caracteres y entrega al
@@ -554,7 +598,8 @@ pertinente y la que no lo es:
   conservarlas cuesta un tercio de la separación. "marzo de 2026" sale en
   todos los fragmentos y actúa igual que la plantilla, solo que más
   disimulado.
-- `RAG_UMBRAL_COMUNITARIO = 0.65`, propio y distinto del 0.68 oficial: un
+- `RAG_UMBRAL_COMUNITARIO = 0.65`, propio y distinto del oficial —0.68 en
+  aquel momento, 0.66 desde el 19/08—: un
   fragmento comunitario es una lista de tres palabras y uno oficial prosa
   de 400 tokens. El hueco medido es de **+0,0437**, cuatro veces más
   holgado que el del CU2.
@@ -963,6 +1008,87 @@ a propósito.** El orden importa: primero se despliega el código que deja de
 escribir esas columnas y solo después se borran. Al revés, cada
 confirmación del CU3 falla mientras dure la ventana, porque Railway lee esta
 misma base.
+
+### Fase 7: corpus limpio, umbral a 0.66 y cambio de modelo, 19/08/2026
+
+Tres cosas del mismo día, y la primera nació de una pregunta suya: por qué
+tardaba tanto.
+
+**El modelo generativo pasó a `gemini-3.5-flash-lite`, en Railway.**
+Cronometrando cada etapa por separado, el RAG y la base resultaron ser
+ruido —embedding 0.33 s, Supabase 0.30 s, recuperación completa 0.83 s— y
+todo el tiempo se lo llevaba el modelo. Con `gemini-3.6-flash` un prompt
+trivial tardó 18 s, 31 s y 1.95 s, y la causa era **503 UNAVAILABLE por
+sobrecarga** más los reintentos del SDK. Midiendo siete modelos sin
+reintentos y con tope de 20 s:
+
+| Modelo | 3 intentos (s) | Pensamiento | Éxito |
+|---|---|---|---|
+| `gemini-3.5-flash-lite` | 3.3 · 3.4 · 3.0 | 0 | **3/3** |
+| `gemini-3.5-flash` | 13.6 · 9.1 · 17.0 | 996 | 2/3 |
+| `gemini-3.6-flash` | 10.9 · 19.2 · 19.3 | 965 | 1/3 |
+| `gemini-3.7-flash` | 19.2 · 1.7 · 20.0 | — | 0/3 |
+| `gemini-2.5-flash` | 10.1 · 19.6 · 19.6 | 976 | 1/3 |
+
+No era problema del `3.6`: fallaban todos los de la familia flash
+completa. Los *lite* **no piensan** —cero tokens de pensamiento— y parecen
+estar en otra cola de capacidad. Se comprobó antes de recomendarlo que
+`3.5-flash-lite` **acepta function calling y entrada de audio**, que son
+obligatorios aquí.
+
+**Ojo con esto:** el cambio está solo en Railway. `app/config.py` sigue
+diciendo `gemini-3.6-flash`, y eso contradice la propia nota de ese
+archivo, que dice que el valor por defecto existe para que el repositorio
+deje constancia de con qué se probó. **Hay que decidir si se baja el
+defecto a `flash-lite`.** El autor observó además que responde peor que el
+flash completo, así que la decisión no es obvia.
+
+**El corpus perdió diez fragmentos que eran índices.** Midiendo las 81
+consultas reales contra los 774 fragmentos, resultó que los índices
+—«Cilantro ........... 51»— salían entre los cuatro mejores en el 25 % de
+las consultas y como el **mejor** en el 10 %. Un índice es una lista de
+nombres de plantas: puntúa altísimo contra cualquier pregunta sobre
+plantas y no responde nada. Era la causa principal del «no tengo esa
+información» firmado con `Fuente: Jardín Botánico`, que la usuaria notó en
+la prueba del 15/08 con un mensaje que decía literalmente *«sino me estas
+respondiendo nada, porque citas información?»*.
+
+El filtro va en `_reconstruir_parrafos`, donde ya se descartan la plantilla
+y los pies de figura. Reingeridas las dos fuentes afectadas: catálogo de
+plantas 125 → 120 y cartilla de fertilización 34 → 30. **Corpus en 765**, y
+la polución de índices en esas mismas 81 consultas bajó a 0 %.
+
+**Matiz importante que se descubrió al revisarlo:** ese 25 % medía
+consultas cuya recuperación cambió, no respuestas que la usuaria vaya a
+notar mejores. La mayoría eran barrios, saludos y mensajes del CU3 y CU4,
+que **nunca llegan al CU2**. Filtrando a consultas reales del CU2, el
+mejor fragmento era un índice en **2** casos y estaba en tercera o cuarta
+posición en unos 7 más. La mejora es real pero modesta; lo que sí
+desaparece es la causa principal del modo de fallo de la cita vacía.
+
+**El umbral bajó de 0.68 a 0.66.** Quitar los índices **bajó** las
+similitudes de las consultas que los recuperaban —lo que ganaba era el
+índice— y varias legítimas quedaron rozando el 0.68:
+
+    Cuánto se demora en dar cosecha la papa    0.6883 -> 0.6865
+    pero que plantas me sirven para interior   0.6755 -> 0.6643
+    Que recomendaciones das para sembrar papa  0.7282 -> 0.7044
+
+Con 0.66 pasan a citar cuatro consultas legítimas más. El razonamiento
+completo, con las mediciones que contradicen al ADR-0010, está en el
+comentario de `RAG_UMBRAL_SIMILITUD` en `app/config.py`.
+
+**Y se corrigieron dos restos de la fecha de siembra** que el ADR-0018 no
+había alcanzado, porque hablaban de la fecha en prosa y no con los nombres
+de código que se rastrearon: `REGISTRO_NADA_QUE_ANOTAR`, que le preguntaba
+«¿por ahí cuándo lo sembró?», y el prompt del agente, que describía
+`registrar_huerta` con la fecha, el nombre de la huerta y el barrio —los
+tres retirados ya, por el ADR-0018 y el ADR-0016—. El segundo era el más
+serio: el prompt decide el enrutamiento, así que describir la herramienta
+con campos muertos invita a llamarla cuando no toca.
+
+**Falta el ADR de todo esto.** Sería el **ADR-0019** y hoy solo vive en los
+mensajes de commit `00133ef`, `9102b50` y `d6cac90`.
 
 ### Primera fuente oficial, ya verificada
 

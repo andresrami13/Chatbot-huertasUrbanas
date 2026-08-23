@@ -39,12 +39,18 @@ dicen, no lo implementes: dilo y espera decisión.
 | `docs/adr/` | Dieciocho decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
-15/08/2026 con la prueba en un celular real. De la 7 van hechas dos cosas:
-la ampliación del corpus —de 81 a **774 fragmentos en nueve fuentes**— y el
-**onboarding de tres preguntas cerradas** que corrige la captura del CU3
-(ADR-0016, 17/08/2026). Falta lo principal: **revalidar el umbral**, que se
-calibró contra un corpus nueve veces menor. El detalle está en
-`docs/ESTADO.md`, sección «Por dónde seguir».
+15/08/2026 con la prueba en un celular real. De la 7 van hechas cuatro
+cosas: la ampliación del corpus —de 81 a **765 fragmentos en nueve
+fuentes**—, el **onboarding de tres preguntas cerradas** que corrige la
+captura del CU3 (ADR-0016), la **limpieza de los índices** del corpus y la
+bajada del **umbral a 0.66**, medido contra 81 consultas reales
+(19/08/2026).
+
+**La calibración sigue sin cerrarse, y ahora se sabe por qué:** falta
+etiquetar leyendo el fragmento recuperado de cada consulta, y
+`jbb_practicas_2022` no se puede reproducir —62 fragmentos en la base
+contra 83 que produce el código—. El detalle está en `docs/ESTADO.md`,
+sección «Por dónde seguir».
 
 ---
 
@@ -322,7 +328,7 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - **Número de prueba:** admite un máximo de **5 destinatarios verificados**.
   Está previsto migrar a un número propio con SIM nueva para la Fase 8. El
   `PHONE_NUMBER_ID` cambia al migrar — **nunca lo escribas en el código**.
-- **Supabase:** operativo. PostgreSQL 17.6, seis migraciones aplicadas, RLS
+- **Supabase:** operativo. PostgreSQL 17.6, migraciones aplicadas hasta la `008`, RLS
   activo sin políticas. Conexión por **session pooler, puerto 5432**.
   **765 fragmentos oficiales en nueve fuentes** desde el 19/08/2026.
   Escribir ahí cambia lo que responde el bot **en el acto**, con o sin
@@ -418,6 +424,14 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   distribución de todo el corpus— mientras el nombre de la especie salía
   detrás de su propio contenido. Antes de celebrar un número, mira el
   texto.
+  **Van dos, y la segunda se presentó como resultado antes de
+  desglosarla:** el 19/08 la limpieza de índices se anunció con un «25 %
+  de las consultas mejoran», y ese 25 % contaba consultas cuya
+  *recuperación* cambió, no respuestas que la usuaria fuera a notar
+  mejores. Al desglosarlo, la mayoría eran barrios, saludos y mensajes del
+  CU3 y CU4, **que nunca llegan al CU2**; consultas reales del CU2 con el
+  índice como mejor fragmento había **dos**. Antes de dar un porcentaje,
+  comprueba que el denominador sea lo que le importa a la usuaria.
 - **Para buscar defectos en un texto extraído, inventaría; no busques
   sospechosos.** En el Protocolo de espacio público, buscar caracteres
   raros encontró tres de ocho. Arreglados esos tres el texto ya *parecía*
