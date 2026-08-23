@@ -31,79 +31,12 @@ documento queda marcado como pendiente de corrección.
 
 ## Documentos pendientes de corrección
 
-Consolidado de lo que estos ADR obligan a ajustar en los `.docx`:
+El consolidado de lo que estos ADR obligan a ajustar en los `.docx` vive en
+**[`docs/correcciones-a-los-documentos.md`](../correcciones-a-los-documentos.md)**,
+organizado por fase y sección.
 
-- **Fase 2, CU2, paso 1** — dice "datos comunitarios del barrio"; el barrio
-  no filtra (ADR-0001).
-- **Fase 2, CU1, flujo alternativo 3a** — dice que el ciclo se repite hasta
-  que el usuario acepte (ADR-0003).
-- **Fase 2, CU3 y §5.4** — atribuyen al RLS la protección de los datos
-  personales; la Fase 3 §5.1 lo desmiente.
-- **Fase 3, §2 (C4) y Tabla 2** — no contemplan el procesamiento asíncrono
-  ni el despachador (ADR-0005).
-- **Fase 2, CU1 y CU5** — no resuelven cómo se detecta el saludo o la ayuda
-  de alguien que aún no ha autorizado, siendo el CU5 el único caso de uso
-  sin precondición (ADR-0006).
-- **Fase 3, §3 y Fase 4, §7** — citan `text-embedding-004`, dado de baja;
-  se sustituye por `gemini-embedding-001` truncado a 768 (ADR-0007).
-- **Fase 4, Tabla 3** — su justificación del valor cerrado queda anulada
-  por ADR-0001 y sustituida por ADR-0002.
-- **Anteproyecto, §7.1** — lista seis barrios; omite Los 3 Sectores
-  (ADR-0002).
-- **Anteproyecto, §7.2 y §8** — excluyen la entrada por voz, ya incorporada
-  al alcance por la Fase 2.
-- **Anteproyecto, §7.2 y §10.2** — dan Railway por gratuito.
-- **Fase 4, §7** — el troceo de 300–500 tokens no dice cómo se cuentan. La
-  aproximación estándar de 4 caracteres por token desvía el resultado lo
-  bastante para sacar la mitad del corpus del intervalo (ADR-0009).
-- **Fase 4, §7** — el umbral pasa de 0.7 a **0.68**. El valor original se
-  respaldó con material sintético; contra el corpus real dejaba sin
-  responder 4 de 12 consultas legítimas del CU2 (ADR-0010).
-- **Fase 2, CU2** — no contempla qué hacer cuando ninguna fuente responde.
-  Se resuelve con texto fijo y no con conocimiento del modelo (ADR-0010).
-- **Fase 3 / ADR-0004** — el texto del fragmento comunitario ya no incluye
-  el nombre de la huerta, el barrio ni las fechas: solo las especies
-  (ADR-0011).
-- **Fase 4, §7** — la colección comunitaria lleva **umbral propio** (0.65).
-  El spike de la Fase 5 concluyó que no hacía falta, pero lo midió sobre el
-  formato con plantilla (ADR-0011).
-- **Fase 3, §3** — la tabla `mensaje` no guarda el `wamid`, sino su huella.
-  El `wamid` contiene el teléfono del remitente (ADR-0012).
-- **Fase 4, §6** — la ventana de diez no precisa si son mensajes o turnos,
-  ni qué entra en ella. Son mensajes, el último es el de la usuaria, y nada
-  anterior al consentimiento se registra (ADR-0012).
-- **Fase 3, §5.2** — el modelo de seguridad no contempla que la
-  conversación quede almacenada. `mensaje.contenido` es texto libre en
-  claro, y la minimización solo gobierna lo que el sistema pide, no lo que
-  la usuaria decide contar (ADR-0012).
-- **Fase 2, §4** — las herramientas del agente son **cuatro**, no tres. El
-  saludo posterior al consentimiento no cabía en ninguna de las tres sin
-  incumplir la propia Fase 2 (ADR-0013).
-- **Fase 4, §7** — el umbral se calibró sobre mensajes completos, y el
-  agente puede recortar la consulta. El recorte de un mensaje de doble
-  intención cayó a 0.6796, cuatro diezmilésimas por debajo (ADR-0013).
-- **Fase 2, CU3** — describe un único flujo conversacional. El registro
-  empieza ahora con un onboarding de tres preguntas cerradas, una por
-  mensaje; el flujo conversacional atiende lo que ella cuente después
-  (ADR-0016).
-- **Anteproyecto, §5.3.1** — lista `Los 3 Sectores`, que no aparece en el
-  listado oficial de barrios de Bosa. Corrige en sentido contrario al
-  ADR-0002: era el §7.1 el que acertaba al omitirlo (ADR-0016).
-- **Anteproyecto, §7.1** — acota el alcance a la UPZ 84 Bosa Occidental; el
-  catálogo de barrios pasa a cubrir la localidad de Bosa entera, 312
-  barrios (ADR-0016).
-- **Fase 3, §2 (C4)** — el procesamiento asíncrono se describe desde el lado
-  del webhook, para que Meta no reintente, y no desde el lado de quien
-  espera: nada dice qué ve la usuaria durante los trece segundos que tarda
-  el camino con RAG (ADR-0017).
-- **Fase 4, Tabla 3** — la extracción ya no devuelve la fecha de siembra ni
-  la marca de imprecisión. Era un dato de solo escritura, y el ADR-0011 ya
-  había medido que empeoraba la recuperación (ADR-0018).
-- **Fase 3, §3** — `cultivo` pierde `fecha_siembra_aprox` y
-  `fecha_imprecisa` en la migración `008` (ADR-0018).
-- **Fase 2, CU3** — el resumen de confirmación ya no muestra la fecha de
-  cada cultivo, solo el nombre de la planta (ADR-0018).
-- **Fase 3, §5.2 y Fase 4, Tabla 3** — no contemplan que el nombre de la
-  usuaria se muestre en la conversación. El saludo personalizado se
-  antepone al enviar y **no** se registra en `mensaje`, o el nombre cifrado
-  quedaría en claro allí (ADR-0016).
+Estaba aquí hasta el 23/08/2026 y se movió para que haya **un solo sitio que
+mantener**: el listado se estaba quedando viejo cada vez que un ADR nuevo
+cambiaba un número, y este proyecto ya arrastra bastantes cifras duplicadas.
+
+Al añadir un ADR que corrija un documento de fase, la entrada va allí.
