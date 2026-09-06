@@ -40,18 +40,34 @@ dicen, no lo implementes: dilo y espera decisión.
 | `docs/correcciones-a-los-documentos.md` | **Qué dice cada `.docx` y qué hace el sistema**, por fase y sección. Consolidado de las desviaciones |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
-15/08/2026 con la prueba en un celular real. De la 7 van hechas cuatro
-cosas: la ampliación del corpus —de 81 a **765 fragmentos en nueve
-fuentes**—, el **onboarding de tres preguntas cerradas** que corrige la
-captura del CU3 (ADR-0016), la **limpieza de los índices** del corpus y la
-bajada del **umbral a 0.66**, medido contra 81 consultas reales
-(19/08/2026).
+15/08/2026 con la prueba en un celular real. De la 7 van hechas siete
+cosas:
+
+1. El corpus oficial pasó de 81 a **765 fragmentos en nueve fuentes**
+   (ADR-0014), y dos ya no son del Jardín Botánico.
+2. El **CU2 responde aunque nada supere el umbral**, sin citar, y toda
+   respuesta que hable de salud lleva advertencia (ADR-0015).
+3. El CU3 empieza con un **onboarding de tres preguntas cerradas** y el
+   catálogo de barrios pasó de 8 a 313 (ADR-0016).
+4. El corpus se **limpió de índices** y el **umbral bajó a 0.66**, medido
+   contra 81 consultas reales (19/08/2026).
+5. El modelo generativo pasó a `gemini-3.5-flash-lite` **en Railway** —los
+   de la familia flash completa daban 503 por sobrecarga—. Ver el §8.
+6. La **nota de voz se acusa en el acto**; se envía y no se recuerda
+   (ADR-0017). El aviso equivalente del camino con RAG se puso y se
+   retiró el mismo día.
+7. La **fecha de siembra salió del CU3 entero** por ser un dato de solo
+   escritura (ADR-0018).
 
 **La calibración sigue sin cerrarse, y ahora se sabe por qué:** falta
 etiquetar leyendo el fragmento recuperado de cada consulta, y
 `jbb_practicas_2022` no se puede reproducir —62 fragmentos en la base
 contra 83 que produce el código—. El detalle está en `docs/ESTADO.md`,
 sección «Por dónde seguir».
+
+**Falta el ADR-0019**, el de la limpieza de índices y la bajada a 0.66.
+Hoy esa decisión solo vive en los commits `00133ef`, `9102b50` y `d6cac90`
+y en el comentario de `RAG_UMBRAL_SIMILITUD` en `app/config.py`.
 
 ---
 
@@ -62,9 +78,23 @@ sección «Por dónde seguir».
 | Backend | Python + FastAPI |
 | Despliegue | Railway |
 | Base de datos | Supabase (PostgreSQL + pgvector) |
-| Modelo de lenguaje | API de Gemini |
-| Orquestación | LangChain (librería dentro del backend, **no** un contenedor) |
+| Modelo de lenguaje | API de Gemini, por el SDK `google-genai` |
+| Orquestación | **Ninguna librería.** Function calling a mano en `app/agent/agente.py` |
 | Canal | Meta Cloud API (WhatsApp) |
+
+**LangChain no se usa, y esta tabla lo declaraba hasta el 05/09/2026.**
+Comprobado: no está en `requirements.txt` ni se importa en ningún archivo
+del proyecto. Es una **desviación respecto de las fases de diseño**, que sí
+lo preveían, y hay que llevarla a
+`docs/correcciones-a-los-documentos.md` y al documento de grado.
+
+No la revoques por su cuenta ni «vuelvas» a LangChain: lo que el agente
+hace es incompatible con dejarle el bucle a un framework. El *automatic
+function calling* del SDK hay que **desactivarlo** para no saltarse los
+botones del §4.7, el orden de ejecución lo impone el código —el registro
+siempre el último— y la salida de cada herramienta se envía tal cual, sin
+una segunda pasada por el modelo. Un framework encima habría que
+desmontarlo justo en los tres puntos donde se decide algo (ADR-0013).
 
 ---
 
@@ -123,6 +153,8 @@ encuesta (Fase 1, n=11). No las revises ni las "mejores" por tu cuenta.
 | CU1 | Iniciar y autorizar datos | Primer contacto |
 | CU2 | Consultar orientación agroecológica | Consentimiento (CU1) |
 | CU3 | Registrar información de la huerta | Consentimiento (CU1) |
+| CU4 | Consultar qué siembran otras huertas | Consentimiento (CU1) + datos existentes |
+| CU5 | Pedir ayuda | Ninguna (contenido estático) |
 
 **El CU3 tiene dos entradas desde el ADR-0016.** Al aceptar el
 consentimiento arranca un **onboarding de tres preguntas cerradas** —nombre
@@ -132,8 +164,10 @@ vaya contando lo atiende el CU3 conversacional de siempre, que ya solo
 añade cultivos. Consecuencia que hay que tener presente: **existir en
 `huerta` significa ahora «completó el onboarding»**, no «registró algo», y
 una huerta sin cultivos es lo normal.
-| CU4 | Consultar qué siembran otras huertas | Consentimiento (CU1) + datos existentes |
-| CU5 | Pedir ayuda | Ninguna (contenido estático) |
+
+El orden en el despachador no es negociable: el onboarding va **antes** que
+los botones del CU3, porque su cierre reutiliza esos mismos dos botones y
+el CU3 se quedaría con una confirmación que no era suya.
 
 **Herramientas del agente — son cuatro, no tres** (ADR-0013):
 `registrar_huerta`, `consultar_orientacion`, `consultar_comunidad` y
@@ -163,6 +197,17 @@ enviado por el backend, **sin pasar por el modelo**.
 
 Entidades: `usuario`, `huerta`, `cultivo`, `mensaje`, `fuente`,
 `fragmento_oficial`, `fragmento_comunitario`.
+
+Son once tablas, no siete: a esas se suman el catálogo `barrio` (ADR-0002)
+y tres de estado efímero que ninguna fase previó —`idempotencia_webhook`
+(ADR-0005), `registro_pendiente` (ADR-0008) y `onboarding_pendiente`
+(ADR-0016)—. Las dos sin dueño, y a propósito, son `barrio` e
+`idempotencia_webhook`: esta última se escribe **antes** de la compuerta,
+así que no puede llevar `usuario_id` ni ningún dato personal.
+
+**La existencia de una fila en `usuario` ES el consentimiento.** No hay
+columna booleana: el CU1 prohíbe persistir nada antes de autorizar y el
+ADR-0003 prohíbe guardar el rechazo.
 
 Dos colecciones vectoriales **separadas** (no una sola con discriminador):
 `fragmento_oficial` (vinculada a `fuente`) y `fragmento_comunitario` (vinculada
@@ -218,6 +263,7 @@ llevan el ADR que lo justifica.
 | Extracción de entidades | Temperatura | 0.1 (fijo, formato estricto) |
 | Desambiguación de barrio | Temperatura | 0.1 (ADR-0016, mismo criterio) |
 | Redacción RAG y comunidad | Temperatura | 0.4 |
+| Respuesta sin respaldo (CU2) | Temperatura | 0.3 — **no está en la Fase 4**; más baja aún que la redacción RAG porque ahí no hay fuente que reformular, solo se puede inventar |
 | Transcripción de voz | Temperatura | 0.0 — **no está en la Fase 4**, es anterior a la entrada por voz |
 | Recuperación oficial | Umbral de similitud (coseno) | **0.66** desde el 19/08/2026; fue 0.7 y luego 0.68 (ADR-0010) |
 | Recuperación comunitaria | Umbral propio | **0.65** (ADR-0011) |
@@ -230,6 +276,18 @@ Los umbrales, el top-k, la ventana y el modelo generativo son variables de
 entorno con valor por defecto en `app/config.py`: se pueden ajustar en
 Railway sin desplegar. **El modelo de embeddings no**, y es deliberado
 (ADR-0007).
+
+**El modelo generativo está desalineado entre el código y el despliegue, y
+hay que decidirlo.** `app/config.py` declara `gemini-3.6-flash` y Railway
+corre `gemini-3.5-flash-lite` desde el 19/08/2026. Se cambió porque toda la
+familia flash completa daba **503 UNAVAILABLE** por sobrecarga y tardaba
+entre 10 y 20 s, mientras el *lite* respondía en 3 s con 3/3 de éxito —los
+*lite* no gastan tokens de pensamiento y parecen estar en otra cola de
+capacidad—. Se comprobó antes que acepta *function calling* y entrada de
+audio, que aquí son obligatorios. Quedan dos cabos: el propio comentario de
+`config.py` dice que el valor por defecto existe para dejar constancia de
+con qué se probó, así que hoy se contradice; y el autor observó que el
+*lite* **redacta peor** el CU2, sin medirlo. No lo resuelvas por tu cuenta.
 
 **Los dos umbrales están medidos contra el corpus real y no sobreviven a un
 cambio de corpus.** El del CU2 tenía un margen de **una centésima**, y el
@@ -286,8 +344,9 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
    sitio donde el texto libre de la usuaria queda guardado de forma
    permanente. Límite declarado en el ADR-0012: la minimización gobierna lo
    que el sistema **pide**, no lo que ella decide contar.
-8. **`gemini-2.5-flash` se retira el 16/10/2026**, antes de la Fase 8. El
-   modelo generativo debe ser de la serie 3.
+8. **`gemini-2.5-flash` se retira el 16/10/2026**, antes de la Fase 8, así
+   que el modelo generativo debe ser de la serie 3. Cuál exactamente está
+   sin decidir y no es obvio: ver el §8.
 9. **El corpus oficial ya no es un documento, son nueve** (ADR-0014), y
    **dos no son del Jardín Botánico**: el manual de compostaje de la FAO y
    un libro de la UNAD. Las fases dan por supuesto una sola entidad; la
@@ -310,7 +369,10 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
     ningún caso de uso, y el ADR-0011 ya había medido que dentro del
     fragmento comunitario empeoraba la recuperación (0.0735 frente a
     0.1166 de separación). Las columnas `fecha_siembra_aprox` y
-    `fecha_imprecisa` salieron de `cultivo` en la migración `008`.
+    `fecha_imprecisa` las retira la migración `008`, **que está escrita y
+    hay que confirmar si llegó a correrse** (ver el §10). El código ya no
+    las escribe en ninguno de los dos casos, así que esto no cambia nada
+    de lo que la usuaria ve.
 12. **El intervalo de 300–500 tokens de la Fase 4 tiene una desviación
     declarada.** Los fragmentos del catálogo de plantas miden unos 183,
     porque una ficha de especie mide eso y respetar el intervalo exigiría
@@ -329,14 +391,22 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - **Número de prueba:** admite un máximo de **5 destinatarios verificados**.
   Está previsto migrar a un número propio con SIM nueva para la Fase 8. El
   `PHONE_NUMBER_ID` cambia al migrar — **nunca lo escribas en el código**.
-- **Supabase:** operativo. PostgreSQL 17.6, migraciones aplicadas hasta la `008`, RLS
-  activo sin políticas. Conexión por **session pooler, puerto 5432**.
-  **765 fragmentos oficiales en nueve fuentes** desde el 19/08/2026.
-  Escribir ahí cambia lo que responde el bot **en el acto**, con o sin
-  despliegue: Railway lee esta misma base.
+- **Supabase:** operativo. PostgreSQL 17.6, migraciones aplicadas hasta la
+  `007`, RLS activo sin políticas. Conexión por **session pooler, puerto
+  5432**. **765 fragmentos oficiales en nueve fuentes** desde el
+  19/08/2026. Escribir ahí cambia lo que responde el bot **en el acto**,
+  con o sin despliegue: Railway lee esta misma base.
+- **La migración `008` está POR CONFIRMAR.** Este archivo la daba por
+  aplicada y `docs/ESTADO.md` la da por escrita y sin correr; no se ha
+  podido comprobar contra la base y **el autor no lo recuerda**. Resuélvelo
+  mirando si `cultivo` conserva `fecha_siembra_aprox` y `fecha_imprecisa`
+  antes de citar cualquiera de las dos versiones. El orden correcto, si
+  sigue pendiente, es el del ADR-0018: primero el código que deja de
+  escribir esas columnas —ya desplegado— y solo después borrarlas.
 - **Railway:** desplegado y con el servicio en marcha. `/health` dice qué
   commit está corriendo, así que confirmar un despliegue no exige mandar un
-  WhatsApp.
+  WhatsApp. Corre `gemini-3.5-flash-lite`, que no es el defecto del
+  repositorio (§8).
 - **Pendiente del autor, y urgente:** purgar los registros de Railway
   anteriores al 30/07/2026, que contienen su número de teléfono.
 
@@ -356,20 +426,29 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   almacenar o comparar, `huella_wamid`. Aplica igual al `wamid` de los
   mensajes que envías, que lleva el número del destinatario.
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
-- Los prompts viven en `app/agent/prompts/` como archivos versionados
-  (`agente_v1.md`, `extraccion_v2.md`, `barrio_v1.md`,
-  `redaccion_rag_v1.md`, `redaccion_comunidad_v1.md`,
-  `respuesta_general_v1.md`), conforme a la
-  práctica de versionamiento
-  declarada en la metodología. **Se rellenan con `str.format`: una llave
-  literal rompe la carga con un `KeyError`.** El del agente no lleva huecos
-  y se carga tal cual, a propósito.
+- Los prompts viven en `app/agent/prompts/` como archivos versionados,
+  conforme a la práctica de versionamiento declarada en la metodología.
+  **Los seis vigentes son** `agente_v1.md`, `extraccion_v3.md`,
+  `barrio_v1.md`, `redaccion_rag_v1.md`, `redaccion_comunidad_v1.md` y
+  `respuesta_general_v1.md`. `extraccion_v1.md` y `extraccion_v2.md` siguen
+  en el repositorio a propósito, como historial citable, pero **no los carga
+  nadie**: no los edites creyendo que están en uso.
+  **Se rellenan con `str.format`: una llave literal rompe la carga con un
+  `KeyError`.** El del agente no lleva huecos y se carga tal cual, a
+  propósito.
 - Un componente, una responsabilidad — según la Tabla 2 de la Fase 3.
 - **Enviar y recordar van juntos.** Después de la compuerta se responde con
   `memoria.responder`, no con `whatsapp.enviar_texto`: un envío sin
   registrar deja en la memoria un hueco que el agente no puede detectar
   (ADR-0012). Antes de la compuerta sí se envía directo, porque ahí no hay
   nada que recordar.
+  **Hay una sola excepción declarada, y está razonada:** el acuse de la
+  nota de voz (`app/services/espera.py`) se envía y **no** se recuerda
+  (ADR-0017). No dice nada que el agente necesite después, y recordarlo
+  gastaría uno de los diez huecos de la ventana en cada nota de voz. El
+  saludo personalizado del onboarding tampoco entra en la memoria, por otro
+  motivo: lleva el nombre, que va cifrado en `usuario` mientras
+  `mensaje.contenido` va en claro (ADR-0016).
 - **Los scripts de `scripts/` que escriben en la base crean datos
   temporales y los borran en un `finally`**, con teléfonos que empiezan por
   `57000000`. Hay **una fila real** en `usuario`, la del celular de pruebas
