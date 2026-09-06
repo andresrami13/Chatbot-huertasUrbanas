@@ -87,6 +87,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | **Probado en producción desde el celular** |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
 | Acuse de la nota de voz | `app/services/espera.py` | Se manda al recibir el audio, sin umbral (ADR-0017, revisado) |
+| Indicador de «escribiendo» | `whatsapp.marcar_escribiendo` | Los tres puntitos nativos de WhatsApp, en todos los mensajes (ADR-0017, 2.ª revisión). **Sin probar desde el celular** |
 | CU3 sin fecha de siembra | `extraccion_v3.md`, `db/008_*.sql` | Código listo; **la migración `008` está sin correr** (ADR-0018) |
 | Catálogo de barrios de Bosa | `db/003_catalogo_barrios_bosa.sql` | **313 filas en Supabase** desde el 17/08/2026 |
 
@@ -217,12 +218,12 @@ export, que es lo que hizo la medición del 19/08.
 
 Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
 
-- **Los trece segundos del camino con RAG siguen sin resolverse**
-  (ADR-0017, revisión). El aviso de texto se probó y se retiró: no añadía
-  tiempo, pero anunciar la espera la hacía sentir más larga. Si se quiere
-  atacar, la vía es el **indicador de «escribiendo…» de la Cloud API**, que
-  no manda ningún mensaje —y que hay que verificar antes contra la
-  documentación vigente, porque no se ha hecho—.
+- **Comprobar los puntitos de «escribiendo» desde un celular real**
+  (ADR-0017, 2.ª revisión). Es lo único construido que no ha pasado por un
+  teléfono. Lo que hay que mirar: si se ven de verdad durante los ~13 s del
+  camino con RAG, si el doble chulo azul —que ahora aparece, porque va
+  incluido— cambia algo para ella, y si con los puntitos puestos el acuse
+  de la nota de voz se vuelve redundante.
   Para repetir cualquier prueba del onboarding basta con **borrar su fila
   de `huerta`**: el siguiente mensaje lo relanza solo, sin repetir el
   consentimiento. Borrar `usuario` también sirve, pero se lleva por

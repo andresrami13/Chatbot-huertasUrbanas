@@ -43,7 +43,7 @@ from app.services.normalizacion import transcribir_audio
 from app.services.onboarding import atender_onboarding, iniciar_onboarding
 from app.services.registro import confirmar_registro, descartar_registro
 from app.services.repositorio import marcar_procesado, reclamar_wamid
-from app.services.whatsapp import enviar_texto
+from app.services.whatsapp import enviar_texto, marcar_escribiendo
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,23 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     if not numero:
         logger.warning("Mensaje sin remitente; se descarta | ref=%s", ref)
         return
+
+    # Los tres puntitos de "escribiendo", lo primero de todo (ADR-0017,
+    # segunda revisión). Sustituye al aviso de texto que se puso y se retiró
+    # el 18/08: no ocupa un renglón del chat, no entra en la memoria y no
+    # marca el comienzo de la espera, que era lo que la hacía sentir larga.
+    #
+    # Se espera en vez de lanzarlo aparte para garantizar que llega antes
+    # que la respuesta; si llegara después, los puntitos se quedarían 25
+    # segundos con nada detrás. Ver `whatsapp.marcar_escribiendo`.
+    #
+    # Va antes de la compuerta a propósito: quien todavía no ha autorizado
+    # también recibe una respuesta —la solicitud de permiso— y merece la
+    # misma señal. No procesa nada suyo: es un identificador de Meta que
+    # vuelve a Meta.
+    identificador = mensaje.get("id")
+    if identificador:
+        await marcar_escribiendo(identificador)
 
     texto: str | None = None
     boton_id: str | None = None

@@ -1,7 +1,8 @@
 # ADR-0017. El aviso de espera se envía y no se recuerda
 
-- **Estado:** Aceptada **solo para la nota de voz**. El aviso del camino
-  con RAG se puso y se retiró el mismo día; ver la revisión al final
+- **Estado:** Aceptada. El aviso de texto del camino con RAG se puso y se
+  retiró el 18/08; el 23/08 lo sustituye el **indicador de «escribiendo»**
+  de la Cloud API. Ver las dos revisiones al final
 - **Fecha:** 2026-08-18
 - **Fase:** 7
 - **Origen:** sin respaldo documental
@@ -199,3 +200,93 @@ segundos, que dejó de tener sentido. En particular, el indicador de
 verificar si el silencio del camino con RAG se quiere resolver: no manda
 ningún mensaje, así que no marca el comienzo de la espera como lo hacía
 este.
+
+---
+
+## Revisión del 23/08/2026: entran los puntitos de «escribiendo»
+
+La alternativa que este ADR descartó **por no estar verificada** resultó ser
+la buena. Verificada el 23/08/2026 en la documentación de Meta, existe y
+hace justo lo que hacía falta.
+
+### Cómo se pide
+
+    POST https://graph.facebook.com/<version>/<PHONE_NUMBER_ID>/messages
+    {
+      "messaging_product": "whatsapp",
+      "status": "read",
+      "message_id": "<wamid del mensaje entrante>",
+      "typing_indicator": { "type": "text" }
+    }
+
+Dura **hasta 25 segundos** y se quita al responder, lo que ocurra primero.
+Los 25 cubren de sobra los ~13 del camino con RAG. Meta pide mostrarlo solo
+si se va a responder.
+
+### Por qué resuelve lo que el aviso de texto no pudo
+
+La revisión del 18/08 concluyó que el problema no era el tiempo sino la
+percepción: un mensaje que dice «deme un momentico» **marca el comienzo de
+la espera** y la convierte en algo que se mide. Los puntitos son
+ambientales. No ocupan un renglón del chat, no son un mensaje, y no hay
+nada que empiece.
+
+Y de paso desaparecen dos cosas que el aviso de texto obligaba a arrastrar:
+
+- **La excepción al CLAUDE.md §11 deja de hacer falta para este camino.** No
+  hay nada que enviar ni que recordar. Sigue vigente solo para el acuse de
+  la nota de voz, que sí es un mensaje.
+- **El `ContextVar` y los dos disparadores no vuelven.** El indicador se
+  pide en el despachador, antes de saber nada de la ruta.
+
+### Decisión A. Va esperado, no en segundo plano
+
+Es lo contrario de lo que hacía el aviso de texto, y por un motivo que solo
+aplica aquí: si la petición del indicador llegara **después** de la
+respuesta, Meta ya no tendría qué descartar y **los puntitos se quedarían
+puestos los 25 segundos con nada detrás**.
+
+Cuesta un viaje de ida y vuelta —medido, menos de un segundo— y garantiza el
+orden. Con timeout propio de 5 s, no los 20 de un envío normal: esta llamada
+está en el camino crítico del turno y una Meta lenta no puede retrasar la
+respuesta de verdad.
+
+### Decisión B. Va antes de la compuerta
+
+Quien todavía no ha autorizado también recibe una respuesta —la solicitud de
+permiso— y merece la misma señal.
+
+No incumple el ADR-0006, que prohíbe **procesar** el mensaje de quien no ha
+autorizado: aquí no se lee el contenido, no se transcribe nada y no se llama
+al modelo. Se le devuelve a Meta un identificador que Meta generó.
+
+### Decisión C. El `wamid` que se manda no incumple el §11
+
+La regla dice que el `wamid` nunca va a la bitácora ni a la base **en
+claro**, porque lleva dentro el teléfono del remitente. Aquí no se registra
+ni se almacena: viaja de vuelta a quien ya lo tiene. A la bitácora sigue
+yendo la referencia.
+
+Queda escrito porque a primera vista parece que choca, y el siguiente que
+lea el §11 se va a hacer la misma pregunta.
+
+### Lo que trae de propina, y no es opcional
+
+El cuerpo lleva `status: "read"`, así que **marca el mensaje como leído**:
+aparecen los dos chulos azules. No se puede pedir lo uno sin lo otro. Es
+probablemente bueno —ella sabe que llegó— pero es un cambio de
+comportamiento visible que antes no existía.
+
+### Lo que esta revisión no resuelve
+
+- **Si el acuse de la nota de voz queda redundante.** Con el doble chulo
+  azul y los puntitos, el mensaje «🎤 ya le estoy oyendo la nota de voz»
+  quizá sobre. O quizá no: los puntitos no dicen que el audio *se oyó*. Se
+  conserva y se mira en la prueba con celular.
+- **Los caminos que no responden.** Meta pide mostrar el indicador solo si
+  se va a responder, y hay casos que no responden —un botón desconocido, un
+  tipo de mensaje no soportado—, que solo se saben después. Se acepta que
+  en esos casos raros los puntitos aparezcan sin respuesta detrás.
+- **Si cuenta para la facturación.** La documentación no menciona límites de
+  tasa y, al ser un cambio de estado y no un mensaje, lo esperable es que
+  sea gratuito como el acuse de lectura. **No se comprobó.**

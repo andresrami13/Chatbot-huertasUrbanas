@@ -133,8 +133,10 @@ con más peso legal del proyecto.
   no reintente.
 - **Hace:** nada dice qué ve **la usuaria** durante los ~13 segundos del
   camino con RAG, que es quien de verdad espera. Se probó un aviso de texto y
-  **se retiró**: anunciar la espera la hacía sentir más larga. Queda solo el
-  acuse de la nota de voz.
+  **se retiró**: anunciar la espera la hacía sentir más larga. Desde el
+  23/08/2026 lo cubre el **indicador de «escribiendo» de la Cloud API**, que
+  no manda ningún mensaje y por tanto no marca el comienzo de la espera. Trae
+  incluido el acuse de lectura: aparecen los dos chulos azules.
 - **Justifica:** [ADR-0017](adr/0017-aviso-de-espera.md) y su revisión
 
 ### §3 — el modelo de embeddings

@@ -26,6 +26,13 @@ _MAX_CUERPO = 1024
 
 _TIEMPO_ESPERA = 20.0
 
+# El indicador de "escribiendo" va ESPERADO, en el camino crítico del turno
+# (ver `marcar_escribiendo`), así que no puede heredar los 20 segundos de un
+# envío normal: una Meta lenta retrasaría la respuesta de verdad. Cinco
+# segundos bastan de sobra para un cambio de estado, y si no llega, el turno
+# sigue sin los puntitos.
+_TIEMPO_ESPERA_INDICADOR = 5.0
+
 
 def _url() -> str:
     return (
@@ -74,6 +81,63 @@ async def _enviar(carga: dict) -> str | None:
         "Mensaje enviado | ref=%s", referencia_wamid(wamid) if wamid else "-"
     )
     return wamid
+
+
+async def marcar_escribiendo(wamid: str) -> None:
+    """Muestra los tres puntitos de "escribiendo" en el chat de la usuaria.
+
+    Verificado en la documentación de Meta el 23/08/2026: se pide con un
+    POST al mismo endpoint de mensajes, con `status: "read"` y el
+    `message_id` del mensaje entrante. Dura **hasta 25 segundos** y se
+    quita al responder, lo que ocurra primero. Los 25 cubren de sobra los
+    ~13 del camino con RAG.
+
+    ## Por qué el wamid aquí no incumple el §11
+
+    La regla dice que el `wamid` nunca va a la bitácora ni a la base **en
+    claro**, porque lleva dentro el teléfono del remitente. Aquí no se
+    registra ni se almacena: se le devuelve a Meta un identificador que
+    Meta mismo generó y ya tiene. A la bitácora sigue yendo la referencia.
+
+    ## Por qué se espera en vez de lanzarlo en segundo plano
+
+    Si la petición del indicador llegara **después** de la respuesta, Meta
+    ya no tendría qué descartar y los puntitos se quedarían puestos los 25
+    segundos, con nada detrás. Esperar cuesta un viaje de ida y vuelta y
+    garantiza el orden.
+
+    ## Efecto que no es opcional
+
+    El cuerpo lleva `status: "read"`, así que además **marca el mensaje
+    como leído**: aparecen los dos chulos azules. No se puede pedir lo uno
+    sin lo otro.
+
+    No lanza: que no salgan los puntitos no puede tumbar el turno.
+    """
+    carga = {
+        "messaging_product": "whatsapp",
+        "status": "read",
+        "message_id": wamid,
+        "typing_indicator": {"type": "text"},
+    }
+    cabeceras = {
+        "Authorization": f"Bearer {settings.META_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=_TIEMPO_ESPERA_INDICADOR) as cliente:
+            respuesta = await cliente.post(_url(), json=carga, headers=cabeceras)
+    except httpx.HTTPError as exc:
+        logger.warning("No se pudo marcar escribiendo | %s", type(exc).__name__)
+        return
+
+    if respuesta.status_code != 200:
+        logger.warning(
+            "Meta rechazó el indicador de escritura | http=%d | %s",
+            respuesta.status_code,
+            respuesta.text[:200],
+        )
 
 
 async def enviar_texto(destino: str, texto: str) -> str | None:
