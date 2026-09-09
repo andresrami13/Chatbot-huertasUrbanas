@@ -109,9 +109,33 @@ REGISTRO_NADA_QUE_ANOTAR = """Me quedé con las ganas de anotarlo, pero no le en
 ¿Me cuenta qué planta es? Con el nombre me basta."""
 
 
+# Cierre del CU3, después del botón [Sí, guardar]. Además de acusar el
+# guardado, **encadena con el CU2**: hasta el 05/09/2026 terminaba en
+# "cuando siembre algo nuevo me cuenta" y ahí se acababa la conversación,
+# sin decirle qué más podía hacer.
+#
+# Los tres ejemplos son preguntas, nunca afirmaciones, y es deliberado: uno
+# del tipo "tengo tomate" lo enrutaría el agente al CU3 y le ofrecería
+# guardar un cultivo que ella no tiene.
+#
+# Y están escogidos entre lo que el corpus sí responde —siembra mide 0.7044
+# en las consultas reales, y el riego y el abono los cubre el manual de
+# compostaje de la FAO con sus 68 fragmentos—: invitar a preguntar algo que
+# termine en "no tengo esa información" es peor que no invitar.
+#
+# No repiten el ejemplo de plagas de BIENVENIDA, que ella ya vio.
+#
+# Pendiente de medir en la Fase 7: esto sale en CADA registro confirmado,
+# no solo en el primero. A la quinta planta que anote, la invitación puede
+# sobrar. Condicionarla a la primera confirmación es cambio de código.
 REGISTRO_GUARDADO = """✅ Listo, ya quedó guardado.
 
-Cuando siembre algo nuevo me cuenta y lo agrego."""
+Cuando siembre algo nuevo me cuenta y lo agrego.
+
+Por ahora cuénteme, ¿tiene alguna duda de su huerta? Pregúnteme sin pena:
+🌱 "cómo se siembra la cebolla larga"
+💧 "cada cuánto riego el cilantro"
+♻️ "cómo hago abono con las cáscaras\""""
 
 
 # No se le pide explicación ni se repregunta: es su decisión.
