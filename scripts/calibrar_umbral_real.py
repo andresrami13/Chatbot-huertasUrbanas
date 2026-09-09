@@ -2,8 +2,9 @@
 
     python -m scripts.calibrar_umbral_real
 
-No escribe nada. Es el compañero de `scripts/calibrar_umbral.py`, y lo que
-cambia entre los dos es de dónde salen las consultas:
+No escribe nada. Fue el compañero de `scripts/calibrar_umbral.py`, que se
+**borró el 08/09/2026** y vive en el historial de git. Lo que cambiaba
+entre los dos es de dónde salen las consultas:
 
 - `calibrar_umbral.py` las imaginó el autor. Doce positivas y seis
   negativas, escritas en el vocabulario del documento. Dieron el 0.68 del

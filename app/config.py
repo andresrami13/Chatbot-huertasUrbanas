@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     META_ACCESS_TOKEN: str
     META_PHONE_NUMBER_ID: str
     META_WABA_ID: str = ""
-    META_GRAPH_VERSION: str = "v25.0"
+    META_GRAPH_VERSION: str = "v26.0"
 
     # --- Identidad y cifrado (Fase 3, §5.2) ---
     # Ambos son críticos e irrecuperables. Si el pepper cambia, las

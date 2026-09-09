@@ -28,6 +28,7 @@ documento queda marcado como pendiente de corrección.
 | [0016](0016-onboarding-de-preguntas-cerradas.md) | El registro empieza con un onboarding de preguntas cerradas | Aceptada | Fase 2 (CU3) |
 | [0017](0017-aviso-de-espera.md) | El aviso de espera se envía y no se recuerda | Aceptada solo para la nota de voz; el del RAG se retiró el mismo día | Sin respaldo documental |
 | [0018](0018-sin-fecha-de-siembra.md) | La fecha de siembra sale del CU3 | Aceptada; extiende el [0011](0011-fragmento-comunitario-solo-especies.md) al CU3 | Fase 4 (Tabla 3) / Fase 3 |
+| [0019](0019-aviso-cuando-la-base-no-responde.md) | Cuando la base no responde, se reintenta y se le avisa a la usuaria | Aceptada; el freno de la decision 5 se retiro el mismo dia | Sin respaldo documental |
 
 ## Documentos pendientes de corrección
 

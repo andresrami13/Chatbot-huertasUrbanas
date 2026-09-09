@@ -280,18 +280,31 @@ la fila real del autor no se toca.
 
 | Script | Qué hace |
 |---|---|
-| `spike_despachador` | La rama completa, entrando por `procesar_evento`. **El más útil para comprobar que nada se rompió.** |
-| `spike_agente` | El agente y sus cuatro herramientas, con espías en vez de envíos |
-| `spike_memoria` | La ventana, la deduplicación y el aislamiento entre usuarias |
-| `spike_comunidad`, `spike_orientacion` | El CU4 y el CU2 por separado |
-| `spike_extraccion`, `spike_transcripcion`, `spike_embeddings` | Piezas de la Fase 5 |
-| `calibrar_umbral`, `calibrar_fragmento_comunitario` | Las mediciones de los ADR-0010 y 0011, con consultas imaginadas por el autor |
+| `spike_despachador` | La rama completa, entrando por `procesar_evento`. **El más útil para comprobar que nada se rompió**, y la única prueba de regresión de extremo a extremo que hay |
 | `calibrar_umbral_real` | **La revalidación de la Fase 7**, con las consultas de la prueba real |
 | `revisar_prueba_real` | Reconstruye una sesión hecha desde el celular y remide cada consulta. Solo lee |
 | `ingesta_fuente` | La ingesta oficial. `--listar`, `--fuente`, `--detectar-folio`, `--medir-tokens`, `--simular`, `--reingerir` |
 | `catalogo_fuentes` | No se ejecuta: es la declaración de las nueve fuentes y sus parámetros medidos |
 | `regenerar_fragmentos` | Rehace los fragmentos comunitarios |
 | `generar_catalogo_barrios` | Escribe `db/003_catalogo_barrios_bosa.sql` desde el listado oficial. No toca la base |
+
+**El 08/09/2026 se borraron nueve scripts** que ya no se ejecutaban:
+los siete spikes de la Fase 5 —`spike_agente`, `spike_memoria`,
+`spike_comunidad`, `spike_orientacion`, `spike_extraccion`,
+`spike_transcripcion`, `spike_embeddings`— y las dos calibraciones con
+consultas imaginadas por el autor, `calibrar_umbral` y
+`calibrar_fragmento_comunitario`, que midieron los ADR-0010 y 0011.
+
+**Siguen en el historial de git y es ahí donde hay que buscarlos**: los
+ADR que citan sus mediciones no pierden trazabilidad, y el anexo del
+documento de grado sale de las versiones de git. Tres de ellos
+(`spike_comunidad`, `spike_embeddings`, `calibrar_fragmento_comunitario`)
+ya no corrían de todos modos: usaban `Los 3 Sectores`, que dejó de estar
+en el catálogo con el ADR-0016.
+
+Se conservó `spike_despachador` porque no es evidencia sino herramienta:
+es lo único que comprueba de una pasada que la cadena entera sigue en
+pie, y este proyecto no tiene otra batería de pruebas.
 
 ---
 

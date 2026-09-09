@@ -18,6 +18,13 @@ transcripción va **después** de la compuerta a propósito (ADR-0006), y la
 memoria después de la transcripción, para que el audio quede guardado ya
 convertido en texto (ADR-0012).
 
+**Cuando Supabase no responde, el turno no llega a empezar y se le avisa a
+la usuaria** (ADR-0019). Es el único fallo que se atiende aquí y no dentro
+del flujo, porque ocurre en `reclamar_wamid`: antes de la compuerta y antes
+de la memoria, así que no hay `usuario_id` con el que responder ni dónde
+dejar constancia. Se envía con `whatsapp.enviar_texto`, que solo necesita a
+Meta.
+
 **Este módulo ya no decide intenciones.** Desde el 15/08/2026 esa decisión
 es del agente por function calling (Fase 2, §4; ADR-0013), y aquí solo
 quedan las que no son interpretación: una pulsación de botón, que es
@@ -31,6 +38,7 @@ donde el ADR-0006 lo declara camino permanente. Lo único que sobraba era su
 uso posterior.
 """
 
+import asyncio
 import logging
 
 from app import textos
@@ -74,6 +82,131 @@ async def procesar_evento(payload: dict) -> None:
         logger.exception("Error no controlado procesando el evento")
 
 
+# --- El reclamo del mensaje cuando la base falla (ADR-0019) -----------
+#
+# `reclamar_wamid` es la primera consulta a Supabase de todo el turno, y
+# hasta el 08/09/2026 un fallo suyo era silencio absoluto para la usuaria:
+# el webhook ya le había devuelto 200 a Meta, así que tampoco quedaba un
+# reintento de Meta que lo recuperase.
+
+# Esperas entre reintentos, en segundos. Tres intentos en total: el primero
+# sin esperar y dos más tras estas pausas.
+#
+# Aquí sobra el tiempo, y por eso se puede reintentar: Meta ya recibió su
+# 200 (ADR-0005) y nadie está esperando esta tarea. Un corte del pooler de
+# Supabase suele durar segundos, de modo que la mayoría de las caídas se
+# resuelven sin que la usuaria se entere, que vale más que cualquier
+# disculpa bien redactada.
+_ESPERAS_RECLAMO = (1.0, 3.0)
+
+
+async def _reclamar_con_reintentos(huella: str, ref: str) -> bool:
+    """Reclama el mensaje, reintentando si la base no responde.
+
+    Devuelve lo mismo que `reclamar_wamid`: si hay que procesarlo. Si se
+    agotan los intentos relanza la excepción, y quien llama avisa a la
+    usuaria.
+
+    ## La rendija que abre el reintento, y por qué se deja abierta
+
+    Si un intento llega a escribir la fila en Supabase pero la conexión se
+    rompe antes de que leamos la respuesta, el intento siguiente encuentra
+    **su propia fila** en 'recibido' y recién puesta. El `where` del
+    reclamo exige que hayan pasado `_PLAZO_RECLAMO_SEGUNDOS` —300— para
+    volver a tomarla, así que no devuelve nada y el mensaje se descarta
+    como si fuera un duplicado.
+
+    Se acepta a propósito. Resolverlo obligaría a leer la fila y decidir si
+    es nuestra o de una entrega concurrente de Meta, y equivocarse ahí
+    **le mandaría la respuesta dos veces**, que es peor que perder el
+    mensaje: uno se puede volver a escribir, el otro ya lo leyó. Lo que sí
+    se hace es no dejarlo disfrazado, y por eso un rechazo tras un
+    reintento se registra distinto del duplicado normal.
+    """
+    intentos = len(_ESPERAS_RECLAMO) + 1
+
+    for intento in range(1, intentos + 1):
+        try:
+            reclamado = await reclamar_wamid(huella)
+        except Exception:
+            if intento == intentos:
+                raise
+
+            # Sin traza completa mientras queden intentos: una caída de un
+            # segundo no merece un `exception` por cada tropiezo.
+            logger.warning(
+                "La base no respondió al reclamar | ref=%s | intento=%d de %d",
+                ref,
+                intento,
+                intentos,
+            )
+            await asyncio.sleep(_ESPERAS_RECLAMO[intento - 1])
+            continue
+
+        if not reclamado and intento > 1:
+            # La rendija del docstring: puede ser un duplicado de verdad o
+            # la fila que dejó el intento que se rompió. No se distinguen,
+            # pero al menos no se confunden en la bitácora.
+            logger.warning(
+                "Reclamo rechazado tras un reintento | ref=%s | intento=%d | "
+                "duplicado real o fila del intento anterior",
+                ref,
+                intento,
+            )
+
+        return reclamado
+
+    # El último intento o devuelve o relanza; aquí no se llega.
+    raise AssertionError("El bucle de reclamo terminó sin resolver")
+
+
+# --- El aviso de que la base no responde (ADR-0019) -------------------
+#
+# **Se avisa siempre, sin excepción y sin llevar cuenta de nada.** Hubo un
+# freno de cinco minutos por número, para que cinco mensajes suyos durante
+# una caída no fueran cinco disculpas idénticas, y **se quitó el mismo día
+# de escribirlo** (ADR-0019, revisión de la decisión 5).
+#
+# Resolvía el problema con la única herramienta que este perfil de usuaria
+# no tolera: callarse. Y el texto que enviamos dice «¿me lo vuelve a
+# escribir en unos minuticos?», así que la usuaria que **obedece** caía
+# dentro de la ventana y recibía silencio por hacer lo que le pedimos. El
+# sistema se contradecía a sí mismo justo en el caso más probable.
+#
+# El problema que el freno atajaba tampoco existe de verdad: pasadas dos
+# veces sin respuesta, la usuaria deja de escribirle al bot. Las cinco
+# disculpas seguidas eran un escenario de laboratorio.
+
+
+async def _avisar_base_caida(numero: str | None, ref: str) -> None:
+    """Le dice que vuelva a escribir, sin mencionar ninguna tecnología.
+
+    Se envía con `enviar_texto` y **no se recuerda**, que es la segunda
+    excepción declarada al CLAUDE.md §11 después del acuse de voz
+    (ADR-0017). Aquí ni siquiera incomoda: con la base caída no hay dónde
+    escribir, y como esto ocurre antes de `recordar_usuaria`, tampoco llegó
+    a guardarse el mensaje de ella. La ventana se salta el turno entero y
+    queda coherente, que es justo lo que el ADR-0012 protege.
+
+    Va antes de la compuerta, sin saber si autorizó, por el mismo motivo
+    que el indicador de «escribiendo» (ADR-0017, decisión B): es un texto
+    fijo devuelto al número que acaba de escribir. No lee su mensaje, no lo
+    transcribe, no llama al modelo y no persiste nada suyo.
+
+    **Avisa siempre.** Si la caída dura, ella recibe la misma disculpa por
+    cada mensaje que mande, y eso es deliberado: repetido es molesto, pero
+    es inequívoco, mientras que callar después de haberle pedido que
+    vuelva a escribir la deja peor que si nunca le hubiéramos hablado.
+    """
+    if not numero:
+        logger.warning("Fallo de base sin remitente al que avisar | ref=%s", ref)
+        return
+
+    # `enviar_texto` no toca la base y no lanza: devuelve None si falla.
+    await enviar_texto(numero, textos.SERVICIO_NO_DISPONIBLE)
+    logger.info("Avisado de que el servicio no está disponible | ref=%s", ref)
+
+
 async def _procesar_mensaje(mensaje: dict) -> None:
     """Reclama el mensaje, lo atiende y solo entonces lo cierra.
 
@@ -81,6 +214,12 @@ async def _procesar_mensaje(mensaje: dict) -> None:
     terminar bien**, nunca al empezar. Si el trabajo falla, la fila se deja
     en `recibido` y al vencer el plazo el reintento de Meta lo vuelve a
     tomar, en lugar de descartarlo como duplicado y perderlo en silencio.
+
+    **Ojo con ese reintento: solo ocurre si Meta no recibió el 200**, y el
+    webhook lo devuelve siempre en cuanto la firma es válida y el cuerpo
+    parsea. Un fallo de procesamiento no provoca reentrega, así que la fila
+    se queda en 'recibido' y nadie la vuelve a tomar. Está sin resolver, y
+    el ADR-0019 **no** lo arregla: solo se ocupa de que ella se entere.
     """
     wamid = mensaje.get("id")
     if not wamid:
@@ -91,7 +230,18 @@ async def _procesar_mensaje(mensaje: dict) -> None:
     ref = referencia_wamid(wamid)
     huella = huella_wamid(wamid)
 
-    if not await reclamar_wamid(huella):
+    try:
+        reclamado = await _reclamar_con_reintentos(huella, ref)
+    except Exception:
+        # Ningún intento pasó. El turno no llega a empezar: no hay usuaria
+        # identificada, ni memoria escrita, ni nada que deshacer.
+        logger.exception(
+            "No se pudo reclamar el mensaje; la base no responde | ref=%s", ref
+        )
+        await _avisar_base_caida(mensaje.get("from"), ref)
+        return
+
+    if not reclamado:
         logger.info("Duplicado o ya en curso; se descarta | ref=%s", ref)
         return
 

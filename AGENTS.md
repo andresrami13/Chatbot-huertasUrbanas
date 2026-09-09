@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-Instrucciones de proyecto para Claude Code. Léelas al inicio de cada sesión.
+Instrucciones de proyecto para Codex. Léelas al inicio de cada sesión.
 
 ---
 

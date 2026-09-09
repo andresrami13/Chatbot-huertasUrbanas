@@ -368,3 +368,27 @@ ESPERA_AUDIO = (
     "🎤 Permítame un momentico, que estoy oyendo su nota de voz.",
     "🎤 Estoy oyendo lo que me contó. Deme un segundito.",
 )
+
+
+# --- La base de datos no responde (ADR-0019) --------------------------
+# Se manda cuando el mensaje ni siquiera se pudo reclamar, es decir cuando
+# Supabase no contesta y el turno no llega a empezar. Hasta el 08/09/2026
+# ese caso era **silencio absoluto**: el webhook ya le había devuelto 200 a
+# Meta, así que no había reintento, y la usuaria se quedaba sin respuesta y
+# sin señal de ninguna clase.
+#
+# Se envía con `whatsapp.enviar_texto` y **no entra en la memoria**, que es
+# la segunda excepción declarada al CLAUDE.md §11 después del acuse de voz.
+# Aquí ni siquiera es una excepción incómoda: con la base caída no hay dónde
+# escribir, y como el fallo ocurre antes de `recordar_usuaria`, tampoco se
+# guardó el mensaje de ella. La ventana se salta el turno entero y queda
+# coherente, que es justo lo que el ADR-0012 quiere proteger.
+#
+# Sin tecnicismos (CLAUDE.md §11): "base de datos" no le dice nada a la
+# usuaria. Lo que necesita saber son tres cosas y están las tres: que no fue
+# culpa suya, que no se guardó nada, y que vuelva a escribir.
+SERVICIO_NO_DISPONIBLE = """Perdone, en este momento no la puedo atender.
+
+No es culpa suya y no se perdió nada de lo que tenía guardado, pero este mensaje no lo alcancé a recibir.
+
+¿Me lo vuelve a escribir en una hora?"""
