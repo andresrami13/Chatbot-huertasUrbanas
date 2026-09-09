@@ -302,6 +302,7 @@ la fila real del autor no se toca.
 |---|---|
 | `spike_despachador` | La rama completa, entrando por `procesar_evento`. **El más útil para comprobar que nada se rompió**, y la única prueba de regresión de extremo a extremo que hay |
 | `calibrar_umbral_real` | **La revalidación de la Fase 7**, con las consultas de la prueba real |
+| `calibrar_enrutamiento` | **A qué herramienta enruta el agente**, repitiendo porque a 0.7 no es determinista. No ejecuta ninguna. `--grupo`, `--modelos`, `--repeticiones` |
 | `revisar_prueba_real` | Reconstruye una sesión hecha desde el celular y remide cada consulta. Solo lee |
 | `ingesta_fuente` | La ingesta oficial. `--listar`, `--fuente`, `--detectar-folio`, `--medir-tokens`, `--simular`, `--reingerir` |
 | `catalogo_fuentes` | No se ejecuta: es la declaración de las nueve fuentes y sus parámetros medidos |
