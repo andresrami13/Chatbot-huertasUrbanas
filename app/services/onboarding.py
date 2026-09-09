@@ -30,7 +30,6 @@ intento (ADR-0006).
 
 import json
 import logging
-import unicodedata
 from uuid import UUID
 
 from google.genai import types
@@ -38,6 +37,7 @@ from google.genai import types
 from app import textos
 from app.agent.plantillas import cargar_prompt
 from app.core.gemini import MODELO_GENERATIVO, obtener_cliente
+from app.core.texto import normalizar
 from app.services.consentimiento import es_saludo_o_ayuda
 from app.services.memoria import responder, responder_con_botones
 from app.services.repositorio import (
@@ -99,25 +99,13 @@ _ESQUEMA_BARRIO = types.Schema(
 )
 
 
-def _normalizar(texto: str) -> str:
-    """Minúsculas, sin tildes y sin signos, para comparar."""
-    sin_tildes = "".join(
-        c
-        for c in unicodedata.normalize("NFD", texto.lower())
-        if unicodedata.category(c) != "Mn"
-    )
-    return " ".join(
-        "".join(c for c in sin_tildes if c.isalnum() or c.isspace()).split()
-    )
-
-
 # Emoji de teclado para numerar las opciones. Se ven como un número
 # metido en una tecla, y a simple vista dicen "aquí toca escribir un
 # número" mejor que un "1." al principio del renglón.
 #
 # Ella sigue escribiendo el dígito normal de su teclado, y eso es lo que
 # le pide `ONBOARDING_NUMERO_NO_ENTENDIDO`. Pero si copia el emoji de la
-# lista y lo manda, también vale: `_normalizar` le quita el envolvente
+# lista y lo manda, también vale: `normalizar` le quita el envolvente
 # (categoría Me) y el selector de variación (Mn) y deja el dígito solo.
 # Comprobado: "3", "tres" y "3️⃣" dan los tres 3.
 _DIGITOS_EMOJI = ("1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣",
@@ -151,7 +139,7 @@ def leer_numero(texto: str | None, maximo: int) -> int | None:
     if not texto:
         return None
 
-    normalizado = _normalizar(texto)
+    normalizado = normalizar(texto)
 
     if normalizado.isdigit():
         numero = int(normalizado)
@@ -174,7 +162,7 @@ def _es_respuesta_util(texto: str | None, maximo_palabras: int) -> bool:
     if not texto or "?" in texto or "¿" in texto:
         return False
 
-    normalizado = _normalizar(texto)
+    normalizado = normalizar(texto)
     if not normalizado:
         return False
 

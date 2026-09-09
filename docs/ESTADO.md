@@ -1,13 +1,15 @@
 # Estado del proyecto
 
-Última actualización: 2026-08-19. **La Fase 6 se cerró el 15/08/2026 con la
+Última actualización: 2026-09-08. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
-pruebas).** Los cinco casos de uso están construidos y desplegados, y la
-conversación ya se probó desde un celular real. El CU4 es el único que
-sigue sin ejercitarse de verdad, y no por un fallo: excluye la huerta de
-quien pregunta y solo hay una registrada.
+pruebas).** Los casos de uso están construidos y desplegados, y la
+conversación ya se probó desde un celular real. **Son siete contando el CU6
+(onboarding) del documento de grado y el CU7 (buscar un cultivo en otras
+huertas), separado del CU4 el 08/09/2026.** El CU4 y el CU7 son los que
+siguen sin ejercitarse de verdad, y no por un fallo: excluyen la huerta de
+quien pregunta y apenas hay huertas registradas.
 
-De la Fase 7 van hechas siete cosas, las dos primeras nacidas de esa prueba:
+De la Fase 7 van hechas nueve cosas, las dos primeras nacidas de esa prueba:
 
 - **El corpus oficial pasó de 81 a 765 fragmentos en nueve fuentes**
   (ADR-0014), y dos de ellas ya no son del Jardín Botánico. Fueron 774
@@ -29,13 +31,19 @@ De la Fase 7 van hechas siete cosas, las dos primeras nacidas de esa prueba:
   sentir más larga.
 - **La fecha de siembra salió del CU3 entero** —del prompt, del resumen y de
   la tabla `cultivo`— por ser un dato de solo escritura (ADR-0018).
+- **Cuando la base no responde se reintenta y se le avisa** (ADR-0019).
+  Antes era silencio absoluto: el webhook ya le había devuelto 200 a Meta,
+  así que tampoco quedaba reintento que lo recuperase.
+- **El CU4 se partió en dos** (ADR-0021): el listado lo compone el código y
+  sale de tres en tres, y la búsqueda por cultivo es el CU7.
 
 Falta lo principal: **revalidar el umbral**, que hoy no lo respalda ninguna
 medición.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(dieciocho decisiones tomadas durante la implementación).
+(veinte decisiones tomadas durante la implementación; el 0020 está
+reservado y sin escribir).
 
 **Si retoma en una conversación nueva, vaya directo a
 [Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
@@ -82,7 +90,8 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Respuesta sin respaldo oficial | `respuesta_general_v1.md`, `CU2_RESPALDO_MODELO` | Activo desde el 15/08; se apaga en Railway sin desplegar |
 | Advertencia de contenido médico | `app/textos.py`, `orientacion.py` | La pone el backend, no el prompt (ADR-0015) |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
-| Qué siembran otras huertas (CU4) | `app/services/comunidad.py` | Enrutado por el agente desde el 15/08 |
+| Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. **La migración `009` está sin correr** (ADR-0021) |
+| Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Sin probar desde el celular** |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
 | Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | **Probado en producción desde el celular** |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
@@ -112,13 +121,17 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
   **765 fragmentos oficiales de nueve fuentes** desde el 19/08/2026, y
   **313 barrios** desde el 17/08. Escribir ahí cambia lo que responde el
   bot **en el acto**, con o sin despliegue: Railway lee esta misma base.
-  **`usuario`, `mensaje`, `huerta`, `cultivo` y `fragmento_comunitario`
-  están en cero filas** desde el 18/08/2026: se borró a propósito la fila
-  real del autor para volver a recorrer el camino completo. Con eso
-  desapareció también la conversación de la prueba del 15/08, que solo
-  sobrevive exportada en `fuentes/conversacion_prueba_real.json` —fuera del
-  repositorio, que es público—. **`scripts/revisar_prueba_real.py` ya no
-  tiene qué reconstruir** hasta que haya una prueba nueva.
+  El 18/08/2026 se vaciaron a propósito `usuario`, `mensaje`, `huerta`,
+  `cultivo` y `fragmento_comunitario` —incluida la fila real del autor—
+  para volver a recorrer el camino completo, y con eso desapareció la
+  conversación de la prueba del 15/08, que solo sobrevive exportada en
+  `fuentes/conversacion_prueba_real.json` —fuera del repositorio, que es
+  público—. **Al 08/09/2026 hay otra vez 4 usuarias, 4 huertas con 13
+  cultivos y sus 4 fragmentos comunitarios**, que son los que por fin
+  permiten ejercitar el CU4 y el CU7.
+  **Migraciones aplicadas: hasta la `008`** —comprobado el 08/09 contra
+  `information_schema`: la columna `fecha_siembra_aprox` ya no existe—.
+  **La `009` está sin correr.**
 - **Meta:** app `Chatbot Huertas Urbanas` (id `4332318797098432`), número de
   prueba `+1 555-136-8057`. Webhook registrado, app suscrita al WABA y campo
   `messages` suscrito. **Los tres pasos son independientes**; que el webhook
@@ -229,6 +242,9 @@ Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
   consentimiento. Borrar `usuario` también sirve, pero se lleva por
   cascada la conversación de `mensaje`, que es el material de esta fase.
 - **Remedir el umbral comunitario** con 5–7 huertas de verdad (ADR-0011).
+  Desde el ADR-0021 ese umbral gobierna **solo el CU7**: la pregunta
+  general del CU4 ya no consulta la colección vectorial, así que la
+  remedición pesa menos que antes pero sigue haciendo falta.
   Sigue sin tocar desde el 04/08, y no se puede tocar antes: el CU4 excluye
   la huerta de quien pregunta y solo hay una registrada.
 - **Cuántas veces responde el CU2 sin respaldo oficial.** Cada vez queda
@@ -1103,6 +1119,58 @@ con campos muertos invita a llamarla cuando no toca.
 
 **Falta el ADR de todo esto.** Sería el **ADR-0019** y hoy solo vive en los
 mensajes de commit `00133ef`, `9102b50` y `d6cac90`.
+
+### Fase 7: el CU4 se parte en dos, 08/09/2026
+
+**El CU4 respondía hablando de una sola huerta teniendo varias**, y al
+mirarlo no había un defecto sino tres cosas, solo una de ellas un error:
+la base tenía dos huertas y el CU4 excluye la de quien pregunta; `RAG_TOP_K`
+era el techo de las dos vías y es la misma variable del CU2; y el prompt le
+pedía al modelo no pasar de 70 palabras, que es menos de lo que ocupa un
+listado fiel de cuatro huertas. Lo corrige el
+[ADR-0021](adr/0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md).
+
+Piezas: `app/services/comunidad.py` reescrito,
+`db/009_listado_comunitario_pendiente.sql`, `redaccion_comunidad_v2.md`,
+`app/core/texto.py`, las perillas `CU4_HUERTAS_POR_TANDA` y
+`CU4_CULTIVOS_POR_HUERTA`, y el parámetro `especie` de la herramienta.
+
+- **El listado lo compone el código**, como el resumen del CU3 (ADR-0008).
+  Tres huertas por mensaje, cinco cultivos cada una, el resto en la tanda
+  siguiente. No llama a Gemini y no consulta la colección vectorial: lee
+  `cultivo`, que es la fuente de verdad (ADR-0004).
+- **La búsqueda por cultivo se separa como CU7**, con el parámetro
+  `especie` que rellena el agente **antes** de recuperar. Deducir la vía
+  después —mirando si la búsqueda encontró algo— era lo que hacía que
+  preguntar por un cultivo que nadie tiene se contestara con un listado de
+  huertas que no lo tienen. Ese fallo ya existía.
+- **El respaldo por listado del ADR-0011 desaparece.** No se sustituye:
+  el listado dejó de ser el respaldo de la búsqueda para ser un caso de uso
+  con su propio camino.
+- **El CU7 comprueba la especie después de recuperar.** El umbral no basta
+  —el propio ADR-0011 midió que con 5–7 huertas y top-k=4 casi cualquier
+  consulta recupera medio corpus—, y sin la comprobación se le atribuirían
+  cultivos a quien no los sembró.
+- **`normalizar` se sacó a `app/core/texto.py`.** Había dos copias
+  idénticas, en `consentimiento.py` y `onboarding.py`, y esta era la
+  tercera (CLAUDE.md §12).
+
+**Migración `009` aplicada el 08/09/2026, y probado contra la base real**
+con las cuatro huertas que hay: la paginación recorre 3 + 1 y a la tercera
+pregunta da la vuelta avisando; el CU7 encuentra la fresa y descarta la
+maracuyá; `spike_despachador` pasa sus **26 comprobaciones**. El mensaje
+sale en siete renglones y ~300 caracteres, con el tope de Meta en 1024.
+
+**La medición que justifica el filtro por especie:** «alguien siembra
+maracuyá?» recupera dos fragmentos con la mejor similitud en **0.6601**,
+por encima del umbral de 0.65, y **ninguna de esas dos huertas tiene
+maracuyá**. Sin la comprobación se le habrían atribuido a dos vecinas
+cultivos que no sembraron. El umbral no separa lo que parece que separa,
+que es la misma lección del ADR-0013 y del ADR-0011.
+
+**Lo que falta: probarlo desde un celular.** En concreto, si la cola «si
+quiere le cuento de ellas, dígame» se entiende como una invitación a pedir
+la tanda siguiente.
 
 ### Primera fuente oficial, ya verificada
 

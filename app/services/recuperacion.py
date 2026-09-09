@@ -39,7 +39,6 @@ from app.services.repositorio import (
     FragmentoOficial,
     buscar_fragmentos_comunitarios,
     buscar_fragmentos_oficiales,
-    listar_fragmentos_comunitarios_recientes,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,50 +128,42 @@ def componer_contexto_comunitario(fragmentos: list[FragmentoComunitario]) -> str
     )
 
 
-async def recuperar_comunidad(
+async def buscar_en_comunidad(
     pregunta: str,
     usuario_id: UUID | None = None,
 ) -> list[FragmentoComunitario]:
-    """Recupera lo que siembran **otras** huertas (CU4).
+    """Busca qué huertas ajenas tienen sembrado lo que ella preguntó (CU7).
 
-    `usuario_id` se excluye de los resultados: devolverle a la usuaria su
-    propia huerta como dato comunitario sería repetirle lo que ella misma
-    registró.
+    `usuario_id` se excluye de los resultados: devolverle su propia huerta
+    como dato comunitario sería repetirle lo que ella misma registró.
 
     Umbral propio, distinto del de la colección oficial (ADR-0011): estos
     fragmentos son listas de tres o cuatro palabras, no prosa de 400
     tokens, y sus similitudes viven en otro rango.
 
-    ## Dos etapas, y la segunda no es un parche
+    ## Ya no lleva respaldo por listado, y eso es el ADR-0021
 
-    Si la similitud no devuelve nada, se listan las huertas actualizadas
-    más recientemente. El motivo es que el CU4 recibe dos clases de
-    pregunta que no se resuelven igual:
+    Hasta el 08/09/2026 esta función hacía dos cosas: buscaba por similitud
+    y, si nada pasaba el umbral, devolvía las huertas actualizadas más
+    recientemente. Ese respaldo existía porque el CU4 recibía dos clases de
+    pregunta por el mismo camino y solo una era una búsqueda (ADR-0011).
 
-    - **"¿alguien más siembra tomate?"** es una búsqueda. La similitud la
-      resuelve bien y con precisión: en la medición, la huerta con fresas
-      salía a 0.819 y las demás por debajo de 0.653.
-    - **"¿qué están sembrando las otras huertas?"** es un listado. Y una
-      lista de especies —"cebolla larga, acelga"— se parece poco a esa
-      frase por mucho que sea la respuesta correcta. Medido: se queda en
-      0.63, por debajo del umbral, y el CU4 callaba teniendo tres huertas
-      que enseñar.
+    El respaldo tenía un modo de fallo que solo se ve cuando las dos clases
+    se separan: si ella pregunta por un cultivo que **nadie** tiene, la
+    similitud no devuelve nada, el respaldo se dispara y recibe un listado
+    de huertas que no tienen lo que preguntó. Con el listado ya bien
+    formateado eso queda peor, no mejor.
 
-    Bajar el umbral para que pasara la segunda estropearía la primera: con
-    0.60 entran las cuatro huertas cuando preguntan por fresas, y solo una
-    las tiene. Se conserva el umbral alto para lo específico y se cubre lo
-    general por listado.
-
-    **Lo que este respaldo NO hace es filtrar por intención.** Una pregunta
-    ajena al dominio que llegue hasta aquí recibirá el listado igual. No es
-    descuido: quien decide si esto es una consulta a la comunidad es el
-    function calling (Fase 2, §4), y mientras el agente no exista el CU4 no
-    está conectado al despachador.
+    Hoy el listado es su propio caso de uso, lo compone el código y no pasa
+    por aquí. Lo que queda aquí es solo la búsqueda, y cuando no encuentra
+    **devuelve la lista vacía**, que es una respuesta y no un fallo: quien
+    llama tiene que decir que ninguna huerta tiene eso anotado.
 
     Advertencia que vale también para el documento de grado: **aquí el
-    umbral no hace el trabajo**. Con 5 a 7 huertas y top-k=4, casi
-    cualquier consulta legítima recupera medio corpus. Lo que aporta rigor
-    es el orden y la atribución, no el filtro.
+    umbral no hace todo el trabajo**. Con 5 a 7 huertas y top-k=4, casi
+    cualquier consulta recupera medio corpus, y por eso `comunidad.py`
+    filtra después por la especie. Lo que aporta rigor es esa comprobación
+    y la atribución, no el filtro por similitud.
     """
     vector = await vectorizar_consulta(pregunta)
 
@@ -183,25 +174,11 @@ async def recuperar_comunidad(
         excluir_usuario=usuario_id,
     )
 
-    if fragmentos:
-        logger.info(
-            "Recuperación comunitaria | fragmentos=%d | umbral=%.2f | mejor=%.4f",
-            len(fragmentos),
-            settings.RAG_UMBRAL_COMUNITARIO,
-            fragmentos[0].similitud,
-        )
-        return fragmentos
-
-    fragmentos = await listar_fragmentos_comunitarios_recientes(
-        top_k=settings.RAG_TOP_K,
-        excluir_usuario=usuario_id,
-    )
-
     logger.info(
-        "Recuperación comunitaria por listado | fragmentos=%d | "
-        "ninguna superó el umbral de %.2f",
+        "Búsqueda comunitaria | fragmentos=%d | umbral=%.2f | mejor=%s",
         len(fragmentos),
         settings.RAG_UMBRAL_COMUNITARIO,
+        f"{fragmentos[0].similitud:.4f}" if fragmentos else "-",
     )
 
     return fragmentos

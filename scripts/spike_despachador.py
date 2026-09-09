@@ -168,7 +168,10 @@ async def main() -> None:
             usuario_id=vecina.id,
             barrio_codigo="el_regalo",
             nombre_huerta="La Esperanza",
-            cultivos=[("fresa", None, True), ("uchuva", None, True)],
+            # Solo los nombres: la fecha de siembra salió de `cultivo` en
+            # la migración 008 (ADR-0018), y este spike se quedó llamando
+            # con el formato viejo hasta el 08/09/2026.
+            especies=["fresa", "uchuva"],
         )
         await regenerar_fragmento(huerta_id)
         print("Preparado: huerta vecina con fresa y uchuva en El Regalo.")
@@ -355,9 +358,18 @@ async def main() -> None:
         texto = _todo(enviados)
 
         _comprobar(
-            "El Regalo" in texto or textos.COMUNIDAD_SIN_DATOS in texto,
+            "regalo" in texto.lower() or textos.COMUNIDAD_SIN_HUERTAS in texto,
             "el agente la enrutó al CU4",
             "antes de 4c esta rama no existía",
+        )
+        # Desde el ADR-0021 el listado lo compone el código, así que su
+        # forma es comprobable y no depende de lo que redacte el modelo.
+        # Si hay huertas que enseñar, el encabezado está.
+        _comprobar(
+            textos.COMUNIDAD_SIN_HUERTAS in texto
+            or textos.COMUNIDAD_LISTADO_ENCABEZADO in texto,
+            "el listado del CU4 lo compuso el código",
+            "encabezado fijo, no un párrafo del modelo",
         )
         # El 15/08/2026 el modelo escribió "la huerta COMUNITARIO – La
         # Esperanza". La etiqueta es andamiaje del prompt y para ella no

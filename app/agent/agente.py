@@ -125,10 +125,44 @@ _HERRAMIENTAS = types.Tool(
             name=_COMUNIDAD,
             description=(
                 "Cuenta qué siembran OTRAS huertas de la zona. Solo para saber "
-                "qué hacen los demás, no para resolver dudas de cultivo."
+                "qué hacen los demás, no para resolver dudas de cultivo. "
+                "Sirve para dos cosas: enseñarle la lista de las otras huertas "
+                "y sus cultivos, y buscar si alguna tiene sembrada una planta "
+                "en concreto. Úsela también cuando pida ver más huertas."
             ),
-            parameters=_esquema_pregunta(
-                "La pregunta con las palabras de la usuaria, sin el saludo."
+            # `especie` es la bandera que separa el CU4 del CU7 (ADR-0021).
+            # Tiene que decidirse ANTES de recuperar: si se dedujera después,
+            # mirando si la búsqueda encontró algo, una pregunta por un
+            # cultivo que nadie tiene acabaría contestada con un listado de
+            # huertas que no lo tienen.
+            #
+            # El backend la usa solo para elegir la vía y filtrar el
+            # resultado. La búsqueda por similitud sigue corriendo sobre la
+            # pregunta completa, que es la formulación sobre la que existe la
+            # calibración del umbral (ADR-0011) y la que no sufre el recorte
+            # que midió el ADR-0013.
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "pregunta": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "La pregunta con las palabras de la usuaria, sin "
+                            "el saludo."
+                        ),
+                    ),
+                    "especie": types.Schema(
+                        type=types.Type.STRING,
+                        description=(
+                            "SOLO si preguntó por una planta concreta: el "
+                            "nombre de esa planta tal como ella lo escribió, "
+                            "sin recortarlo ('cebolla larga', no 'cebolla'). "
+                            "Déjelo vacío si preguntó en general qué siembran "
+                            "las otras huertas o si pidió ver más."
+                        ),
+                    ),
+                },
+                required=["pregunta"],
             ),
         ),
         types.FunctionDeclaration(
@@ -259,14 +293,27 @@ async def _ejecutar(
 
     if nombre == _COMUNIDAD:
         pregunta = _pregunta_de(llamada, mensaje)
+
+        # Vacío o ausente significa "el listado" (ADR-0021). Se normaliza
+        # aquí y no en el servicio para que este sea el único sitio que
+        # sabe qué forma tienen los argumentos del modelo.
+        especie = str((llamada.args or {}).get("especie") or "").strip()
+
+        # Sin la especie en la bitácora, que es dato agronómico de una
+        # conversación (CLAUDE.md §11): interesa qué vía se tomó, no qué
+        # planta preguntó. En la Fase 7 dice cuánto se usa cada caso de uso
+        # y si el modelo rellena la bandera cuando toca.
         logger.info(
-            "Herramienta %s | literal=%s | usuario_id=%s",
+            "Herramienta %s | literal=%s | via=%s | usuario_id=%s",
             nombre,
             pregunta == mensaje,
+            "CU7" if especie else "CU4",
             usuario_id,
         )
         await responder(
-            numero, usuario_id, await consultar_comunidad(pregunta, usuario_id)
+            numero,
+            usuario_id,
+            await consultar_comunidad(pregunta, usuario_id, especie or None),
         )
         return True
 

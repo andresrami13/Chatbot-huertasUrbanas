@@ -155,6 +155,23 @@ encuesta (Fase 1, n=11). No las revises ni las "mejores" por tu cuenta.
 | CU3 | Registrar información de la huerta | Consentimiento (CU1) |
 | CU4 | Consultar qué siembran otras huertas | Consentimiento (CU1) + datos existentes |
 | CU5 | Pedir ayuda | Ninguna (contenido estático) |
+| CU6 | Onboarding | Consentimiento (CU1) |
+| CU7 | Buscar un cultivo concreto en otras huertas | Consentimiento (CU1) + datos existentes |
+
+**Son siete, no cinco, y dos son posteriores a la Fase 2.** El **CU6
+(Onboarding)** lo especifica el documento de grado en su §3.6; aquí es lo
+que el ADR-0016 llama «la segunda entrada del CU3». El **CU7** se separó
+del CU4 el 08/09/2026 (ADR-0021).
+
+**El CU4 y el CU7 son la misma herramienta y caminos distintos.** El CU4 es
+un **listado** —«¿qué están sembrando las otras huertas?»— que compone el
+**código**, sale de tres en tres y no consulta la colección vectorial. El
+CU7 es una **búsqueda** —«¿alguien más siembra tomate?»— que sí usa la
+similitud, comprueba después que la especie esté de verdad en la huerta y
+redacta con el modelo. Los separa el parámetro `especie`, que rellena el
+agente **antes** de recuperar: deducirlo después —mirando si la búsqueda
+encontró algo— hacía que preguntar por un cultivo que nadie tiene se
+respondiera con un listado de huertas que no lo tienen.
 
 **El CU3 tiene dos entradas desde el ADR-0016.** Al aceptar el
 consentimiento arranca un **onboarding de tres preguntas cerradas** —nombre
@@ -268,6 +285,7 @@ llevan el ADR que lo justifica.
 | Recuperación oficial | Umbral de similitud (coseno) | **0.66** desde el 19/08/2026; fue 0.7 y luego 0.68 (ADR-0010) |
 | Recuperación comunitaria | Umbral propio | **0.65** (ADR-0011) |
 | Recuperación | top-k | 4 por colección |
+| Listado del CU4 | Huertas por tanda / cultivos por huerta | **3 / 5** (ADR-0021). Perillas propias: **no** reusan el top-k, que gobierna el contexto del CU2 |
 | Memoria | Ventana de mensajes | 10 mensajes, no turnos; el último es el de ella |
 | Ingesta | Fragmento / solape | 300–500 / 50 tokens, midiendo tokens de verdad (ADR-0009). La ratio car./token es **por documento** y vive en el catálogo (ADR-0014) |
 
@@ -391,18 +409,17 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - **Número de prueba:** admite un máximo de **5 destinatarios verificados**.
   Está previsto migrar a un número propio con SIM nueva para la Fase 8. El
   `PHONE_NUMBER_ID` cambia al migrar — **nunca lo escribas en el código**.
-- **Supabase:** operativo. PostgreSQL 17.6, migraciones aplicadas hasta la
-  `007`, RLS activo sin políticas. Conexión por **session pooler, puerto
-  5432**. **765 fragmentos oficiales en nueve fuentes** desde el
-  19/08/2026. Escribir ahí cambia lo que responde el bot **en el acto**,
-  con o sin despliegue: Railway lee esta misma base.
-- **La migración `008` está POR CONFIRMAR.** Este archivo la daba por
-  aplicada y `docs/ESTADO.md` la da por escrita y sin correr; no se ha
-  podido comprobar contra la base y **el autor no lo recuerda**. Resuélvelo
-  mirando si `cultivo` conserva `fecha_siembra_aprox` y `fecha_imprecisa`
-  antes de citar cualquiera de las dos versiones. El orden correcto, si
-  sigue pendiente, es el del ADR-0018: primero el código que deja de
-  escribir esas columnas —ya desplegado— y solo después borrarlas.
+- **Supabase:** operativo. PostgreSQL 17.6, RLS activo sin políticas.
+  Conexión por **session pooler, puerto 5432**. **765 fragmentos oficiales
+  en nueve fuentes** desde el 19/08/2026. Escribir ahí cambia lo que
+  responde el bot **en el acto**, con o sin despliegue: Railway lee esta
+  misma base. Al 08/09/2026 hay **4 usuarias, 4 huertas con 13 cultivos** y
+  sus fragmentos comunitarios.
+- **Migraciones aplicadas: hasta la `008`.** Comprobado el 08/09/2026
+  contra `information_schema` —la columna `fecha_siembra_aprox` ya no
+  existe—, lo que cierra la duda que este archivo arrastraba. **La `009`
+  está sin correr**, y el listado del CU4 la necesita en cuanto haya más
+  huertas que `CU4_HUERTAS_POR_TANDA`.
 - **Railway:** desplegado y con el servicio en marcha. `/health` dice qué
   commit está corriendo, así que confirmar un despliegue no exige mandar un
   WhatsApp. Corre `gemini-3.5-flash-lite`, que no es el defecto del
@@ -429,7 +446,7 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - Los prompts viven en `app/agent/prompts/` como archivos versionados,
   conforme a la práctica de versionamiento declarada en la metodología.
   **Los seis vigentes son** `agente_v1.md`, `extraccion_v3.md`,
-  `barrio_v1.md`, `redaccion_rag_v1.md`, `redaccion_comunidad_v1.md` y
+  `barrio_v1.md`, `redaccion_rag_v1.md`, `redaccion_comunidad_v2.md` y
   `respuesta_general_v1.md`. `extraccion_v1.md` y `extraccion_v2.md` siguen
   en el repositorio a propósito, como historial citable, pero **no los carga
   nadie**: no los edites creyendo que están en uso.

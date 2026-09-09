@@ -214,18 +214,68 @@ Antes de tomar cualquier planta como remedio, consúltelo con su médico o en el
 
 
 # --- CU4, qué siembran otras huertas -----------------------------------
+#
+# **El listado lo compone el código, no el modelo** (ADR-0021). Aquí están
+# sus piezas y en `comunidad.py` el armado.
+#
+# El motivo es el mismo por el que el resumen del CU3 lo compone el código
+# (ADR-0008): un listado es un reporte de datos, y lo que el modelo puede
+# hacer con él es restarle. A 0.4 se le caían huertas para caber en las 70
+# palabras que le pedía el prompt, y la atribución «de qué huerta y de qué
+# barrio» —imprescindible, porque el barrio no filtra (ADR-0001)— quedaba
+# encomendada a una regla de prompt que ya está medido que se incumple.
+# Compuesto por código, ninguna de las dos cosas puede pasar.
 
-# No hay otras huertas registradas todavía, o ninguna viene a cuento. No se
-# distinguen los dos casos: a la usuaria le da igual el motivo, y en la
-# Fase 8 el primero será el habitual durante las primeras sesiones.
+# Ninguna otra huerta tiene nada sembrado todavía. En la Fase 8 será lo
+# habitual durante las primeras sesiones.
 #
 # Se aprovecha para invitarla a registrar la suya, que es lo que hace
 # crecer el dato comunitario. Sin presionar: se le cuenta para qué sirve.
-COMUNIDAD_SIN_DATOS = """🌱 Todavía no tengo qué contarle de otras huertas por esa pregunta.
+COMUNIDAD_SIN_HUERTAS = """🌱 Todavía no tengo otras huertas que contarle.
 
 Esto se va llenando a medida que cada quien cuenta lo suyo. Si me cuenta qué tiene sembrado, las demás también pueden verlo.
 
 Mientras tanto, pregúnteme por su huerta y le ayudo con lo que necesite."""
+
+
+# Encabezado del listado. No lleva número: cuántas hay se dice en la cola,
+# y decirlo dos veces en un mensaje de siete renglones sobra.
+COMUNIDAD_LISTADO_ENCABEZADO = "🌱 Esto es lo que tienen sembrado otras huertas:"
+
+# Un renglón por huerta. `{huerta}` ya viene resuelto —con nombre o como
+# «Una huerta»—, porque el nombre es opcional en el esquema.
+COMUNIDAD_LISTADO_RENGLON = "• {huerta} ({barrio}): {cultivos}"
+
+# Una huerta sin nombre se identifica por su barrio, que es lo único que se
+# puede decir de ella sin inventar. Mismo criterio que la atribución de
+# `recuperacion._etiquetar_comunitario`.
+COMUNIDAD_HUERTA_SIN_NOMBRE = "Una huerta"
+
+# La huerta tiene más cultivos de los que caben en el renglón.
+COMUNIDAD_MAS_CULTIVOS = "y {faltan} más"
+
+# Quedan huertas por enseñar. Es lo que le dice que puede pedir la tanda
+# siguiente: sin esta línea, el recorrido de `listado_comunitario_pendiente`
+# existiría y ella no tendría cómo saberlo.
+#
+# Dos redacciones y no un "huerta(s)": el paréntesis es de formulario, y
+# este mensaje lo lee una señora en el celular (CLAUDE.md §11).
+COMUNIDAD_LISTADO_COLA = """Hay {faltan} huertas más. Si quiere le cuento de ellas, dígame."""
+
+COMUNIDAD_LISTADO_COLA_UNA = """Hay una huerta más. Si quiere le cuento, dígame."""
+
+# Ya se le enseñaron todas y vuelve a preguntar. Se le repite desde el
+# principio, y se le avisa: recibir otra vez las tres primeras sin
+# explicación parecería que el bot se trabó.
+COMUNIDAD_LISTADO_REINICIO = """Ya le conté de todas las huertas que tengo. Le repito desde el principio:"""
+
+
+# Ella preguntó por un cultivo concreto y ninguna huerta lo tiene anotado
+# (CU7). Es distinto de no tener huertas, y hasta el ADR-0021 los dos casos
+# se respondían con el mismo texto vago porque el código no los distinguía.
+COMUNIDAD_SIN_ESE_CULTIVO = """🌱 De las huertas que conozco, ninguna tiene {cultivo} anotado.
+
+Si quiere le cuento qué tienen sembrado, o le ayudo con lo suyo."""
 
 
 COMUNIDAD_NO_DISPONIBLE = """Perdone, en este momento no pude consultar lo de las otras huertas.

@@ -23,6 +23,21 @@ huertas o su barrio: qué siembran los demás, si alguien más tiene tal
 cultivo, qué se está dando por la zona. La misma regla con `pregunta`:
 sus palabras.
 
+Esta función hace dos cosas distintas y quien las separa es usted, con
+`especie`:
+
+- **Déjela vacía** si preguntó en general: "qué siembran las otras
+  huertas", "qué hay por mi barrio". Recibe la lista de las huertas con
+  sus cultivos.
+- **Déjela vacía también cuando pida ver más**: "y las otras?",
+  "cuénteme más", "quiero ver las demás". La lista sale de tres en tres y
+  el sistema lleva la cuenta de por dónde va, así que llamar otra vez le
+  trae las siguientes.
+- **Rellénela** solo si preguntó por una planta concreta: "¿alguien más
+  siembra tomate?", "¿quién tiene fresas?". Ponga el nombre de la planta
+  **tal como ella lo escribió y sin recortarlo**: si dijo "cebolla larga",
+  ponga "cebolla larga", no "cebolla".
+
 Si la duda es sobre cómo cuidar algo, es `consultar_orientacion`, aunque
 mencione el barrio. `consultar_comunidad` es solo para saber qué hacen
 otras personas.

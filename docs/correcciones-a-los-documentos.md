@@ -8,8 +8,8 @@ Es el consolidado que antes vivía en `docs/adr/README.md`. Se movió aquí para
 que haya un solo sitio que mantener, y porque incorpora además lo que se
 decidió después de escribir aquel listado.
 
-- **Corte:** 2026-08-23
-- **Estado del código:** commit `d3c7c01`
+- **Corte:** 2026-09-08
+- **Estado del código:** commit `4db1c13` más el CU4/CU7 sin commitear
 - **Regla:** cuando un ADR corrige un documento de fase, **prevalece el ADR**.
 
 Los valores de la tabla de parámetros se leyeron del código, no de la
@@ -25,7 +25,8 @@ documentación.
 | Modelo generativo | `gemini-3.5-flash-lite` | No existía al escribir la Fase 4. **Desalineado:** `config.py` declara `gemini-3.6-flash` y Railway corre el *lite* |
 | Umbral oficial (coseno) | **0.66** | La Fase 4 §7 dice 0.7. Bajó a 0.68 (ADR-0010) y a 0.66 el 19/08/2026 |
 | Umbral comunitario | 0.65 | La Fase 4 no contempla un umbral propio (ADR-0011) |
-| top-k por colección | 4 | Conforme |
+| top-k por colección | 4 | Conforme. Gobierna el CU2 y el CU7; el listado del CU4 no pasa por él |
+| Listado del CU4 | 3 huertas por tanda, 5 cultivos cada una | La Fase 2 no dice cuántas se enseñan de una vez (ADR-0021) |
 | Ventana de memoria | 10 mensajes | La Fase 4 §6 no precisa si son mensajes o turnos (ADR-0012) |
 | Temperatura · agente | 0.7 | Conforme |
 | Temperatura · extracción | 0.1 | Conforme. Única no calibrable |
@@ -102,6 +103,34 @@ prever porque solo aparecen al ponerlo a hablar con una persona.
   conversacional atiende después solo los cultivos. De una respuesta parcial
   a tres preguntas juntas no salía una extracción buena.
 - **Justifica:** [ADR-0016](adr/0016-onboarding-de-preguntas-cerradas.md)
+
+### §3 — los casos de uso son siete, no cinco
+
+- **Dice:** cinco casos de uso, CU1 a CU5.
+- **Hace:** son **siete**. El **CU6 (Onboarding)** ya está especificado en
+  el documento de grado §3.6, y el CU1 remite a él en su curso normal; aquí
+  es lo que el ADR-0016 llamaba «la segunda entrada del CU3». El **CU7
+  (buscar un cultivo concreto en otras huertas)** se separó del CU4 el
+  08/09/2026, porque tienen cursos de excepción distintos que el código no
+  podía distinguir: «no hay otras huertas» y «ninguna tiene tomate» se
+  respondían con el mismo texto vago.
+- **Justifica:** [ADR-0016](adr/0016-onboarding-de-preguntas-cerradas.md),
+  [ADR-0021](adr/0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md)
+
+### CU4 — la respuesta es un listado que compone el código
+
+- **Dice:** el CU4 recupera datos comunitarios y redacta una respuesta.
+- **Hace:** la pregunta general **no pasa por el modelo ni por la
+  colección vectorial**. El listado lo compone el código leyendo `cultivo`,
+  sale de **tres huertas por mensaje** con hasta cinco cultivos cada una, y
+  el recorrido espera en `listado_comunitario_pendiente` para que la
+  siguiente pregunta traiga las siguientes tres.
+  El motivo es el del resumen del CU3 (ADR-0008): un listado es un reporte
+  de datos y el modelo solo puede restarle. Con el prompt pidiéndole 70
+  palabras, se le caían huertas —respondía hablando de una sola teniendo
+  cuatro— y la atribución obligatoria de huerta y barrio quedaba
+  encomendada a una regla de prompt que a 0.4 se incumple.
+- **Justifica:** [ADR-0021](adr/0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md)
 
 ### CU3, confirmación — sin fecha
 
@@ -244,7 +273,9 @@ números se fijaron antes de que existiera el corpus real**.
 - **Hace:** la colección comunitaria lleva **umbral propio, 0.65**. Sus
   fragmentos son listas de tres o cuatro palabras, no prosa de 400 tokens,
   así que sus similitudes viven en otro rango.
-- **Justifica:** [ADR-0011](adr/0011-fragmento-comunitario-solo-especies.md)
+- **Justifica:** [ADR-0011](adr/0011-fragmento-comunitario-solo-especies.md).
+  Desde el ADR-0021 ese umbral gobierna **solo el CU7**: la pregunta
+  general del CU4 no consulta la colección vectorial.
 
 ### §7 — el agente puede recortar la consulta
 

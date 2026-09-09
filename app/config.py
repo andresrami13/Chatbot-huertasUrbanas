@@ -118,6 +118,27 @@ class Settings(BaseSettings):
     # fuera—.
     RAG_UMBRAL_COMUNITARIO: float = 0.65
 
+    # --- Presentación del listado del CU4 (ADR-0021) ----------------------
+    #
+    # Cuántas huertas por mensaje y cuántos cultivos por huerta. Son
+    # decisiones de PRESENTACIÓN, no de recuperación, y por eso no reusan
+    # `RAG_TOP_K`: aquella gobierna cuántos fragmentos entran al prompt del
+    # CU2, y subirla para enseñar más huertas le cambiaría al CU2 el
+    # tamaño de su contexto en mitad de una calibración que sigue abierta
+    # (CLAUDE.md §8). Una perilla, una cosa.
+    #
+    # Tres y cinco los fijó el autor el 08/09/2026. Tres deja el mensaje
+    # en siete renglones contando encabezado y cola, dentro de los 6-8 que
+    # manda el CLAUDE.md §11; el resto de huertas se ofrecen en la tanda
+    # siguiente, que es lo que sostiene la tabla `listado_comunitario_
+    # pendiente`. Cinco cultivos evitan que una huerta con quince especies
+    # se lleve el mensaje entero.
+    #
+    # Calibrables en la Fase 7 desde Railway, como los umbrales: cambiarlos
+    # no invalida nada guardado, solo cuánto se enseña de una vez.
+    CU4_HUERTAS_POR_TANDA: int = 3
+    CU4_CULTIVOS_POR_HUERTA: int = 5
+
     # --- Respaldo del CU2 con conocimiento del modelo ---------------------
     #
     # Cuando ninguna fuente oficial supera el umbral, el CU2 responde con el
@@ -274,6 +295,19 @@ class Settings(BaseSettings):
     def _validar_top_k(cls, valor: int) -> int:
         if valor < 1:
             raise ValueError(f"RAG_TOP_K debe ser al menos 1; llegó {valor}.")
+        return valor
+
+    @field_validator("CU4_HUERTAS_POR_TANDA", "CU4_CULTIVOS_POR_HUERTA")
+    @classmethod
+    def _validar_tamano_listado(cls, valor: int) -> int:
+        # Cero huertas por tanda daría un listado vacío con su cola
+        # diciendo cuántas hay, y cero cultivos, huertas sin nada al lado.
+        # Las dos cosas fallarían en silencio, que es lo que aquí se evita.
+        if valor < 1:
+            raise ValueError(
+                f"Los tamaños del listado del CU4 deben ser al menos 1; "
+                f"llegó {valor}."
+            )
         return valor
 
     @field_validator("MEMORIA_VENTANA_MENSAJES")

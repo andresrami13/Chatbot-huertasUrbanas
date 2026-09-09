@@ -406,6 +406,67 @@ async def limpiar_onboardings() -> int:
     return borrados
 
 
+# --- Por dónde va el listado del CU4 (ADR-0021) -----------------------
+# Caduca a la hora, no a las 24 del borrador y el onboarding. Aquellos son
+# tareas a medio terminar que conviene que sobrevivan a que ella suelte el
+# teléfono; esto es la posición de una conversación en curso. Dos días
+# después, "cuénteme de las otras huertas" quiere decir empezar de nuevo.
+_CADUCIDAD_LISTADO_HORAS = 1
+
+
+async def obtener_desplazamiento_listado(usuario_id: UUID) -> int:
+    """Cuántas huertas ya se le enseñaron, o 0 si no hay recorrido vivo.
+
+    Filtra la caducidad en la propia consulta, igual que el borrador y el
+    onboarding: un recorrido vencido es como si no existiera, y así no hay
+    que acordarse de comprobarlo en cada sitio que lo lea.
+    """
+    desplazamiento = await obtener_pool().fetchval(
+        """
+        select desplazamiento
+          from listado_comunitario_pendiente
+         where usuario_id = $1
+           and actualizado_en > now() - make_interval(hours => $2)
+        """,
+        usuario_id,
+        _CADUCIDAD_LISTADO_HORAS,
+    )
+
+    return desplazamiento or 0
+
+
+async def guardar_desplazamiento_listado(usuario_id: UUID, desplazamiento: int) -> None:
+    """Deja anotado por dónde quedó el recorrido."""
+    await obtener_pool().execute(
+        """
+        insert into listado_comunitario_pendiente (usuario_id, desplazamiento)
+             values ($1, $2)
+        on conflict (usuario_id) do update
+                set desplazamiento = excluded.desplazamiento,
+                    actualizado_en = now()
+        """,
+        usuario_id,
+        desplazamiento,
+    )
+
+
+async def limpiar_listados_comunitarios() -> int:
+    """Borra los recorridos caducados. Se invoca al arrancar."""
+    resultado = await obtener_pool().execute(
+        """
+        delete from listado_comunitario_pendiente
+         where actualizado_en < now() - make_interval(hours => $1)
+        """,
+        _CADUCIDAD_LISTADO_HORAS,
+    )
+
+    borrados = int(resultado.rsplit(" ", 1)[-1]) if resultado else 0
+    if borrados:
+        logger.info("Recorridos del listado caducados borrados=%d", borrados)
+
+    return borrados
+
+
 # --- Huerta y cultivos (CU3) ------------------------------------------
 
 
@@ -596,10 +657,10 @@ async def agregar_cultivos(
                     especie,
                 )
 
-            # La huerta cambió aunque su fila no: el CU4 ordena por esta
-            # marca (`listar_fragmentos_comunitarios_recientes`), y sin
-            # tocarla una huerta que acaba de sumar cultivos se hundiría en
-            # el listado.
+            # La huerta cambió aunque su fila no: el listado del CU4 ordena
+            # por esta marca (`listar_huertas_con_cultivos`), y sin tocarla
+            # una huerta que acaba de sumar cultivos se hundiría en el
+            # listado en vez de encabezarlo.
             await conexion.execute(
                 "update huerta set actualizado_en = now() where id = $1",
                 huerta_id,
@@ -961,49 +1022,117 @@ async def buscar_fragmentos_comunitarios(
     ]
 
 
-async def listar_fragmentos_comunitarios_recientes(
-    top_k: int,
+# --- El listado de otras huertas del CU4 (ADR-0021) -------------------
+#
+# Aquí NO se busca por similitud, y por eso no hay vectores en esta
+# sección. "Qué están sembrando las otras huertas" no es una búsqueda sino
+# un listado, y el ADR-0011 ya lo había concluido: una lista de especies
+# se parece poco a esa frase por muy correcta que sea la respuesta.
+#
+# Lo que aquel ADR resolvió con un respaldo —recuperar por similitud y, si
+# no daba nada, listar los fragmentos recientes— se resuelve ahora leyendo
+# `cultivo` directamente, que es la fuente de verdad del dato agronómico
+# (ADR-0004). El fragmento comunitario es un derivado, y listar desde él
+# obligaba a deshacer con un `split` el texto que `componer_texto` acababa
+# de armar. La colección vectorial se queda para lo que sí es una
+# búsqueda: el CU7.
+
+
+@dataclass(frozen=True)
+class HuertaDeLaComunidad:
+    """Una huerta ajena y lo que tiene sembrado, lista para enseñar.
+
+    Solo columnas compartibles, que es la capa 4 del modelo de seguridad
+    (Fase 3, §5). Ni teléfono, ni nombre de la usuaria, ni su
+    identificador: quien lee esto es otra vecina.
+
+    Las especies vienen completas; recortarlas a cuántas caben en el
+    mensaje es cosa de quien redacta, no de quien consulta.
+    """
+
+    nombre_huerta: str | None
+    barrio: str
+    cultivos: list[str]
+
+
+async def listar_huertas_con_cultivos(
+    limite: int,
+    desde: int = 0,
     excluir_usuario: UUID | None = None,
-) -> list[FragmentoComunitario]:
-    """Las huertas actualizadas más recientemente, sin buscar por similitud.
+) -> list[HuertaDeLaComunidad]:
+    """Las huertas ajenas que tienen algo sembrado, de las últimas hacia atrás.
 
-    Es el respaldo del CU4 para la pregunta general —"qué están sembrando
-    las otras huertas"—, que **no es una búsqueda sino un listado**: una
-    lista de especies se parece poco a esa frase, por muy pertinente que
-    sea la respuesta. Ver `recuperacion.recuperar_comunidad`.
+    `desde` es el desplazamiento que sostiene la paginación del CU4: se
+    guarda en `listado_comunitario_pendiente` para que la tanda siguiente
+    continúe donde quedó la anterior (ADR-0021).
 
-    Se ordena por fecha de actualización y no al azar para que dos
-    preguntas seguidas den la misma respuesta, y para que lo que se muestre
-    sea lo último que alguien contó.
+    Se ordena por `actualizado_en` de la huerta —"las últimas que fueron
+    guardadas"— y se desempata por `id`, que no cambia. Sin el desempate,
+    dos huertas guardadas en el mismo instante podrían salir en distinto
+    orden en dos consultas y ella vería una repetida y otra nunca.
+
+    **Una huerta sin cultivos no aparece.** Desde el ADR-0016 es lo normal
+    —existir en `huerta` significa "completó el onboarding"—, y enseñarla
+    con la lista vacía no le contaría nada a nadie.
     """
     filas = await obtener_pool().fetch(
         """
-        select f.contenido,
-               h.nombre_huerta,
-               b.nombre as barrio
-          from fragmento_comunitario f
-          join huerta h on h.id = f.huerta_id
+        select h.nombre_huerta,
+               b.nombre as barrio,
+               c.especies
+          from huerta h
           join barrio b on b.id = h.barrio_id
-         where ($2::uuid is null or h.usuario_id <> $2)
-         order by f.actualizado_en desc
-         limit $1
+          join lateral (
+                select array_agg(especie order by orden) as especies
+                  from (
+                        select distinct on (lower(especie))
+                               especie, creado_en as orden
+                          from cultivo
+                         where huerta_id = h.id
+                         order by lower(especie), creado_en
+                       ) unicas
+               ) c on true
+         where c.especies is not null
+           and ($3::uuid is null or h.usuario_id <> $3)
+         order by h.actualizado_en desc, h.id
+         limit $1 offset $2
         """,
-        top_k,
+        limite,
+        desde,
         excluir_usuario,
     )
 
     return [
-        FragmentoComunitario(
-            contenido=fila["contenido"],
-            # No hay similitud que informar: no se buscó por parecido.
-            # Ponerle un número inventado haría que la bitácora de
-            # calibración mezclara medidas con relleno.
-            similitud=float("nan"),
+        HuertaDeLaComunidad(
             nombre_huerta=fila["nombre_huerta"],
             barrio=fila["barrio"],
+            cultivos=list(fila["especies"]),
         )
         for fila in filas
     ]
+
+
+async def contar_huertas_con_cultivos(excluir_usuario: UUID | None = None) -> int:
+    """Cuántas huertas ajenas tienen algo sembrado.
+
+    Es el total que la cola del listado necesita para decirle cuántas le
+    faltan por ver, y el que distingue los dos silencios del CU7: que no
+    haya ninguna otra huerta no es lo mismo que que ninguna tenga lo que
+    ella preguntó (ADR-0021).
+
+    Cuenta con el mismo criterio que `listar_huertas_con_cultivos`, y eso
+    hay que mantenerlo a la par: si una contara huertas sin cultivos y la
+    otra no, la cola prometería tandas que después salen vacías.
+    """
+    return await obtener_pool().fetchval(
+        """
+        select count(*)
+          from huerta h
+         where ($1::uuid is null or h.usuario_id <> $1)
+           and exists (select 1 from cultivo c where c.huerta_id = h.id)
+        """,
+        excluir_usuario,
+    )
 
 
 async def listar_huertas_para_regenerar() -> list[UUID]:

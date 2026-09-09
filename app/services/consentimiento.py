@@ -11,9 +11,9 @@ ADR-0003).
 """
 
 import logging
-import unicodedata
 
 from app import textos
+from app.core.texto import normalizar
 from app.services.repositorio import (
     Usuaria,
     buscar_usuaria,
@@ -44,18 +44,6 @@ _PETICIONES_AYUDA = {
 }
 
 
-def _normalizar(texto: str) -> str:
-    """Minúsculas, sin tildes y sin signos, para comparar."""
-    sin_tildes = "".join(
-        c
-        for c in unicodedata.normalize("NFD", texto.lower())
-        if unicodedata.category(c) != "Mn"
-    )
-    return " ".join(
-        "".join(c for c in sin_tildes if c.isalnum() or c.isspace()).split()
-    )
-
-
 def es_saludo_o_ayuda(texto: str | None) -> bool:
     """Indica si el mensaje es un saludo o una petición de ayuda.
 
@@ -67,7 +55,7 @@ def es_saludo_o_ayuda(texto: str | None) -> bool:
     if not texto:
         return False
 
-    normalizado = _normalizar(texto)
+    normalizado = normalizar(texto)
     if not normalizado or len(normalizado.split()) > 4:
         return False
 

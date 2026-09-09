@@ -14,8 +14,30 @@ En el editor SQL de Supabase, **en este orden**:
 | [`003_rls.sql`](003_rls.sql) | Activación de RLS y retirada de privilegios públicos |
 | [`004_idempotencia.sql`](004_idempotencia.sql) | Tabla de idempotencia del webhook ([ADR-0005](../docs/adr/0005-procesamiento-asincrono-e-idempotencia.md)) |
 | [`005_registro_pendiente.sql`](005_registro_pendiente.sql) | Borrador del CU3 a la espera de confirmación ([ADR-0008](../docs/adr/0008-borrador-de-registro-y-una-huerta-por-usuaria.md)) |
+| [`006_memoria_mensaje.sql`](006_memoria_mensaje.sql) | La memoria de conversación, y el `wamid` fuera del esquema ([ADR-0012](../docs/adr/0012-memoria-de-conversacion.md)) |
+| [`007_onboarding_pendiente.sql`](007_onboarding_pendiente.sql) | Estado del onboarding de tres preguntas ([ADR-0016](../docs/adr/0016-onboarding-de-preguntas-cerradas.md)) |
+| [`008_sin_fecha_de_siembra.sql`](008_sin_fecha_de_siembra.sql) | Retira `fecha_siembra_aprox` y `fecha_imprecisa` de `cultivo` ([ADR-0018](../docs/adr/0018-sin-fecha-de-siembra.md)) |
+| [`009_listado_comunitario_pendiente.sql`](009_listado_comunitario_pendiente.sql) | Por dónde va el listado de otras huertas del CU4 ([ADR-0021](../docs/adr/0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md)) |
 
-Los cinco son idempotentes: reejecutarlos no duplica nada.
+Todas son idempotentes: reejecutarlas no duplica nada.
+
+**La `008` borra columnas y por eso tiene orden propio:** primero se
+despliega el código que deja de escribirlas y solo después se corre. Al
+revés, cada confirmación del CU3 falla mientras dure la ventana, porque
+Railway lee esta misma base. Ese código está en `main` desde el commit
+`d6cac90`; **compruebe con `/health` que es lo que Railway está corriendo
+antes de aplicarla**, que para eso ese endpoint dice el commit.
+
+**La `009` va después, y el CU4 la necesita.** Sin la tabla, una consulta
+a la comunidad falla en cuanto haya más huertas que `CU4_HUERTAS_POR_TANDA`
+— con tres o menos el recorrido ni se consulta, así que no se nota —. El
+fallo no rompe nada: queda en la bitácora y la usuaria recibe el texto de
+«no pude consultar lo de las otras huertas».
+
+El catálogo `003_catalogo_barrios_bosa.sql` **sustituye** al
+`002_catalogo_barrios.sql`, que sembraba los 7 barrios de la UPZ 84
+([ADR-0016](../docs/adr/0016-onboarding-de-preguntas-cerradas.md)). No se
+ejecutan los dos.
 
 ## Modelo
 

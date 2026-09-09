@@ -29,6 +29,8 @@ documento queda marcado como pendiente de corrección.
 | [0017](0017-aviso-de-espera.md) | El aviso de espera se envía y no se recuerda | Aceptada solo para la nota de voz; el del RAG se retiró el mismo día | Sin respaldo documental |
 | [0018](0018-sin-fecha-de-siembra.md) | La fecha de siembra sale del CU3 | Aceptada; extiende el [0011](0011-fragmento-comunitario-solo-especies.md) al CU3 | Fase 4 (Tabla 3) / Fase 3 |
 | [0019](0019-aviso-cuando-la-base-no-responde.md) | Cuando la base no responde, se reintenta y se le avisa a la usuaria | Aceptada; el freno de la decision 5 se retiro el mismo dia | Sin respaldo documental |
+| 0020 | *Reservado:* la limpieza de índices del corpus y el umbral a 0.66 (19/08/2026) | **Sin escribir**; hoy vive en los commits `00133ef`, `9102b50` y `d6cac90` | Fase 4 (§7) |
+| [0021](0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md) | El listado de la comunidad lo compone el código, y la búsqueda por cultivo se separa como CU7 | Aceptada; retira el respaldo por listado del [0011](0011-fragmento-comunitario-solo-especies.md) | Fase 2 (CU4) / ADR-0011 |
 
 ## Documentos pendientes de corrección
 
