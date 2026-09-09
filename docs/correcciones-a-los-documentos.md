@@ -22,7 +22,7 @@ documentación.
 | Parámetro | Valor | Frente al documento |
 |---|---|---|
 | Modelo de embeddings | `gemini-embedding-001`, 768 dim | La Fase 3 §3 y la Fase 4 §7 citan `text-embedding-004`, dado de baja. Truncado a 768 porque pgvector solo indexa hasta 2000 (ADR-0007). Fijo en código a propósito |
-| Modelo generativo | `gemini-3.5-flash-lite` | No existía al escribir la Fase 4. **Desalineado:** `config.py` declara `gemini-3.6-flash` y Railway corre el *lite* |
+| Modelo generativo | **`gemini-3.6-flash`** | No existía al escribir la Fase 4. Lo manda `GEMINI_GENERATIVE_MODEL` de Railway y el defecto de `config.py` la copia; alineados desde el 08/09/2026 |
 | Umbral oficial (coseno) | **0.66** | La Fase 4 §7 dice 0.7. Bajó a 0.68 (ADR-0010) y a 0.66 el 19/08/2026 |
 | Umbral comunitario | 0.65 | La Fase 4 no contempla un umbral propio (ADR-0011) |
 | top-k por colección | 4 | Conforme. Gobierna el CU2 y el CU7; el listado del CU4 no pasa por él |
@@ -417,12 +417,18 @@ consultas reales, pero falta etiquetar leyendo el fragmento recuperado de cada
 una. La frontera que importa no es «del dominio o no», es «el fragmento
 responde de verdad o no», y eso es criterio del autor.
 
-**El modelo generativo está desalineado entre código y despliegue.**
-`app/config.py` declara `gemini-3.6-flash` y Railway corre
-`gemini-3.5-flash-lite`. El propio comentario de ese archivo dice que el valor
-por defecto existe para dejar constancia de con qué se probó, así que hoy se
-contradice. El *lite* responde más rápido —3 s frente a 10-19 s— pero, según
-observación del autor, con peor calidad.
+**El modelo generativo quedó alineado el 08/09/2026**, y de paso resultó que
+ninguno de los tres sitios acertaba: los documentos decían
+`gemini-3.5-flash-lite` desde el 19/08, `config.py` decía `gemini-3.6-flash` y
+Railway corría `gemini-2.5-flash`. Ahora manda la variable de Railway
+—**`gemini-3.6-flash`**— y todo lo demás la copia.
+
+Con ese hallazgo llegó otro que no es documental: **el modelo decide cuánto
+acierta el enrutamiento del agente.** Medido con 19 frases y 4 repeticiones,
+`gemini-2.5-flash` acertó **50/76 (66 %)** contra 76/76 de los otros dos, y
+sus 26 fallos fueron todos «no llamó a ninguna herramienta» —incluido
+«hola», 4 de 4—. Ahí `agente.py` manda el texto del modelo y se salta el CU2
+entero: sin RAG, sin cita y sin la advertencia del ADR-0015.
 
 **El ADR-0020 ya está escrito** (08/09/2026): la limpieza de índices del
 corpus y la bajada del umbral a 0.66, que es la decisión con más recorrido

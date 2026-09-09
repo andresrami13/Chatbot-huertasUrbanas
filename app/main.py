@@ -114,8 +114,15 @@ async def health() -> JSONResponse:
     despliegue sin gastar un mensaje del número de prueba, que solo admite
     cinco destinatarios verificados.
 
-    No expone nada sensible: el commit es público —el repositorio lo es— y
-    no hay aquí ninguna variable de entorno con secretos.
+    **Y qué modelo generativo**, desde el 08/09/2026. Ese día se midió el
+    enrutamiento del agente contra dos modelos que no eran el desplegado
+    —los documentos decían uno, `config.py` otro y Railway corría un
+    tercero— y la medición no valía. El commit ya se podía comprobar aquí;
+    el modelo no, y es la otra mitad de «qué está corriendo de verdad».
+
+    No expone nada sensible: el commit es público —el repositorio lo es—,
+    el nombre del modelo también, y no hay aquí ninguna variable de entorno
+    con secretos.
     """
     base_ok = await comprobar_conexion()
 
@@ -125,5 +132,6 @@ async def health() -> JSONResponse:
             "status": "ok" if base_ok else "degradado",
             "base_de_datos": "ok" if base_ok else "sin conexión",
             "version": _version_desplegada(),
+            "modelo_generativo": settings.GEMINI_GENERATIVE_MODEL,
         },
     )

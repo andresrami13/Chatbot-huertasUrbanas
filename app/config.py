@@ -38,8 +38,29 @@ class Settings(BaseSettings):
     # desplegar —los modelos de Gemini se retiran con calendario— y para
     # comparar modelos durante la calibración de la Fase 7.
     #
-    # El valor de aquí es el que vale si Railway no define nada, así que el
-    # repositorio siempre deja constancia de con qué se probó.
+    # **MANDA LA VARIABLE DE RAILWAY, y este valor la copia.** El defecto de
+    # aquí es lo que vale si Railway no define nada, así que el repositorio
+    # deja constancia de con qué se está corriendo; para eso los dos tienen
+    # que decir lo mismo. Al cambiarlo en Railway hay que cambiarlo aquí, en
+    # `CLAUDE.md` §8 y §10, en `AGENTS.md` y en `docs/ESTADO.md`.
+    #
+    # No es burocracia. El 08/09/2026 los documentos daban por corriendo
+    # `gemini-3.5-flash-lite` desde el 19/08, `config.py` declaraba
+    # `gemini-3.6-flash` y Railway corría `gemini-2.5-flash`: tres valores y
+    # ninguno acertaba. Con eso se midió el enrutamiento contra dos modelos
+    # que no eran producción, y la medición no valía (CLAUDE.md §12).
+    #
+    # **El modelo decide cuánto acierta el enrutamiento**, que es lo que más
+    # se notó al medirlo. Mismas 19 frases, 4 repeticiones, mismo prompt:
+    #
+    #     gemini-2.5-flash        50/76   (66 %)
+    #     gemini-3.5-flash-lite   76/76  (100 %)
+    #     gemini-3.6-flash        76/76  (100 %)
+    #
+    # Los 26 fallos del 2.5 son todos "no llamó a ninguna herramienta" —ni
+    # uno solo fue a la herramienta equivocada—, y ahí `agente.py` manda el
+    # texto que escribió el modelo, saltándose el CU2 entero: sin RAG, sin
+    # cita y sin la advertencia médica del ADR-0015.
     #
     # NO existe una variable equivalente para el modelo de embeddings, y es
     # deliberado: ver app/core/gemini.py y el ADR-0007.

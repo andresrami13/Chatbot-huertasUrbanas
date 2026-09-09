@@ -9,7 +9,7 @@ huertas), separado del CU4 el 08/09/2026.** El CU4 y el CU7 son los que
 siguen sin ejercitarse de verdad, y no por un fallo: excluyen la huerta de
 quien pregunta y apenas hay huertas registradas.
 
-De la Fase 7 van hechas nueve cosas, las dos primeras nacidas de esa prueba:
+De la Fase 7 van hechas diez cosas, las dos primeras nacidas de esa prueba:
 
 - **El corpus oficial pasó de 81 a 765 fragmentos en nueve fuentes**
   (ADR-0014), y dos de ellas ya no son del Jardín Botánico. Fueron 774
@@ -22,9 +22,11 @@ De la Fase 7 van hechas nueve cosas, las dos primeras nacidas de esa prueba:
   **Probado desde un celular real el 17/08/2026, y funcionó.**
 - **El corpus se limpió de índices y el umbral bajó a 0.66**, medido
   contra 81 consultas reales de las dos pruebas con celular (19/08/2026).
-- **El modelo generativo pasó a `gemini-3.5-flash-lite`** en Railway: los
-  de la familia flash completa daban 503 por sobrecarga y tardaban entre
-  10 y 138 segundos.
+- **El modelo generativo lo manda la variable de Railway**, que vale
+  `gemini-3.6-flash`, y todo lo demás la copia (08/09/2026). Está medido
+  que **el modelo decide cuánto acierta el enrutamiento**: el
+  `gemini-2.5-flash` que corría acertaba 50/76, contra 76/76 de los otros
+  dos candidatos.
 - **La nota de voz se acusa en el acto**, para que ella sepa que llegó. Se
   envía y no se recuerda (ADR-0017). El aviso equivalente para el camino
   con RAG se puso y **se retiró el mismo día**: anunciar la espera la hacía
@@ -152,14 +154,16 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
   `b159cd2`, así que no lo causó la limpieza de índices. Mientras siga
   así, el corpus entero no es reproducible y toda calibración hereda esa
   debilidad.
-- **El defecto por defecto del modelo generativo está desalineado.**
-  `app/config.py` dice `gemini-3.6-flash` y Railway corre
-  `gemini-3.5-flash-lite`. El propio comentario de ese archivo dice que el
-  valor por defecto existe para dejar constancia de con qué se probó, así
-  que hay que decidirlo: o se baja el defecto, o se documenta por qué no.
-- **El `flash-lite` responde peor.** Observado por el autor al cambiarlo:
-  mucho más rápido —3 s frente a 10-19 s— pero de menor calidad en la
-  redacción del CU2. Está sin medir; es material de la Fase 7.
+- **El modelo generativo quedó alineado el 08/09/2026.** Manda
+  `GEMINI_GENERATIVE_MODEL` de Railway, que vale **`gemini-3.6-flash`**, y
+  el defecto de `app/config.py` la copia. Antes había **tres valores y
+  ninguno acertaba**: los documentos decían `gemini-3.5-flash-lite` desde
+  el 19/08, `config.py` decía `gemini-3.6-flash` y Railway corría
+  `gemini-2.5-flash`. No consta cuándo ni por qué quedó el 2.5.
+- **Sin medir: si el `flash-lite` redacta peor.** Observado por el autor el
+  19/08 —mucho más rápido, 3 s frente a 10-19, pero de menor calidad en la
+  redacción del CU2—. Ya no está puesto, pero la observación sigue sin
+  comprobarse y decide si conviene volver a él.
 - **El corpus tiene huecos que el umbral no arregla.** La prueba real dejó
   un tercer grupo de consultas —del dominio, pero fuera de lo que tratan
   las fuentes— que bajar el umbral no salva: solo consigue que se respondan
@@ -372,9 +376,9 @@ tareas pendientes.
      `001` previsto para el 14/05/2028, muy posterior a la Fase 8. Recogido
      en [ADR-0007](adr/0007-modelo-de-embeddings-fijo-en-codigo.md).
    - **`gemini-2.5-flash` se retira el 16/10/2026**, probablemente antes de
-     la Fase 8. El valor por defecto de `app/config.py` es
-     `gemini-3.6-flash`, **pero Railway corre `gemini-3.5-flash-lite`**
-     desde el 19/08: ver la sección del 19/08 más abajo.
+     la Fase 8. Desde el 08/09/2026 el modelo lo manda la variable de
+     Railway y vale **`gemini-3.6-flash`**, con el defecto de
+     `app/config.py` copiándola: ver la sección del 08/09 más abajo.
 3. **Servicio de normalización.** Hecho y **probado en producción** el
    30/07/2026 con una nota de voz real desde un celular: descarga, mime
    `audio/ogg`, 15 515 bytes, transcripción de 69 caracteres y entrega al
@@ -1065,12 +1069,12 @@ estar en otra cola de capacidad. Se comprobó antes de recomendarlo que
 `3.5-flash-lite` **acepta function calling y entrada de audio**, que son
 obligatorios aquí.
 
-**Ojo con esto:** el cambio está solo en Railway. `app/config.py` sigue
-diciendo `gemini-3.6-flash`, y eso contradice la propia nota de ese
-archivo, que dice que el valor por defecto existe para que el repositorio
-deje constancia de con qué se probó. **Hay que decidir si se baja el
-defecto a `flash-lite`.** El autor observó además que responde peor que el
-flash completo, así que la decisión no es obvia.
+**Ojo con esto, y se resolvió el 08/09/2026:** aquel cambio quedó solo en
+Railway y `app/config.py` siguió diciendo `gemini-3.6-flash`, con lo que el
+repositorio dejó de dejar constancia de con qué se corría. Peor aún: el
+08/09 resultó que **Railway no corría el `flash-lite` sino
+`gemini-2.5-flash`**, así que ni siquiera este documento acertaba. No
+consta cuándo ni por qué. Ver la sección del 08/09 más abajo.
 
 **El corpus perdió diez fragmentos que eran índices.** Midiendo las 81
 consultas reales contra los 774 fragmentos, resultó que los índices
@@ -1120,6 +1124,52 @@ con campos muertos invita a llamarla cuando no toca.
 [ADR-0020](adr/0020-indices-fuera-del-corpus-y-umbral-a-066.md)**, tres
 semanas después de la decisión. Hasta entonces vivía solo en los mensajes
 de commit `00133ef` y `9102b50` y en un comentario de `app/config.py`.
+
+### Fase 7: el modelo de producción no llamaba a las herramientas, 08/09/2026
+
+Nació de una observación del autor: el bot no le reconocía la intención de
+preguntar por las otras huertas. La sospecha era el prompt —ampliar las
+frases del CU4—, y **medirlo dijo otra cosa**.
+
+**Primero se midió mal, y conviene contarlo.** La primera tanda se corrió
+contra `gemini-3.5-flash-lite` y `gemini-3.6-flash`, que era lo que este
+documento daba por desplegado, y dio **100 % en los dos**. El autor
+corrigió: Railway corría **`gemini-2.5-flash`**. Es el error de método que
+el CLAUDE.md §12 lleva anotado cuatro veces, y esta es la quinta.
+
+Repetida contra los tres modelos, con las mismas 19 frases y 4
+repeticiones —el enrutamiento corre a 0.7 y no es determinista—:
+
+| Modelo | Enrutamientos correctos |
+|---|---|
+| `gemini-2.5-flash` (el que corría) | **50/76 (66 %)** |
+| `gemini-3.5-flash-lite` | 76/76 (100 %) |
+| `gemini-3.6-flash` | 76/76 (100 %) |
+
+**No era el prompt: era el modelo.** Y lo prueba el detalle de los fallos:
+los 26 son **todos** «no llamó a ninguna herramienta», ni uno solo se fue a
+la herramienta equivocada. `"hola"` falló **4 de 4** y «como siembro
+tomate» 3 de 4, que son los dos mensajes más inequívocos del sistema.
+Ampliar la lista de frases del CU4 no habría arreglado nada: las frases que
+le fallaban son las mismas que los otros dos aciertan 4/4.
+
+**La consecuencia es peor que el CU4.** Cuando el modelo no llama a nada,
+`agente.py` manda el texto que escribió el modelo tal cual, y eso **se
+salta el CU2 entero**: sin RAG, sin cita, sin jerarquía de fuentes y sin la
+advertencia médica del ADR-0015, que solo se aplica en `orientacion.py`. Y
+si no produce ni texto ni función, cae en el último recurso y manda la
+bienvenida. Eso último se ve en la conversación real del 09/09 a las 00:36:
+«Mira que a mis matas le salió un bichito blanco…» recibió el saludo.
+
+**`/health` dice ahora también el modelo.** El commit ya se podía
+comprobar ahí; el modelo no, y es la otra mitad de «qué está corriendo de
+verdad». Con eso, este error concreto no se puede repetir en silencio.
+
+**Decisión del autor:** manda la variable de Railway y todo lo demás la
+copia. Quedó en **`gemini-3.6-flash`**, y `app/config.py`, `CLAUDE.md`,
+`AGENTS.md` y este documento dicen lo mismo. Queda por ver si vuelven los
+**503 UNAVAILABLE** que el 19/08 afectaban a toda la familia flash
+completa; el 08/09 el `3.6-flash` encadenó 76 llamadas sin un fallo.
 
 ### Fase 7: el CU4 se parte en dos, 08/09/2026
 

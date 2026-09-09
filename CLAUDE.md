@@ -51,8 +51,9 @@ cosas:
    catálogo de barrios pasó de 8 a 313 (ADR-0016).
 4. El corpus se **limpió de índices** y el **umbral bajó a 0.66**, medido
    contra 81 consultas reales (19/08/2026).
-5. El modelo generativo pasó a `gemini-3.5-flash-lite` **en Railway** —los
-   de la familia flash completa daban 503 por sobrecarga—. Ver el §8.
+5. El **modelo generativo lo manda la variable de Railway**, que hoy dice
+   `gemini-3.6-flash`. Está medido que el modelo decide cuánto acierta el
+   enrutamiento del agente (08/09/2026). Ver el §8.
 6. La **nota de voz se acusa en el acto**; se envía y no se recuerda
    (ADR-0017). El aviso equivalente del camino con RAG se puso y se
    retiró el mismo día.
@@ -276,6 +277,7 @@ llevan el ADR que lo justifica.
 
 | Tarea | Parámetro | Valor |
 |---|---|---|
+| **Todas** | **Modelo generativo** | **`gemini-3.6-flash`**, y lo manda `GEMINI_GENERATIVE_MODEL` de Railway. El defecto de `config.py` la copia |
 | Conversación (agente) | Temperatura | 0.7 |
 | Extracción de entidades | Temperatura | 0.1 (fijo, formato estricto) |
 | Desambiguación de barrio | Temperatura | 0.1 (ADR-0016, mismo criterio) |
@@ -295,17 +297,37 @@ entorno con valor por defecto en `app/config.py`: se pueden ajustar en
 Railway sin desplegar. **El modelo de embeddings no**, y es deliberado
 (ADR-0007).
 
-**El modelo generativo está desalineado entre el código y el despliegue, y
-hay que decidirlo.** `app/config.py` declara `gemini-3.6-flash` y Railway
-corre `gemini-3.5-flash-lite` desde el 19/08/2026. Se cambió porque toda la
-familia flash completa daba **503 UNAVAILABLE** por sobrecarga y tardaba
-entre 10 y 20 s, mientras el *lite* respondía en 3 s con 3/3 de éxito —los
-*lite* no gastan tokens de pensamiento y parecen estar en otra cola de
-capacidad—. Se comprobó antes que acepta *function calling* y entrada de
-audio, que aquí son obligatorios. Quedan dos cabos: el propio comentario de
-`config.py` dice que el valor por defecto existe para dejar constancia de
-con qué se probó, así que hoy se contradice; y el autor observó que el
-*lite* **redacta peor** el CU2, sin medirlo. No lo resuelvas por tu cuenta.
+**El modelo generativo lo manda `GEMINI_GENERATIVE_MODEL` de Railway, y
+todo lo demás la copia.** Hoy vale **`gemini-3.6-flash`**, y el defecto de
+`app/config.py` dice lo mismo a propósito: ese defecto existe para dejar
+constancia de con qué se está corriendo, y para eso los dos tienen que
+coincidir. **Al cambiarlo en Railway, cámbialo también** en `config.py`, en
+este archivo (§8 y §10), en `AGENTS.md` y en `docs/ESTADO.md`.
+
+No es burocracia. El 08/09/2026 había **tres valores y ninguno acertaba**:
+los documentos daban por corriendo `gemini-3.5-flash-lite` desde el 19/08,
+`config.py` declaraba `gemini-3.6-flash` y Railway corría
+`gemini-2.5-flash`. Con eso se midió el enrutamiento contra dos modelos que
+no eran producción, y la medición no valía.
+
+**El modelo decide cuánto acierta el enrutamiento**, y está medido. Mismas
+19 frases, 4 repeticiones, mismo prompt:
+
+| Modelo | Enrutamientos correctos |
+|---|---|
+| `gemini-2.5-flash` | **50/76 (66 %)** |
+| `gemini-3.5-flash-lite` | 76/76 (100 %) |
+| `gemini-3.6-flash` | 76/76 (100 %) |
+
+Los 26 fallos del 2.5 son **todos** «no llamó a ninguna herramienta» —ni
+uno fue a la herramienta equivocada—, incluido `"hola"` 4 de 4. Y ahí
+`agente.py` manda el texto que escribió el modelo, **saltándose el CU2
+entero**: sin RAG, sin cita y sin la advertencia médica del ADR-0015.
+
+Dos cosas que siguen sin medir: el autor observó que el *lite* **redacta
+peor** el CU2, y el 19/08 toda la familia flash completa daba **503
+UNAVAILABLE** por sobrecarga —aunque el 08/09 el `3.6-flash` encadenó 76
+llamadas sin un solo fallo—.
 
 **Los dos umbrales están medidos contra el corpus real y no sobreviven a un
 cambio de corpus.** El del CU2 tenía un margen de **una centésima**, y el
@@ -422,8 +444,9 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   huertas que `CU4_HUERTAS_POR_TANDA`.
 - **Railway:** desplegado y con el servicio en marcha. `/health` dice qué
   commit está corriendo, así que confirmar un despliegue no exige mandar un
-  WhatsApp. Corre `gemini-3.5-flash-lite`, que no es el defecto del
-  repositorio (§8).
+  WhatsApp. **`/health` dice también qué modelo generativo corre**, desde
+  el 08/09/2026: es la forma de comprobarlo sin preguntar. Hoy vale
+  `gemini-3.6-flash`, igual que el defecto del repositorio (§8).
 - **Pendiente del autor, y urgente:** purgar los registros de Railway
   anteriores al 30/07/2026, que contienen su número de teléfono.
 

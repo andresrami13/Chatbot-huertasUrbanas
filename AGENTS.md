@@ -231,6 +231,7 @@ llevan el ADR que lo justifica.
 
 | Tarea | Parámetro | Valor |
 |---|---|---|
+| **Todas** | **Modelo generativo** | **`gemini-3.6-flash`**, y lo manda `GEMINI_GENERATIVE_MODEL` de Railway. El defecto de `config.py` la copia |
 | Conversación (agente) | Temperatura | 0.7 |
 | Extracción de entidades | Temperatura | 0.1 (fijo, formato estricto) |
 | Desambiguación de barrio | Temperatura | 0.1 (ADR-0016, mismo criterio) |
@@ -248,6 +249,32 @@ Los umbrales, el top-k, la ventana y el modelo generativo son variables de
 entorno con valor por defecto en `app/config.py`: se pueden ajustar en
 Railway sin desplegar. **El modelo de embeddings no**, y es deliberado
 (ADR-0007).
+
+**El modelo generativo lo manda `GEMINI_GENERATIVE_MODEL` de Railway, y
+todo lo demás la copia.** Hoy vale **`gemini-3.6-flash`**, y el defecto de
+`app/config.py` dice lo mismo a propósito. **Al cambiarlo en Railway,
+cámbialo también** en `config.py`, en `CLAUDE.md` (§8 y §10), en este
+archivo y en `docs/ESTADO.md`.
+
+No es burocracia. El 08/09/2026 había **tres valores y ninguno acertaba**:
+los documentos daban por corriendo `gemini-3.5-flash-lite` desde el 19/08,
+`config.py` declaraba `gemini-3.6-flash` y Railway corría
+`gemini-2.5-flash`. Con eso se midió el enrutamiento contra dos modelos que
+no eran producción, y la medición no valía.
+
+**El modelo decide cuánto acierta el enrutamiento**, y está medido. Mismas
+19 frases, 4 repeticiones, mismo prompt:
+
+| Modelo | Enrutamientos correctos |
+|---|---|
+| `gemini-2.5-flash` | **50/76 (66 %)** |
+| `gemini-3.5-flash-lite` | 76/76 (100 %) |
+| `gemini-3.6-flash` | 76/76 (100 %) |
+
+Los 26 fallos del 2.5 son **todos** «no llamó a ninguna herramienta» —ni
+uno fue a la herramienta equivocada—, incluido `"hola"` 4 de 4. Y ahí
+`agente.py` manda el texto que escribió el modelo, **saltándose el CU2
+entero**: sin RAG, sin cita y sin la advertencia médica del ADR-0015.
 
 **Los dos umbrales están medidos contra el corpus real y no sobreviven a un
 cambio de corpus.** El del CU2 tenía un margen de **una centésima**, y el
@@ -360,7 +387,9 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   huertas que `CU4_HUERTAS_POR_TANDA`.
 - **Railway:** desplegado y con el servicio en marcha. `/health` dice qué
   commit está corriendo, así que confirmar un despliegue no exige mandar un
-  WhatsApp.
+  WhatsApp. **`/health` dice también qué modelo generativo corre**, desde
+  el 08/09/2026: es la forma de comprobarlo sin preguntar. Hoy vale
+  `gemini-3.6-flash`, igual que el defecto del repositorio (§8).
 - **Pendiente del autor, y urgente:** purgar los registros de Railway
   anteriores al 30/07/2026, que contienen su número de teléfono.
 
