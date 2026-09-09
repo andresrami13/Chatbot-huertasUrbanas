@@ -42,8 +42,7 @@ medición.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(veinte decisiones tomadas durante la implementación; el 0020 está
-reservado y sin escribir).
+(veintiuna decisiones tomadas durante la implementación).
 
 **Si retoma en una conversación nueva, vaya directo a
 [Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
@@ -1117,8 +1116,10 @@ tres retirados ya, por el ADR-0018 y el ADR-0016—. El segundo era el más
 serio: el prompt decide el enrutamiento, así que describir la herramienta
 con campos muertos invita a llamarla cuando no toca.
 
-**Falta el ADR de todo esto.** Sería el **ADR-0019** y hoy solo vive en los
-mensajes de commit `00133ef`, `9102b50` y `d6cac90`.
+**Escrito el 08/09/2026 como
+[ADR-0020](adr/0020-indices-fuera-del-corpus-y-umbral-a-066.md)**, tres
+semanas después de la decisión. Hasta entonces vivía solo en los mensajes
+de commit `00133ef` y `9102b50` y en un comentario de `app/config.py`.
 
 ### Fase 7: el CU4 se parte en dos, 08/09/2026
 

@@ -304,7 +304,7 @@ números se fijaron antes de que existiera el corpus real**.
   en el 25 % de las consultas reales. Un índice es una lista de nombres de
   plantas: puntúa altísimo contra cualquier pregunta sobre plantas y no
   responde nada.
-- **Justifica:** 19/08/2026, commit `00133ef`. **Pendiente de ADR-0019.**
+- **Justifica:** [ADR-0020](adr/0020-indices-fuera-del-corpus-y-umbral-a-066.md)
 
 ### §7 — desviación declarada del intervalo
 
@@ -424,6 +424,7 @@ por defecto existe para dejar constancia de con qué se probó, así que hoy se
 contradice. El *lite* responde más rápido —3 s frente a 10-19 s— pero, según
 observación del autor, con peor calidad.
 
-**Falta el ADR-0019.** La limpieza de índices del corpus y la bajada del
-umbral a 0.66 son la decisión con más recorrido del 19/08 y hoy solo viven en
-mensajes de commit y en un comentario de `config.py`.
+**El ADR-0020 ya está escrito** (08/09/2026): la limpieza de índices del
+corpus y la bajada del umbral a 0.66, que es la decisión con más recorrido
+del 19/08 y hasta entonces solo vivía en mensajes de commit y en un
+comentario de `config.py`.

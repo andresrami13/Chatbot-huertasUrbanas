@@ -36,7 +36,7 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Dieciocho decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Veintiuna decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 | `docs/correcciones-a-los-documentos.md` | **Qué dice cada `.docx` y qué hace el sistema**, por fase y sección. Consolidado de las desviaciones |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
@@ -65,9 +65,9 @@ etiquetar leyendo el fragmento recuperado de cada consulta, y
 contra 83 que produce el código—. El detalle está en `docs/ESTADO.md`,
 sección «Por dónde seguir».
 
-**Falta el ADR-0019**, el de la limpieza de índices y la bajada a 0.66.
-Hoy esa decisión solo vive en los commits `00133ef`, `9102b50` y `d6cac90`
-y en el comentario de `RAG_UMBRAL_SIMILITUD` en `app/config.py`.
+La limpieza de índices y la bajada a 0.66 son el **ADR-0020**, escrito el
+08/09/2026. Sus mediciones siguen además en el comentario de
+`RAG_UMBRAL_SIMILITUD` en `app/config.py`.
 
 ---
 
