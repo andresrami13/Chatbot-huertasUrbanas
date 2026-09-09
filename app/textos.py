@@ -116,14 +116,31 @@ REGISTRO_NADA_QUE_ANOTAR = """Me quedé con las ganas de anotarlo, pero no le en
 #
 # Los tres ejemplos son preguntas, nunca afirmaciones, y es deliberado: uno
 # del tipo "tengo tomate" lo enrutaría el agente al CU3 y le ofrecería
-# guardar un cultivo que ella no tiene.
+# guardar un cultivo que ella no tiene. Comprobado el 08/09/2026 con la
+# memoria real detrás —acaba de confirmar el registro—: los tres enrutan al
+# CU2 4 de 4.
 #
-# Y están escogidos entre lo que el corpus sí responde —siembra mide 0.7044
-# en las consultas reales, y el riego y el abono los cubre el manual de
-# compostaje de la FAO con sus 68 fragmentos—: invitar a preguntar algo que
-# termine en "no tengo esa información" es peor que no invitar.
+# **Están elegidos midiendo el corpus, no por intuición** (08/09/2026). Se
+# probaron 25 candidatas con el camino real del CU2 y se leyó la respuesta
+# que ella recibiría, que es lo único que decide. Los tres que quedaron
+# recuperan 4 de 4 fragmentos y su respuesta es concreta y accionable:
 #
-# No repiten el ejemplo de plagas de BIENVENIDA, que ella ya vio.
+#     puedo sembrar en materas o tarros    0.7431
+#     cada cuánto hay que regar la huerta  0.7357
+#     cómo hago compost en la casa         0.7385
+#
+# Sustituyen a los tres anteriores, que puntuaban peor —0.6986, 0.7192 y
+# 0.7231— y el primero de ellos, "cómo se siembra la cebolla larga", era el
+# más flojo de las 25.
+#
+# **La similitud sola no sirve para elegir, y aquí quedó demostrado:** "cómo
+# preparo abono orgánico" era la mejor del grupo del abono con 0.7618 y su
+# respuesta termina diciendo "me falta la información para explicarle el
+# paso a paso". Hay que leer la respuesta (CLAUDE.md §12).
+#
+# No repiten el ejemplo de plagas de BIENVENIDA, que ella ya vio. Ninguno
+# dispara la advertencia médica del ADR-0015, que en una invitación
+# quedaría fuera de lugar.
 #
 # Pendiente de medir en la Fase 7: esto sale en CADA registro confirmado,
 # no solo en el primero. A la quinta planta que anote, la invitación puede
@@ -132,10 +149,10 @@ REGISTRO_GUARDADO = """✅ Listo, ya quedó guardado.
 
 Cuando siembre algo nuevo me cuenta y lo agrego.
 
-Por ahora cuénteme, ¿tiene alguna duda de su huerta? Pregúnteme sin pena:
-🌱 "cómo se siembra la cebolla larga"
-💧 "cada cuánto riego el cilantro"
-♻️ "cómo hago abono con las cáscaras\""""
+Por ahora cuénteme, ¿tiene alguna duda de su huerta? Puede preguntarme por ejemplo:
+🌱 "puedo sembrar en materas o tarros"
+💧 "cada cuánto hay que regar la huerta"
+♻️ "cómo hago compost en la casa\""""
 
 
 # No se le pide explicación ni se repregunta: es su decisión.

@@ -1171,6 +1171,26 @@ copia. Quedó en **`gemini-3.6-flash`**, y `app/config.py`, `CLAUDE.md`,
 **503 UNAVAILABLE** que el 19/08 afectaban a toda la familia flash
 completa; el 08/09 el `3.6-flash` encadenó 76 llamadas sin un fallo.
 
+### Fase 7: los ejemplos del cierre del CU3, elegidos midiendo, 08/09/2026
+
+El mensaje que ella recibe tras confirmar sus cultivos la invita a
+preguntar y le enseña tres ejemplos. Estaban escogidos a ojo; ahora salen
+de medir **25 candidatas** con el camino real del CU2 y **leer la respuesta
+que ella recibiría**, que es lo único que decide.
+
+    puedo sembrar en materas o tarros    0.7431   (antes: cómo se siembra la cebolla larga  0.6986)
+    cada cuánto hay que regar la huerta  0.7357   (antes: cada cuánto riego el cilantro     0.7192)
+    cómo hago compost en la casa         0.7385   (antes: cómo hago abono con las cáscaras  0.7231)
+
+Los tres recuperan 4 de 4 fragmentos, responden citando la fuente, no
+disparan la advertencia médica y enrutan al CU2 **4 de 4** con la memoria
+real detrás. El anterior de siembra era el peor de las 25.
+
+**Y volvió a aparecer lo del §12:** «cómo preparo abono orgánico» era la de
+mayor similitud del grupo del abono —**0.7618**, más que la elegida— y su
+respuesta termina en *«me falta la información para explicarle el paso a
+paso»*. La similitud sola no sirve para elegir; hay que leer la respuesta.
+
 ### Fase 7: el CU4 se parte en dos, 08/09/2026
 
 **El CU4 respondía hablando de una sola huerta teniendo varias**, y al
