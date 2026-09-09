@@ -5,9 +5,15 @@ prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
 pruebas).** Los casos de uso están construidos y desplegados, y la
 conversación ya se probó desde un celular real. **Son siete contando el CU6
 (onboarding) del documento de grado y el CU7 (buscar un cultivo en otras
-huertas), separado del CU4 el 08/09/2026.** El CU4 y el CU7 son los que
-siguen sin ejercitarse de verdad, y no por un fallo: excluyen la huerta de
-quien pregunta y apenas hay huertas registradas.
+huertas), separado del CU4 el 08/09/2026, y el CU8 (consultar mi huerta),
+añadido el 09/09.** El CU4, el CU7 y el CU8 son los únicos que no han
+pasado todavía por un teléfono: se desplegaron el 08 y el 09/09.
+
+**Y desde el 09/09/2026 el bot está en un número de producción**, sin el
+límite de 5 destinatarios del número de prueba. En la base hay **cuatro
+huertas de cuatro personas distintas, registradas por ellas mismas desde
+sus celulares** — el onboarding y el CU3 ya están ejercitados por usuarias
+reales.
 
 De la Fase 7 van hechas diez cosas, las dos primeras nacidas de esa prueba:
 
@@ -134,10 +140,15 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
   **Migraciones aplicadas: hasta la `008`** —comprobado el 08/09 contra
   `information_schema`: la columna `fecha_siembra_aprox` ya no existe—.
   **La `009` está sin correr.**
-- **Meta:** app `Chatbot Huertas Urbanas` (id `4332318797098432`), número de
-  prueba `+1 555-136-8057`. Webhook registrado, app suscrita al WABA y campo
-  `messages` suscrito. **Los tres pasos son independientes**; que el webhook
-  verifique no implica que lleguen mensajes.
+- **Meta:** app `Chatbot Huertas Urbanas` (id `4332318797098432`).
+  **Número de producción desde el 09/09/2026**, con WABA y token de acceso
+  nuevos, todo actualizado en Railway. Se acabó el límite de 5
+  destinatarios verificados del número de prueba: **ya le puede escribir
+  cualquiera**. Webhook registrado, app suscrita al WABA y campo `messages`
+  suscrito. **Los tres pasos son independientes**; que el webhook verifique
+  no implica que lleguen mensajes, y al cambiar de WABA hay que rehacerlos.
+  Hay además una **página de Facebook**, «Chatbot Huertas Urbanas |
+  Bogotá», creada para dar credibilidad al repartir el enlace.
 - **GitHub:** repositorio **público**. `origin/main` al día en `c0d2303`.
   **Antes de dar por probado nada, compruebe con `/health` qué commit está
   corriendo:** desde el 15/08 lo dice, y el corpus vive en Supabase, así que
@@ -249,8 +260,9 @@ Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
   Desde el ADR-0021 ese umbral gobierna **solo el CU7**: la pregunta
   general del CU4 ya no consulta la colección vectorial, así que la
   remedición pesa menos que antes pero sigue haciendo falta.
-  Sigue sin tocar desde el 04/08, y no se puede tocar antes: el CU4 excluye
-  la huerta de quien pregunta y solo hay una registrada.
+  Sigue sin tocar desde el 04/08. **Ya es posible**: al 09/09/2026 hay
+  cuatro huertas de cuatro personas distintas, así que quien pregunta ve
+  tres.
 - **Cuántas veces responde el CU2 sin respaldo oficial.** Cada vez queda
   contado en la bitácora, y es la señal honesta de dónde le falta corpus
   —que el respaldo del modelo volvió invisible para la usuaria—.
@@ -1378,8 +1390,11 @@ consigue.
   las usuarias registradas dejan de ser reconocidas.
 - **El repositorio es público.** El `.gitignore` cubre `.env`; no lo
   desactive.
-- Hay **una fila real** en `usuario`, la del celular de pruebas del autor. No
-  es de prueba: borrarla obliga a repetir el consentimiento.
+- **Las filas de `usuario` son de personas reales.** Al 09/09/2026 son
+  cuatro, registradas por ellas mismas desde sus propios celulares, no por
+  el autor. Borrar una obliga a esa persona a repetir el consentimiento y
+  se lleva su conversación por cascada. Los scripts solo tocan teléfonos
+  que empiezan por `57000000`.
 - La resolución DNS del equipo de desarrollo falla de forma intermitente. Si
   algo "no conecta", reintentar antes de tocar configuración.
   **Diagnosticado el 15/08/2026:** el culpable es el resolutor configurado

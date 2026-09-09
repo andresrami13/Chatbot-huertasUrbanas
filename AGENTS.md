@@ -375,9 +375,11 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - **Meta:** app creada, número de prueba operativo, token permanente de usuario
   del sistema generado. Restricción de portfolio apelada; **la revisión sigue
   abierta**, así que el acceso puede considerarse provisional.
-- **Número de prueba:** admite un máximo de **5 destinatarios verificados**.
-  Está previsto migrar a un número propio con SIM nueva para la Fase 8. El
-  `PHONE_NUMBER_ID` cambia al migrar — **nunca lo escribas en el código**.
+- **Número de producción desde el 09/09/2026.** Se migró del número de
+  prueba —que admitía un máximo de 5 destinatarios verificados— a un número
+  propio, con WABA y token de acceso nuevos, todo actualizado en Railway.
+  **Ya le puede escribir cualquiera.** El `PHONE_NUMBER_ID` cambió al
+  migrar; **nunca lo escribas en el código**.
 - **Supabase:** operativo. PostgreSQL 17.6, RLS activo sin políticas.
   Conexión por **session pooler, puerto 5432**. **765 fragmentos oficiales
   en nueve fuentes** desde el 19/08/2026. Escribir ahí cambia lo que
