@@ -87,13 +87,16 @@ prever porque solo aparecen al ponerlo a hablar con una persona.
 - **Justifica:** [ADR-0010](adr/0010-umbral-de-similitud-recalibrado.md),
   revertido por `CU2_RESPALDO_MODELO`
 
-### §4 — las herramientas del agente son cuatro
+### §4 — las herramientas del agente son cinco
 
 - **Dice:** el agente tiene tres herramientas.
-- **Hace:** son **cuatro**. Se añadió `mostrar_ayuda` porque el saludo
+- **Hace:** son **cinco**. `mostrar_ayuda` se añadió porque el saludo
   posterior al consentimiento no cabía en las otras tres sin incumplir la
-  propia Fase 2. El modelo decide *cuándo*, el backend decide *qué*.
-- **Justifica:** [ADR-0013](adr/0013-agente-orquestador.md)
+  propia Fase 2, y `consultar_mi_huerta` porque ninguna fase previó que ella
+  quisiera consultar sus propios datos. El modelo decide *cuándo*, el
+  backend decide *qué*.
+- **Justifica:** [ADR-0013](adr/0013-agente-orquestador.md),
+  [ADR-0022](adr/0022-consultar-mi-propia-huerta.md)
 
 ### CU3 — el registro empieza con preguntas cerradas
 
@@ -107,15 +110,20 @@ prever porque solo aparecen al ponerlo a hablar con una persona.
 ### §3 — los casos de uso son siete, no cinco
 
 - **Dice:** cinco casos de uso, CU1 a CU5.
-- **Hace:** son **siete**. El **CU6 (Onboarding)** ya está especificado en
+- **Hace:** son **ocho**. El **CU6 (Onboarding)** ya está especificado en
   el documento de grado §3.6, y el CU1 remite a él en su curso normal; aquí
   es lo que el ADR-0016 llamaba «la segunda entrada del CU3». El **CU7
   (buscar un cultivo concreto en otras huertas)** se separó del CU4 el
   08/09/2026, porque tienen cursos de excepción distintos que el código no
   podía distinguir: «no hay otras huertas» y «ninguna tiene tomate» se
   respondían con el mismo texto vago.
+  Y el **CU8 (consultar mi propia huerta)** el 09/09/2026: ninguna fase
+  previó que ella quisiera leer lo suyo, así que el agente no llamaba a
+  nada y respondía de la ventana de memoria, nombrando **solo el último
+  cultivo** de los que ella tenía en la base.
 - **Justifica:** [ADR-0016](adr/0016-onboarding-de-preguntas-cerradas.md),
-  [ADR-0021](adr/0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md)
+  [ADR-0021](adr/0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md),
+  [ADR-0022](adr/0022-consultar-mi-propia-huerta.md)
 
 ### CU4 — la respuesta es un listado que compone el código
 

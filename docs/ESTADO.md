@@ -44,7 +44,7 @@ medición.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(veintiuna decisiones tomadas durante la implementación).
+(veintidós decisiones tomadas durante la implementación).
 
 **Si retoma en una conversación nueva, vaya directo a
 [Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
@@ -93,6 +93,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
 | Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. **La migración `009` está sin correr** (ADR-0021) |
 | Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Sin probar desde el celular** |
+| Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Sin probar desde el celular** |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
 | Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | **Probado en producción desde el celular** |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
@@ -1124,6 +1125,48 @@ con campos muertos invita a llamarla cuando no toca.
 [ADR-0020](adr/0020-indices-fuera-del-corpus-y-umbral-a-066.md)**, tres
 semanas después de la decisión. Hasta entonces vivía solo en los mensajes
 de commit `00133ef` y `9102b50` y en un comentario de `app/config.py`.
+
+### Fase 7: el CU8, consultar la propia huerta, 09/09/2026
+
+Al preguntarle **«qué tengo sembrado»** el bot respondía **solo con el
+último cultivo**. La causa no era el CU3, ni la base, ni el modelo:
+**ninguna fase previó que ella quisiera consultar sus propios datos**, así
+que no había herramienta para eso. Lo corrige el
+[ADR-0022](adr/0022-consultar-mi-propia-huerta.md).
+
+Sin herramienta, el agente no llamaba a nada —medido, **0 de 20** con cinco
+frases y cuatro repeticiones— y `agente.py` enviaba el texto que escribía
+el modelo, que sale de la ventana de diez mensajes. Los cultivos anteriores
+ya se habían salido de la ventana.
+
+**Lo grave no era que faltara información, era que afirmaba algo falso
+sobre los datos de ella**, con el tono del asistente. Misma clase de error
+que atribuirle cultivos a la huerta equivocada en el CU4.
+
+Piezas: `app/services/mi_huerta.py`, la quinta herramienta
+`consultar_mi_huerta` en `agente.py`, su bloque en `agente_v1.md` y los
+textos `MI_HUERTA_*`. Sin migración: lee `huerta` y `cultivo`, que ya
+estaban.
+
+- **El texto lo compone el código**, como el resumen del CU3 y el listado
+  del CU4. Aquí el motivo es el más fuerte: son sus datos y el caso de uso
+  existe porque el modelo los contaba mal.
+- **La lista no se recorta**, al contrario que la del CU4. Esconder parte
+  de sus plantas sería volver al fallo.
+- **Cubre además** «cómo se llama mi huerta» y «en qué barrio quedé», que
+  fallaban por lo mismo.
+
+**El riesgo que introduce es el par pregunta/afirmación** —«tengo cilantro
+sembrado» contra «qué tengo sembrado», que se diferencian en una palabra—.
+No lo resuelve el signo de interrogación, que este perfil de usuaria muchas
+veces no escribe, sino **si nombra una planta o no**. Medido con catorce
+frases, **ninguna con signos**, cuatro repeticiones: **56/56**. Y si el
+modelo se equivoca hacia el registro, el extractor no encuentra especies y
+no se guarda nada.
+
+Probado contra la base real: las cuatro huertas devuelven su lista
+completa, incluida la de seis cultivos que era el caso que fallaba.
+`spike_despachador` pasa de 26 a **29 comprobaciones**.
 
 ### Fase 7: el modelo de producción no llamaba a las herramientas, 08/09/2026
 

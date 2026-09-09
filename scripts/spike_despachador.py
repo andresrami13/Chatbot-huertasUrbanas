@@ -26,6 +26,8 @@ se reemplaza código que funcionaba:
 5. Que la **idempotencia** siga descartando el reintento de Meta.
 6. Que el **CU4 quede enrutado**, que era lo que faltaba desde el
    04/08/2026.
+7. Que el **CU8 le cuente lo que ella tiene sembrado**, y que no se
+   confunda con un registro (ADR-0022).
 """
 
 import asyncio
@@ -426,7 +428,35 @@ async def main() -> None:
 
         # -----------------------------------------------------------------
         print("\n" + "=" * 70)
-        print("6. Idempotencia: el reintento de Meta se descarta")
+        print("6. El CU8: qué tengo yo sembrado")
+        print("=" * 70)
+        enviados = await _entra(
+            _texto(_NUMERO_ANA, _wamid("08"), "que tengo sembrado"),
+            "pregunta por su propia huerta",
+        )
+        texto = _todo(enviados)
+
+        # Hasta el ADR-0022 no había herramienta para esto y el agente
+        # respondía de la ventana de memoria, nombrando solo el último
+        # cultivo. El encabezado fijo delata que lo compuso el código.
+        _comprobar(
+            "Su huerta" in texto,
+            "el agente la enrutó al CU8",
+            "y el texto lo compuso el código, no el modelo",
+        )
+        _comprobar(
+            "cilantro" in texto.lower(),
+            "le nombra el cultivo que acaba de registrar",
+        )
+        _comprobar(
+            textos.REGISTRO_NADA_QUE_ANOTAR not in texto,
+            "no lo confundió con un registro",
+            "la pregunta no nombra ninguna planta",
+        )
+
+        # -----------------------------------------------------------------
+        print("\n" + "=" * 70)
+        print("7. Idempotencia: el reintento de Meta se descarta")
         print("=" * 70)
         enviados = await _entra(
             _texto(_NUMERO_ANA, _wamid("05"), "que estan sembrando las otras huertas"),

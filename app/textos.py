@@ -230,6 +230,49 @@ ADVERTENCIA_MEDICA = """⚠️ Eso que le conté es lo que dice la guía sobre l
 Antes de tomar cualquier planta como remedio, consúltelo con su médico o en el centro de salud, sobre todo si usted toma alguna droga formulada."""
 
 
+# --- CU8, qué tengo yo sembrado (ADR-0022) -----------------------------
+#
+# **Lo compone el código**, igual que el resumen del CU3 y el listado del
+# CU4, y aquí el motivo es el más fuerte de los tres: son los datos de ella,
+# y el caso de uso existe precisamente porque el modelo los estaba contando
+# mal. Hasta el 09/09/2026 no había herramienta para esto y el agente
+# respondía de la ventana de memoria, así que nombraba **solo el último
+# cultivo**: una usuaria con cuatro plantas en la base recibía «usted tiene
+# registrado que sembró cilantro».
+#
+# La lista de cultivos NO se recorta, al contrario que la del CU4. Allá son
+# huertas ajenas y caben muchas en un mensaje; aquí son sus plantas, y
+# esconder parte de ellas sería volver al fallo que esto corrige.
+
+MI_HUERTA_ENCABEZADO = "🌱 Su huerta {huerta}, del barrio {barrio}."
+
+# El nombre es opcional en el esquema. Con un solo encabezado, la huerta sin
+# nombre quedaría en "Su huerta , del barrio X".
+MI_HUERTA_ENCABEZADO_SIN_NOMBRE = "🌱 Su huerta queda en el barrio {barrio}."
+
+MI_HUERTA_CULTIVOS = """Esto es lo que tiene anotado: {cultivos}.
+
+Si sembró algo más, me cuenta y lo agrego."""
+
+# Una huerta sin cultivos es lo normal desde el ADR-0016: existir en
+# `huerta` significa "completó el onboarding". Así que esto no es un error
+# y no se le dice como si lo fuera.
+MI_HUERTA_SIN_CULTIVOS = """Todavía no tengo ninguna planta anotada de su huerta.
+
+Cuénteme qué tiene sembrado y lo voy agregando."""
+
+# En la práctica no se llega aquí: el despachador arranca el onboarding
+# antes de dejar hablar al agente.
+MI_HUERTA_SIN_REGISTRO = """Todavía no tengo registrada su huerta.
+
+Cuénteme qué tiene sembrado y empezamos."""
+
+
+MI_HUERTA_NO_DISPONIBLE = """Perdone, en este momento no pude consultar lo de su huerta.
+
+¿Me vuelve a preguntar en un ratico?"""
+
+
 # --- CU4, qué siembran otras huertas -----------------------------------
 #
 # **El listado lo compone el código, no el modelo** (ADR-0021). Aquí están

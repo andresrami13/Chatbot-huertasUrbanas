@@ -36,7 +36,7 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Veintiuna decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Veintidós decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 | `docs/correcciones-a-los-documentos.md` | **Qué dice cada `.docx` y qué hace el sistema**, por fase y sección. Consolidado de las desviaciones |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
@@ -158,11 +158,15 @@ encuesta (Fase 1, n=11). No las revises ni las "mejores" por tu cuenta.
 | CU5 | Pedir ayuda | Ninguna (contenido estático) |
 | CU6 | Onboarding | Consentimiento (CU1) |
 | CU7 | Buscar un cultivo concreto en otras huertas | Consentimiento (CU1) + datos existentes |
+| CU8 | Consultar mi propia huerta | Consentimiento (CU1) + onboarding (CU6) |
 
-**Son siete, no cinco, y dos son posteriores a la Fase 2.** El **CU6
+**Son ocho, no cinco, y tres son posteriores a la Fase 2.** El **CU6
 (Onboarding)** lo especifica el documento de grado en su §3.6; aquí es lo
 que el ADR-0016 llama «la segunda entrada del CU3». El **CU7** se separó
-del CU4 el 08/09/2026 (ADR-0021).
+del CU4 el 08/09/2026 (ADR-0021), y el **CU8** se añadió el 09/09/2026
+(ADR-0022) porque ninguna fase previó que ella quisiera consultar sus
+propios datos: al preguntar «qué tengo sembrado» el agente no llamaba a
+nada y respondía de la memoria, nombrando **solo el último cultivo**.
 
 **El CU4 y el CU7 son la misma herramienta y caminos distintos.** El CU4 es
 un **listado** —«¿qué están sembrando las otras huertas?»— que compone el
@@ -187,9 +191,9 @@ El orden en el despachador no es negociable: el onboarding va **antes** que
 los botones del CU3, porque su cierre reutiliza esos mismos dos botones y
 el CU3 se quedaría con una confirmación que no era suya.
 
-**Herramientas del agente — son cuatro, no tres** (ADR-0013):
-`registrar_huerta`, `consultar_orientacion`, `consultar_comunidad` y
-`mostrar_ayuda`. La cuarta se añadió porque el saludo posterior al
+**Herramientas del agente — son cinco, no tres** (ADR-0013, ADR-0022):
+`registrar_huerta`, `consultar_orientacion`, `consultar_comunidad`,
+`mostrar_ayuda` y `consultar_mi_huerta`. La cuarta se añadió porque el saludo posterior al
 consentimiento no cabía en las otras tres sin incumplir la Fase 2: el
 modelo decide **cuándo**, el backend decide **qué** y manda el texto fijo.
 

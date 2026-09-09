@@ -46,6 +46,10 @@ llamadas se orquestan a mano.
   cuándo, no qué dice.
 - **No sabe quién pregunta.** El `usuario_id` y el número salen del
   contexto de la conversación, nunca de una respuesta del modelo.
+- **No cuenta lo que ella tiene sembrado.** `consultar_mi_huerta` tampoco
+  lleva parámetros: el texto lo compone el código leyendo la base
+  (ADR-0022). Cuando esa herramienta no existía, el modelo respondía esa
+  pregunta de la ventana de memoria y nombraba **solo el último cultivo**.
 """
 
 import logging
@@ -59,6 +63,7 @@ from app.core.gemini import MODELO_GENERATIVO, obtener_cliente
 from app.services.comunidad import consultar_comunidad
 from app.services.extraccion import extraer_huerta
 from app.services.memoria import responder, ventana
+from app.services.mi_huerta import consultar_mi_huerta
 from app.services.orientacion import consultar_orientacion
 from app.services.registro import proponer_registro
 
@@ -75,7 +80,7 @@ _PROMPT = "agente_v1.md"
 # tomar caminos distintos en dos intentos.
 _TEMPERATURA = 0.7
 
-# Tope de funciones que se ejecutan en un turno. Con cuatro herramientas y
+# Tope de funciones que se ejecutan en un turno. Con cinco herramientas y
 # sin repetidas no debería llegar a tres nunca; está para que un modelo que
 # se desboque no produzca una ráfaga de mensajes en el celular de la
 # usuaria.
@@ -85,13 +90,20 @@ _ORIENTACION = "consultar_orientacion"
 _COMUNIDAD = "consultar_comunidad"
 _REGISTRO = "registrar_huerta"
 _AYUDA = "mostrar_ayuda"
+_MI_HUERTA = "consultar_mi_huerta"
 
 # El registro va siempre el último, y no en el orden que decida el modelo:
 # es el que lleva botones, y los botones tienen que quedar en el último
 # mensaje de la pantalla o ella los pulsaría con la respuesta de otra cosa
 # encima. Es además la regla de orquestación del CLAUDE.md §5: primero la
 # necesidad urgente, después ofrecer el registro.
-_ORDEN_EJECUCION = {_ORIENTACION: 0, _COMUNIDAD: 0, _AYUDA: 0, _REGISTRO: 1}
+_ORDEN_EJECUCION = {
+    _ORIENTACION: 0,
+    _COMUNIDAD: 0,
+    _AYUDA: 0,
+    _MI_HUERTA: 0,
+    _REGISTRO: 1,
+}
 
 
 def _esquema_pregunta(descripcion: str) -> types.Schema:
@@ -173,6 +185,15 @@ _HERRAMIENTAS = types.Tool(
                 "huerta o en qué barrio queda. NO guarda nada: prepara un "
                 "resumen que ella tiene que confirmar con un botón. No lleva "
                 "datos; el sistema los saca del mensaje."
+            ),
+        ),
+        types.FunctionDeclaration(
+            name=_MI_HUERTA,
+            description=(
+                "Le dice a la usuaria qué tiene ELLA registrado en SU PROPIA "
+                "huerta: sus cultivos, el nombre de su huerta y su barrio. "
+                "Solo para CONSULTAR lo que ya está guardado, nunca para "
+                "guardar algo nuevo. No lleva datos."
             ),
         ),
         types.FunctionDeclaration(
@@ -315,6 +336,14 @@ async def _ejecutar(
             usuario_id,
             await consultar_comunidad(pregunta, usuario_id, especie or None),
         )
+        return True
+
+    if nombre == _MI_HUERTA:
+        # Sin parámetros: lo que hay que contarle sale de la base por su
+        # `usuario_id`, no de nada que escriba el modelo. Mismo criterio
+        # que `registrar_huerta` (ADR-0013).
+        logger.info("Herramienta %s | usuario_id=%s", nombre, usuario_id)
+        await responder(numero, usuario_id, await consultar_mi_huerta(usuario_id))
         return True
 
     if nombre == _AYUDA:
