@@ -72,7 +72,21 @@ async def procesar_evento(payload: dict) -> None:
                         estado.get("status"),
                     )
 
-                for mensaje in valor.get("messages", []):
+                mensajes = valor.get("messages", [])
+
+                # De qué campo del webhook viene este cambio. Se registra
+                # solo cuando trae mensajes y NO es `messages`, porque
+                # entonces el objeto puede no tener la forma que el
+                # despachador espera. Comprobado el 16/09/2026 que los diez
+                # campos suscritos son `messages`, `calls`, los dos de
+                # plantilla, los cuatro de cuenta y número, y `security`, y
+                # que ninguno salvo el primero envía `messages[]`. Si esta
+                # línea aparece alguna vez, esa comprobación caducó.
+                campo = cambio.get("field")
+                if mensajes and campo != "messages":
+                    logger.warning("Mensajes en un campo inesperado | field=%s", campo)
+
+                for mensaje in mensajes:
                     await _procesar_mensaje(mensaje)
 
     except Exception:
@@ -267,7 +281,22 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     logger.info("Mensaje entrante | tipo=%s | ref=%s", tipo, ref)
 
     if not numero:
-        logger.warning("Mensaje sin remitente; se descarta | ref=%s", ref)
+        # Se registran los NOMBRES de los campos que trae el objeto, nunca
+        # sus valores: son nombres de la API de Meta, no datos de la
+        # usuaria, así que esto no incumple el CLAUDE.md §11.
+        #
+        # Está aquí porque el payload no se guarda en ninguna parte y sin
+        # verlo no se puede distinguir entre las tres causas posibles: que
+        # `from` llegue vacío (aparecerá en la lista), que no llegue
+        # (faltará), o que el remitente venga en otro campo que sí se
+        # podría leer. El 16/09/2026 se descartaron así 8 de unos 69
+        # mensajes entrantes, todos de tipo texto, y nadie sabe por qué.
+        logger.warning(
+            "Mensaje sin remitente; se descarta | ref=%s | tipo=%s | campos=%s",
+            ref,
+            tipo,
+            sorted(mensaje),
+        )
         return
 
     # Los tres puntitos de "escribiendo", lo primero de todo (ADR-0017,
