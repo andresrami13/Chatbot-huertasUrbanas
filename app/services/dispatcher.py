@@ -86,6 +86,31 @@ async def procesar_evento(payload: dict) -> None:
                 if mensajes and campo != "messages":
                     logger.warning("Mensajes en un campo inesperado | field=%s", campo)
 
+                # --- Diagnóstico temporal del BSUID (17/09/2026) ---------
+                #
+                # Meta dejó de mandar el teléfono de quien tiene nombre de
+                # usuario y en su lugar manda un Business-Scoped User ID.
+                # La documentación dice que el BSUID viaja también en
+                # `contacts[].user_id`, que sería el respaldo si algún día
+                # faltara en el mensaje. Pero la documentación describe la
+                # versión vigente y este webhook está suscrito en v25.0, así
+                # que hay que comprobar contra producción que ese bloque
+                # llega y con qué campos (CLAUDE.md §12).
+                #
+                # Solo los NOMBRES de los campos, nunca sus valores:
+                # `contacts[]` trae el nombre de perfil y el número.
+                #
+                # **Se borra en cuanto la identidad pase al BSUID.**
+                if mensajes:
+                    contactos = valor.get("contacts", [])
+                    logger.info(
+                        "Cambio con mensajes | mensajes=%d | contactos=%d | "
+                        "campos_contacto=%s",
+                        len(mensajes),
+                        len(contactos),
+                        sorted(contactos[0]) if contactos else [],
+                    )
+
                 for mensaje in mensajes:
                     await _procesar_mensaje(mensaje)
 
@@ -278,25 +303,25 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     # Minimización de datos (Fase 3, capa 6): no se registra el número del
     # remitente ni el contenido del mensaje en la bitácora. Tampoco el
     # wamid, que contiene el número (ver `huella_wamid`).
-    logger.info("Mensaje entrante | tipo=%s | ref=%s", tipo, ref)
+    #
+    # `campos` son los NOMBRES de lo que trae el objeto, nunca sus valores:
+    # son nombres de la API de Meta, no datos de la usuaria, así que no
+    # incumple el CLAUDE.md §11.
+    #
+    # **Diagnóstico temporal (17/09/2026), y se borra con el anterior.** El
+    # 16/09 se descubrió que Meta manda `from_user_id` —el BSUID— en lugar
+    # del teléfono cuando la usuaria tiene nombre de usuario. La
+    # documentación dice que el BSUID llega en **todos** los mensajes, con
+    # nombre de usuario o sin él, pero describe la versión vigente y este
+    # webhook está suscrito en v25.0. Antes de rehacer la identidad sobre
+    # ese campo hay que verlo llegar en los mensajes que hoy **sí**
+    # funcionan, no solo en los que fallan.
+    logger.info(
+        "Mensaje entrante | tipo=%s | ref=%s | campos=%s", tipo, ref, sorted(mensaje)
+    )
 
     if not numero:
-        # Se registran los NOMBRES de los campos que trae el objeto, nunca
-        # sus valores: son nombres de la API de Meta, no datos de la
-        # usuaria, así que esto no incumple el CLAUDE.md §11.
-        #
-        # Está aquí porque el payload no se guarda en ninguna parte y sin
-        # verlo no se puede distinguir entre las tres causas posibles: que
-        # `from` llegue vacío (aparecerá en la lista), que no llegue
-        # (faltará), o que el remitente venga en otro campo que sí se
-        # podría leer. El 16/09/2026 se descartaron así 8 de unos 69
-        # mensajes entrantes, todos de tipo texto, y nadie sabe por qué.
-        logger.warning(
-            "Mensaje sin remitente; se descarta | ref=%s | tipo=%s | campos=%s",
-            ref,
-            tipo,
-            sorted(mensaje),
-        )
+        logger.warning("Mensaje sin remitente; se descarta | ref=%s", ref)
         return
 
     # Los tres puntitos de "escribiendo", lo primero de todo (ADR-0017,
