@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-09-08. **La Fase 6 se cerró el 15/08/2026 con la
+Última actualización: 2026-09-17. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
 pruebas).** Los casos de uso están construidos y desplegados, y la
 conversación ya se probó desde un celular real. **Son siete contando el CU6
@@ -10,12 +10,13 @@ añadido el 09/09.** El CU4, el CU7 y el CU8 son los únicos que no han
 pasado todavía por un teléfono: se desplegaron el 08 y el 09/09.
 
 **Y desde el 09/09/2026 el bot está en un número de producción**, sin el
-límite de 5 destinatarios del número de prueba. En la base hay **cuatro
-huertas de cuatro personas distintas, registradas por ellas mismas desde
-sus celulares** — el onboarding y el CU3 ya están ejercitados por usuarias
-reales.
+límite de 5 destinatarios del número de prueba. Al 17/09/2026 en la base
+hay **siete huertas de nueve personas distintas, con 56 cultivos y 204
+mensajes, todo registrado por ellas mismas desde sus celulares** — el
+onboarding y el CU3 ya están ejercitados por usuarias reales. Eran cuatro
+y cuatro el 08/09: el número abierto se notó en una semana.
 
-De la Fase 7 van hechas diez cosas, las dos primeras nacidas de esa prueba:
+De la Fase 7 van hechas once cosas, las dos primeras nacidas de esa prueba:
 
 - **El corpus oficial pasó de 81 a 765 fragmentos en nueve fuentes**
   (ADR-0014), y dos de ellas ya no son del Jardín Botánico. Fueron 774
@@ -44,13 +45,19 @@ De la Fase 7 van hechas diez cosas, las dos primeras nacidas de esa prueba:
   así que tampoco quedaba reintento que lo recuperase.
 - **El CU4 se partió en dos** (ADR-0021): el listado lo compone el código y
   sale de tres en tres, y la búsqueda por cultivo es el CU7.
+- **La identidad de la usuaria pasó a ser el BSUID de Meta y no su
+  teléfono** (ADR-0023, 17/09/2026). No fue una mejora buscada: personas
+  nuevas le escribían al bot y **no recibían nada**, porque Meta deja de
+  mandar el número de quien activa su nombre de usuario de WhatsApp. Eran
+  8 de unos 69 mensajes.
 
 Falta lo principal: **revalidar el umbral**, que hoy no lo respalda ninguna
-medición.
+medición. Y antes que eso, **probar en vivo el envío por `recipient`**, que
+es por donde salen ahora todas las respuestas.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(veintidós decisiones tomadas durante la implementación).
+(veintitrés decisiones tomadas durante la implementación).
 
 **Si retoma en una conversación nueva, vaya directo a
 [Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
@@ -77,7 +84,8 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Despachador asíncrono | `app/services/dispatcher.py` | Funcionando |
 | Idempotencia con dos estados | `db/004_idempotencia.sql`, `repositorio.py` | En Supabase, probada |
 | Esquema de base de datos | `db/*.sql` | Aplicado en Supabase |
-| Identidad (HMAC) y cifrado (AES-GCM) | `app/core/identidad.py` | Probado |
+| Identidad (HMAC) y cifrado (AES-GCM) | `app/core/identidad.py` | Probado. **Identifica por el BSUID de Meta desde el 17/09/2026** (ADR-0023) |
+| Escalera de identidad y re-llaveo | `dispatcher._resolver_identidad`, `repositorio.rellavear_identidad` | Comprobado sin base ni red y con el spike. **El envío por `recipient` no se ha probado en vivo** |
 | Conexión a PostgreSQL | `app/core/basedatos.py` | Pool con `asyncpg` |
 | Repositorio de datos | `app/services/repositorio.py` | Cubre el esquema entero |
 | Cliente de WhatsApp | `app/services/whatsapp.py` | Texto y botones |
@@ -110,7 +118,8 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
 [Acepto]/[No acepto] → al aceptar, se crea la fila y se confirma. En la base
-quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
+quedó la huella, nunca el número —esa columna se llama `identidad_hash`
+desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
 15/08 encontró está más abajo, en
 [la prueba con celular](#fase-6-paso-5-la-prueba-con-celular-real-15082026).
 
@@ -129,6 +138,8 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
   **765 fragmentos oficiales de nueve fuentes** desde el 19/08/2026, y
   **313 barrios** desde el 17/08. Escribir ahí cambia lo que responde el
   bot **en el acto**, con o sin despliegue: Railway lee esta misma base.
+  **Al 17/09/2026: 9 usuarias, 7 huertas, 56 cultivos y 204 mensajes**,
+  contados al exportar las conversaciones antes de tocar la identidad.
   El 18/08/2026 se vaciaron a propósito `usuario`, `mensaje`, `huerta`,
   `cultivo` y `fragmento_comunitario` —incluida la fila real del autor—
   para volver a recorrer el camino completo, y con eso desapareció la
@@ -137,6 +148,10 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
   público—. **Al 08/09/2026 hay otra vez 4 usuarias, 4 huertas con 13
   cultivos y sus 4 fragmentos comunitarios**, que son los que por fin
   permiten ejercitar el CU4 y el CU7.
+  **La `010` está sin correr y va junto con su despliegue** (ADR-0023):
+  renombra `usuario.telefono_hash` a `identidad_hash`, y mientras el
+  código desplegado y la columna no coincidan, ningún mensaje se
+  atiende.
   **Migraciones aplicadas: hasta la `008`** —comprobado el 08/09 contra
   `information_schema`: la columna `fecha_siembra_aprox` ya no existe—.
   **La `009` está sin correr.**
@@ -156,6 +171,17 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
 
 ## Lo que NO funciona todavía (esperado)
 
+- **El envío por `recipient` no está probado contra Meta.** Desde el
+  ADR-0023 todas las respuestas salen por ahí, y es el único punto donde
+  equivocarse deja a alguien sin recibir nada. Está comprobado contra la
+  documentación oficial y con el spike, que no llega a Meta. **Hay que
+  escribirle al bot desde un celular en cuanto se despliegue.**
+- **Ocho mensajes se perdieron y no vuelven.** Los del 15/09 en adelante
+  que se descartaron por no traer teléfono quedaron marcados
+  `procesado`, así que ni un reintento de Meta los recuperaría.
+- **`calls` está suscrito y el código no atiende ese evento.** Si alguien
+  llama al número en vez de escribir, no pasa nada: ni respuesta ni
+  rastro en la bitácora. Lo destapó la revisión del webhook del 16/09.
 - **El umbral está en 0.66 desde el 19/08/2026**, medido contra 81
   consultas reales y el corpus ya limpio. **No es una calibración
   cerrada:** falta etiquetar leyendo el fragmento recuperado de cada
@@ -197,6 +223,30 @@ quedó el `telefono_hash`, nunca el número. Lo que la prueba completa del
 ---
 
 ## Por dónde seguir
+
+### 0. Desplegar la identidad por BSUID y probarla en vivo
+
+**Es lo primero porque hoy hay gente que le escribe al bot y no recibe
+nada.** El código está escrito (ADR-0023) y falta ponerlo a andar:
+
+1. **Confirmar el export.** Las nueve conversaciones se exportaron el
+   17/09 a `fuentes/`, fuera del repositorio, que es público. Son el
+   material de la Fase 7 y no hay otra copia.
+2. **Desplegar y correr la `010` seguido**, a una hora tranquila. El
+   código nuevo lee `identidad_hash` y el desplegado lee
+   `telefono_hash`: entre lo uno y lo otro, **ningún mensaje se
+   atiende**. Compruebe con `/health` qué commit está corriendo.
+3. **Escribirle al bot desde un celular.** Es la única forma de saber si
+   `recipient` funciona, y por ahí salen ahora **todas** las respuestas.
+   Si falla, la bitácora lo dice (`WhatsApp rechazó el envío`) y se
+   revierte con un commit.
+4. **Mirar la bitácora unos días.** Cada mensaje registra de dónde salió
+   la identidad (`origen=mensaje`, `origen=contacto`, `origen=telefono`)
+   y cada re-llaveo deja su línea. Si aparece `origen=contacto`, la forma
+   del webhook cambió; si aparece `origen=telefono`, el BSUID no llegó.
+5. **Borrar el re-llaveo** cuando las nueve hayan escrito una vez. Está
+   en `dispatcher` y en `repositorio.rellavear_identidad`, marcado como
+   transitorio en los dos sitios.
 
 ### 1. Cerrar la calibración del umbral del CU2
 
@@ -290,25 +340,103 @@ remide cada consulta. Hace falta porque la bitácora dice `fragmentos=0`
 pero no a qué pregunta (CLAUDE.md §11). **Su salida no va al repositorio,
 que es público.**
 
-### 3. Acciones suyas, que no puede hacer la IA
+### 3. La evaluación con usuarias, en discusión el 11/09/2026
+
+El anteproyecto especifica **dos rondas de SUS**, formativa y sumativa,
+con cuestionario SUS y guía de observación en las dos. Al mirarlo con
+detalle antes de aplicarlo aparecieron tres problemas, y ninguno se
+resuelve simplificando el instrumento.
+
+- **El SUS mide usabilidad, no utilidad ni adopción.** Contesta «¿le
+  resulta fácil?», no «¿le sirve?» ni «¿lo usa?». Para esas dos últimas —
+  que son las que de verdad importan para un trabajo sobre adopción
+  comunitaria— pesan más los **registros del sistema** (`mensaje`,
+  `huerta`, `cultivo`: días distintos que volvió, cuántas consultas
+  terminaron sin respaldo, voz frente a texto) que cualquier cuestionario,
+  porque no dependen de que ella recuerde ni de la cortesía de contestar
+  bien a quien le construyó la herramienta.
+- **Aplicar el SUS dos veces sobre el mismo sistema no mide nada nuevo si
+  entre las dos rondas no cambia algo de verdad.** La segunda ronda mide
+  lo que ella recuerda haber contestado, no una experiencia distinta. Lo
+  que sí aporta es que la ronda formativa **identifique qué ajustar**, y
+  eso el SUS no lo hace: da un número, no un diagnóstico.
+- **Simplificar los diez ítems del SUS lo convierte en otra cosa,** y el
+  ≥68 de la hipótesis deja de ser comparable. La redacción sí puede
+  traducirse a español coloquial conservando el significado; los ítems no
+  se cambian. Con adultas mayores hay un riesgo adicional documentado en
+  la literatura: los ítems pares, redactados en negativo a propósito, se
+  contestan mal con más frecuencia e inflan el puntaje. Se recomienda
+  **conservar la polaridad original** y detectar el problema, si aparece,
+  en la ronda formativa —no adoptar de entrada la variante «todo
+  positivo» de Sauro y Lewis sin medir primero si hace falta.
+
+**Propuesta en discusión, sin decidir:**
+
+1. Se comparte el bot y se usa 2–3 semanas, sin encuesta.
+2. **Ronda formativa:** se leen los registros del sistema y se manda una
+   nota de voz con 3–4 preguntas abiertas (qué le sirvió, qué no entendió,
+   qué le pareció enredado, si lo recomendaría), contestada también por
+   voz. Ninguna evaluación la pide el propio bot: sesgaría la respuesta.
+3. Se ajusta el sistema según lo que salga y se les avisa qué cambió.
+4. Otras 2–3 semanas de uso y **una sola aplicación del SUS**, por llamada
+   telefónica —usted lee las diez frases, ella contesta el número—, que es
+   la que pone a prueba el ≥68 de la hipótesis.
+
+**Consecuencia si se adopta:** hay que declarar en el documento de grado
+que la guía de observación de la ronda formativa se sustituye por el
+análisis de los registros del sistema (es observación de lo que pasó, no
+de lo que el autor creyó ver estando presente), y que el SUS se aplica una
+vez y no dos. Es una corrección declarada más para
+`docs/correcciones-a-los-documentos.md`, del mismo tipo que las veinte que
+ya existen — no una desviación oculta.
+
+**Con más de 30 personas alcanzables por un grupo de huerteros**, hace
+falta reclutar a quiénes de ellas participan en la evaluación de 5 a 7. Se
+está preparando una página de una sola pantalla —nombre, celular, barrio
+y autorización de tratamiento de datos— con un botón a WhatsApp y una
+alternativa por nota de voz para quien no quiera llenar el formulario:
+un formulario web filtra hacia quienes mejor manejan el celular, que es
+precisamente lo contrario del perfil que el proyecto quiere evaluar. Los
+datos de esa página van en un almacenamiento **separado de Supabase**, sin
+relación con `identidad_hash` ni con la base del bot. Existe además una
+página de Facebook, «Chatbot Huertas Urbanas | Bogotá», creada para dar
+credibilidad al repartir el enlace.
+
+### 4. Acciones suyas, que no puede hacer la IA
 
 - **Purgar los registros viejos de Railway.** Lo más urgente: los anteriores
   al 30/07/2026 contienen su número de teléfono.
-- **Migrar a número propio con SIM nueva antes de la Fase 8.** El
-  `PHONE_NUMBER_ID` cambia; nunca escribirlo en el código.
-- **Pasar al documento de grado los quince ADR y las veinte correcciones**
-  de [`docs/adr/README.md`](adr/README.md). Los ADR-0014 y 0015 todavía no
-  han aportado las suyas a esa lista consolidada.
+- ~~Migrar a número propio con SIM nueva.~~ **Hecho el 09/09/2026**, antes
+  de lo previsto para la Fase 8: WABA y token de acceso nuevos, todo
+  actualizado en Railway. Ya no hay límite de destinatarios.
+- **Avisar a nadie: ya no hace falta.** El plan era recrear a las
+  usuarias con identidad nueva y pedirles que volvieran a autorizar; al
+  ver que eran nueve y no cuatro, se hizo un re-llaveo silencioso en su
+  lugar (ADR-0023, decisión 4). Nadie repite el onboarding.
+- **Pasar al documento de grado los veintitrés ADR y las correcciones**
+  de [`docs/adr/README.md`](adr/README.md) y
+  [`docs/correcciones-a-los-documentos.md`](correcciones-a-los-documentos.md).
+  Los últimos en incorporarse fueron el 0019 a 0023 (aviso de base caída,
+  índices y umbral, CU4/CU7, CU8, identidad por BSUID), del 08 al
+  17/09/2026.
 - **Revisar el DNS del equipo.** El resolutor configurado rechaza el host de
   Supabase de forma intermitente (ver más abajo). No rompe nada en
   producción, pero cuesta tiempo en cada sesión de desarrollo.
+- **Decidir el diseño de la evaluación con usuarias** (ver la subsección
+  siguiente): si la ronda formativa se hace por análisis de registros y
+  nota de voz, o como el anteproyecto la describe hoy.
+- **Reclutamiento: confirmar los datos de la página de registro** antes de
+  publicarla — nombre completo y correo de contacto para el aviso de
+  datos, si se menciona a la Universidad Distrital, y el número del bot en
+  formato internacional para el botón de WhatsApp.
 
 ### Scripts, para no buscarlos
 
 Todos se ejecutan con `python -m scripts.<nombre>` desde la raíz, con el
 `.venv` activo. **Los que escriben en la base crean datos temporales y los
-borran en un `finally`**, acotados a teléfonos que empiezan por `57000000`;
-la fila real del autor no se toca.
+borran en un `finally`**, acotados a identidades que llevan `57000000`
+dentro —con forma de BSUID desde el ADR-0023, `CO.570000000601`—; las
+filas reales no se tocan.
 
 | Script | Qué hace |
 |---|---|
@@ -1138,6 +1266,52 @@ con campos muertos invita a llamarla cuando no toca.
 [ADR-0020](adr/0020-indices-fuera-del-corpus-y-umbral-a-066.md)**, tres
 semanas después de la decisión. Hasta entonces vivía solo en los mensajes
 de commit `00133ef` y `9102b50` y en un comentario de `app/config.py`.
+
+### Fase 7: la identidad pasa al BSUID, 16-17/09/2026
+
+**Personas nuevas le escribían al bot y no recibían absolutamente nada.**
+En la bitácora quedaba una línea, `Mensaje sin remitente; se descarta`, y
+eran **8 de unos 69 mensajes (12 %)**: todos de tipo texto, ninguno
+anterior al 15/09 y con el mismo despliegue corriendo desde el 10. No lo
+causó ningún cambio nuestro.
+
+Lo causó Meta: **dejó de mandar `from` —el teléfono— y manda
+`from_user_id`**, un *Business-Scoped User ID*. Viene con los nombres de
+usuario de WhatsApp, y en cuanto ella activa el suyo, su número desaparece
+del webhook. Lo arregla el
+[ADR-0023](adr/0023-identidad-por-bsuid.md).
+
+Antes de rehacer nada se midió contra producción, con un despliegue que
+registraba solo los **nombres** de los campos:
+
+    campos=['from', 'from_user_id', 'id', 'text', 'timestamp', 'type']
+    campos_contacto=['profile', 'user_id', 'wa_id']
+    campos=['from_user_id', 'id', 'text', 'timestamp', 'type']   <- sin teléfono
+
+El BSUID llega **junto al** teléfono, no en su lugar, y además en
+`contacts[]`. Son dos mensajes medidos: confirman la forma, no que el
+BSUID venga siempre, y por eso la resolución de identidad tiene tres
+peldaños y cada uno se cuenta en la bitácora.
+
+**Dos decisiones que no eran obvias:**
+
+La identidad **es también el destino**, así que todas las respuestas pasan
+a salir por `recipient` en lugar de `to`. Se podían mandar los dos campos
+—Meta le da precedencia al teléfono—, y se descartó a propósito: con los
+dos, un error en el camino nuevo no se notaría nunca y el sistema estaría
+dando por bueno algo sin probar.
+
+**El corte limpio se cambió por un re-llaveo al medirlo.** El plan era
+recrear a «las cuatro usuarias registradas» y pedirles que volvieran a
+autorizar. Al exportar las conversaciones antes de tocar nada, la base
+decía **9 usuarias, 7 huertas, 56 cultivos y 204 mensajes**: el número de
+producción llevaba ocho días abierto. Así que la fila se re-llavea sola
+—de la huella del teléfono a la del BSUID— la primera vez que ella
+escriba, sin que se entere y sin perder nada. Es transitorio y hay que
+borrarlo.
+
+De paso salió que **`calls` está suscrito y nadie lo atiende**: si alguien
+llama al número en vez de escribir, no pasa nada y no queda rastro.
 
 ### Fase 7: el CU8, consultar la propia huerta, 09/09/2026
 

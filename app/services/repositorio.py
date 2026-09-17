@@ -4,10 +4,11 @@
 seguridad —el filtrado por usuario_id—, que es la barrera de acceso real
 del sistema, no el RLS (Fase 3, §5.1).
 
-Sobre la identidad: las funciones reciben el número de teléfono en claro,
-tal como llega de Meta, y calculan la huella internamente. Quien las
-llama nunca manipula huellas ni ve datos cifrados. El número no se
-almacena ni se registra en bitácora en ningún momento.
+Sobre la identidad: las funciones reciben el identificador en claro, tal
+como llega de Meta —el BSUID desde el ADR-0023, y solo en la rama de
+respaldo el teléfono—, y calculan la huella internamente. Quien las llama
+nunca manipula huellas ni ve datos cifrados. Ni el identificador ni el
+teléfono se almacenan ni se registran en bitácora en ningún momento.
 
 Estado actual: `usuario`, el catálogo `barrio`, la idempotencia del webhook,
 el registro del CU3 (`huerta`, `cultivo` y su borrador), las dos colecciones
@@ -23,7 +24,7 @@ from uuid import UUID
 
 from app.core.basedatos import obtener_pool
 from app.core.identidad import (
-    calcular_telefono_hash,
+    calcular_identidad_hash,
     cifrar_nombre,
     descifrar_nombre,
 )
@@ -1227,20 +1228,20 @@ async def ultimos_mensajes(usuario_id: UUID, limite: int) -> list[Turno]:
     ]
 
 
-async def buscar_usuaria(telefono: str) -> Usuaria | None:
-    """Busca a la usuaria por su número.
+async def buscar_usuaria(identidad: str) -> Usuaria | None:
+    """Busca a la usuaria por su identidad (ADR-0023).
 
     Devuelve None si no está registrada, que en este sistema equivale a
     que **no ha dado su consentimiento**: la fila solo existe si autorizó
     (CU1). La compuerta de consentimiento se apoya en esto.
     """
-    huella = calcular_telefono_hash(telefono)
+    huella = calcular_identidad_hash(identidad)
 
     fila = await obtener_pool().fetchrow(
         """
         select id, nombre_usuario_cifrado, consentimiento_en
           from usuario
-         where telefono_hash = $1
+         where identidad_hash = $1
         """,
         huella,
     )
@@ -1255,10 +1256,7 @@ async def buscar_usuaria(telefono: str) -> Usuaria | None:
     )
 
 
-async def registrar_consentimiento(
-    telefono: str,
-    nombre: str | None = None,
-) -> Usuaria:
+async def registrar_consentimiento(identidad: str) -> Usuaria:
     """Crea la fila de la usuaria, que ES el registro de su consentimiento.
 
     Deliberadamente NO existe un `buscar_o_crear`: crear la fila equivale
@@ -1267,27 +1265,22 @@ async def registrar_consentimiento(
     buscarla, saltaría la compuerta del CU1 sin que se notara.
 
     Es idempotente: si ya existe, no duplica ni pisa la fecha original de
-    consentimiento, que es la constancia legal (Ley 1581). Un nombre
-    nuevo sí completa el que faltara.
+    consentimiento, que es la constancia legal (Ley 1581).
     """
-    huella = calcular_telefono_hash(telefono)
-    cifrado = cifrar_nombre(nombre)
+    huella = calcular_identidad_hash(identidad)
 
     fila = await obtener_pool().fetchrow(
         """
-        insert into usuario (telefono_hash, nombre_usuario_cifrado)
-             values ($1, $2)
-        on conflict (telefono_hash) do update
-                set nombre_usuario_cifrado = coalesce(
-                        excluded.nombre_usuario_cifrado,
-                        usuario.nombre_usuario_cifrado)
+        insert into usuario (identidad_hash)
+             values ($1)
+        on conflict (identidad_hash) do update
+                set identidad_hash = excluded.identidad_hash
           returning id, nombre_usuario_cifrado, consentimiento_en
         """,
         huella,
-        cifrado,
     )
 
-    # El usuario_id es un UUID sin relación con el número: puede
+    # El usuario_id es un UUID sin relación con la identidad: puede
     # registrarse sin exponer datos personales.
     logger.info("Consentimiento registrado | usuario_id=%s", fila["id"])
 
@@ -1296,3 +1289,78 @@ async def registrar_consentimiento(
         nombre=descifrar_nombre(fila["nombre_usuario_cifrado"]),
         consentimiento_en=fila["consentimiento_en"],
     )
+
+
+async def guardar_nombre(usuario_id: UUID, nombre: str) -> None:
+    """Completa el nombre de pila de la usuaria, cifrado.
+
+    Lo escribe el onboarding en cuanto ella contesta la primera pregunta
+    (ADR-0016). Hasta el ADR-0023 lo hacía `registrar_consentimiento`,
+    aprovechando que era idempotente; se separó porque aquella función
+    identifica por la huella y aquí ya se tiene el `usuario_id`, que es
+    más directo y no obliga a arrastrar la identidad hasta el onboarding.
+    """
+    await obtener_pool().execute(
+        """
+        update usuario
+           set nombre_usuario_cifrado = $2
+         where id = $1
+        """,
+        usuario_id,
+        cifrar_nombre(nombre),
+    )
+
+    # Sin el nombre en la bitácora (CLAUDE.md §11).
+    logger.info("Nombre guardado | usuario_id=%s", usuario_id)
+
+
+# --- Re-llaveo transitorio del teléfono al BSUID (ADR-0023) -----------
+#
+# **Esto se borra.** Existe para que quien se registró cuando la identidad
+# era el teléfono no tenga que volver a autorizar ni a repetir el
+# onboarding, y deja de tener sentido en cuanto todas hayan escrito una
+# vez con el código nuevo desplegado.
+#
+# Mientras siga aquí, cada línea `Identidad re-llaveada` de la bitácora es
+# una usuaria menos por migrar.
+
+
+async def rellavear_identidad(identidad: str, telefono: str) -> bool:
+    """Le cambia la llave a la fila que estaba identificada por teléfono.
+
+    Solo actúa si se cumplen las tres condiciones a la vez: la fila del
+    teléfono existe, la del BSUID **no** —si existiera, ella ya escribió
+    con el código nuevo y esa es la buena— y son huellas distintas.
+    Devuelve si cambió algo.
+
+    No crea ninguna fila y no toca el consentimiento: `consentimiento_en`
+    sigue siendo el del día en que ella pulsó [Acepto], que es la
+    constancia legal. Lo único que cambia es por qué huella se la
+    reconoce, y con ella se conservan su huerta, sus cultivos y su
+    conversación, que cuelgan del `usuario_id`.
+    """
+    huella_nueva = calcular_identidad_hash(identidad)
+    huella_vieja = calcular_identidad_hash(telefono)
+
+    if huella_nueva == huella_vieja:
+        return False
+
+    usuario_id = await obtener_pool().fetchval(
+        """
+        update usuario
+           set identidad_hash = $1
+         where identidad_hash = $2
+           and not exists (
+               select 1 from usuario otra where otra.identidad_hash = $1
+           )
+     returning id
+        """,
+        huella_nueva,
+        huella_vieja,
+    )
+
+    if usuario_id is None:
+        return False
+
+    logger.info("Identidad re-llaveada al BSUID | usuario_id=%s", usuario_id)
+    return True

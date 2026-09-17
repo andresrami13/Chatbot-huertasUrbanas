@@ -70,9 +70,9 @@ _BARAJA_AUDIO = _Baraja(textos.ESPERA_AUDIO)
 _EN_VUELO: set[asyncio.Task] = set()
 
 
-async def _enviar_acuse(numero: str) -> None:
+async def _enviar_acuse(destino: str) -> None:
     try:
-        await enviar_texto(numero, _BARAJA_AUDIO.siguiente())
+        await enviar_texto(destino, _BARAJA_AUDIO.siguiente())
         logger.info("Acuse de nota de voz enviado")
     except Exception:
         # Que no salga el acuse no puede tumbar la respuesta: es un
@@ -80,8 +80,8 @@ async def _enviar_acuse(numero: str) -> None:
         logger.exception("Falló el acuse de la nota de voz")
 
 
-def acusar_audio(numero: str) -> None:
+def acusar_audio(destino: str) -> None:
     """Le confirma que la nota de voz llegó. No bloquea."""
-    tarea = asyncio.create_task(_enviar_acuse(numero))
+    tarea = asyncio.create_task(_enviar_acuse(destino))
     _EN_VUELO.add(tarea)
     tarea.add_done_callback(_EN_VUELO.discard)

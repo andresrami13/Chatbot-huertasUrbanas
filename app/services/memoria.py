@@ -157,7 +157,7 @@ async def _con_saludo(usuario_id: UUID, texto: str) -> str:
     return f"{textos.SALUDO_PERSONALIZADO.format(nombre=nombre)}\n\n{texto}"
 
 
-async def responder(numero: str, usuario_id: UUID, texto: str) -> None:
+async def responder(destino: str, usuario_id: UUID, texto: str) -> None:
     """Envía un texto a la usuaria y lo deja en la memoria.
 
     Es la forma normal de responder a alguien que ya autorizó. Antes de la
@@ -168,12 +168,12 @@ async def responder(numero: str, usuario_id: UUID, texto: str) -> None:
     saludo personalizado. Es deliberado; ver `_con_saludo`.
     """
     enviado = await _con_saludo(usuario_id, texto)
-    wamid = await enviar_texto(numero, enviado)
+    wamid = await enviar_texto(destino, enviado)
     await recordar_asistente(usuario_id, texto, wamid)
 
 
 async def responder_con_botones(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     cuerpo: str,
     botones: list[tuple[str, str]],
@@ -185,5 +185,5 @@ async def responder_con_botones(
     vuelve por el webhook.
     """
     enviado = await _con_saludo(usuario_id, cuerpo)
-    wamid = await enviar_botones(numero, enviado, botones)
+    wamid = await enviar_botones(destino, enviado, botones)
     await recordar_asistente(usuario_id, cuerpo, wamid)

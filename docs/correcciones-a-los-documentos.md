@@ -8,8 +8,9 @@ Es el consolidado que antes vivía en `docs/adr/README.md`. Se movió aquí para
 que haya un solo sitio que mantener, y porque incorpora además lo que se
 decidió después de escribir aquel listado.
 
-- **Corte:** 2026-09-08
-- **Estado del código:** commit `4db1c13` más el CU4/CU7 sin commitear
+- **Corte:** 2026-09-17
+- **Estado del código:** commit `55e5a4d` más la identidad por BSUID sin
+  commitear
 - **Regla:** cuando un ADR corrige un documento de fase, **prevalece el ADR**.
 
 Los valores de la tabla de parámetros se leyeron del código, no de la
@@ -202,6 +203,21 @@ con más peso legal del proyecto.
   frente a 0.1166 de separación—.
 - **Justifica:** [ADR-0018](adr/0018-sin-fecha-de-siembra.md), migración
   `008`
+
+### §5 y §5.2 — la identidad ya no es el teléfono
+
+- **Dice:** la usuaria se identifica por su número de celular, del que se
+  guarda un HMAC-SHA256 con pepper en `usuario.telefono_hash`. La
+  minimización se enuncia como «sin cédula ni dirección».
+- **Hace:** se identifica por el **Business-Scoped User ID** que manda
+  Meta, y la columna se llama `identidad_hash` (migración `010`). **El
+  teléfono no se guarda en ninguna forma, tampoco hasheado**, y la
+  respuesta le sale por `recipient` en lugar de `to`. No fue una mejora
+  buscada: Meta dejó de mandar el número de quien activa su nombre de
+  usuario de WhatsApp, y el 15/09/2026 eso dejó a 8 de unos 69 mensajes
+  —el 12 %— sin respuesta ninguna. Resulta que minimiza más que lo que
+  el documento pedía.
+- **Justifica:** [ADR-0023](adr/0023-identidad-por-bsuid.md)
 
 ### §5.2 — la conversación queda almacenada
 
@@ -413,6 +429,16 @@ deducirse.
 ## Lo que sigue abierto
 
 Antes de dar la Fase 7 por cerrada.
+
+**El envío por `recipient` no está probado en vivo.** Es el camino por el
+que salen ahora **todas** las respuestas (ADR-0023), y el único punto donde
+equivocarse deja a alguien sin recibir nada. Comprobado contra la
+documentación y con el spike, que no llega a Meta; falta escribirle al bot
+desde un celular.
+
+**El re-llaveo de identidades es transitorio y hay que borrarlo.** Vive en
+`dispatcher` y en `repositorio.rellavear_identidad`, y deja de tener sentido
+en cuanto las nueve usuarias hayan escrito una vez con el código nuevo.
 
 **El corpus no es del todo reproducible.** `jbb_practicas_2022` tiene 62
 fragmentos en la base y el código produce 83, comprobado revirtiendo el árbol

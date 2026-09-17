@@ -3,6 +3,9 @@
 Envía las respuestas a través de la Meta Cloud API. Es la única salida
 del sistema hacia la usuaria.
 
+El destinatario es la **identidad** de la usuaria, que desde el ADR-0023
+es su BSUID; ver `_campo_destino`.
+
 Solo dos tipos de mensaje, y es deliberado (Fase 2, §1): texto libre como
 vía principal, y botones únicamente en los dos momentos binarios del
 diseño —el consentimiento y la confirmación de un registro—. No hay menús
@@ -14,7 +17,7 @@ import logging
 import httpx
 
 from app.config import settings
-from app.core.identidad import referencia_wamid
+from app.core.identidad import es_telefono, referencia_wamid
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,24 @@ def _url() -> str:
         f"https://graph.facebook.com/{settings.META_GRAPH_VERSION}"
         f"/{settings.META_PHONE_NUMBER_ID}/messages"
     )
+
+
+def _campo_destino(destino: str) -> dict:
+    """En qué campo viaja el destinatario: `to` o `recipient` (ADR-0023).
+
+    Desde que la identidad es el BSUID, lo normal es `recipient`. El `to`
+    de toda la vida queda para la rama de respaldo del despachador, la
+    que actúa cuando un mensaje llega sin BSUID y solo hay teléfono.
+
+    Meta admite mandar los dos, y entonces manda el teléfono. Aquí se
+    manda **uno**: con los dos, un error en el BSUID no se notaría nunca
+    —el envío saldría bien por el número— y el sistema estaría diciendo
+    que funciona algo que no se ha probado.
+    """
+    if es_telefono(destino):
+        return {"to": destino}
+
+    return {"recipient": destino}
 
 
 async def _enviar(carga: dict) -> str | None:
@@ -152,7 +173,7 @@ async def enviar_texto(destino: str, texto: str) -> str | None:
         {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
-            "to": destino,
+            **_campo_destino(destino),
             "type": "text",
             # preview_url en false: los enlaces no generan vista previa,
             # que en pantallas pequeñas ocupa espacio y distrae.
@@ -194,7 +215,7 @@ async def enviar_botones(
         {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
-            "to": destino,
+            **_campo_destino(destino),
             "type": "interactive",
             "interactive": {
                 "type": "button",

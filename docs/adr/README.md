@@ -32,6 +32,7 @@ documento queda marcado como pendiente de corrección.
 | [0020](0020-indices-fuera-del-corpus-y-umbral-a-066.md) | Los renglones de índice salen del corpus, y el umbral baja a 0.66 | Aceptada; **la calibración no está cerrada**. Obsoleta la medición del [0010](0010-umbral-de-similitud-recalibrado.md) | Fase 4 (§7) / ADR-0010 |
 | [0021](0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md) | El listado de la comunidad lo compone el código, y la búsqueda por cultivo se separa como CU7 | Aceptada; retira el respaldo por listado del [0011](0011-fragmento-comunitario-solo-especies.md) | Fase 2 (CU4) / ADR-0011 |
 | [0022](0022-consultar-mi-propia-huerta.md) | Consultar la propia huerta es el CU8, y son cinco herramientas | Aceptada; enmienda el «son cuatro» del [0013](0013-agente-orquestador.md) | Sin respaldo documental |
+| [0023](0023-identidad-por-bsuid.md) | La identidad de la usuaria es el BSUID, no su teléfono | Aceptada; corrige la «identidad por número de celular» de la Fase 3 | Fase 3 (§5) |
 
 ## Documentos pendientes de corrección
 

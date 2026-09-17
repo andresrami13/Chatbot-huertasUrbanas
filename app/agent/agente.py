@@ -282,7 +282,7 @@ def _pregunta_de(llamada, mensaje: str) -> str:
 
 async def _ejecutar(
     llamada,
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     mensaje: str,
 ) -> bool:
@@ -308,7 +308,7 @@ async def _ejecutar(
         # recupera nada, el CU2 reintenta con lo que ella escribió, que es
         # la formulación sobre la que existe la calibración del umbral.
         await responder(
-            numero, usuario_id, await consultar_orientacion(pregunta, mensaje)
+            destino, usuario_id, await consultar_orientacion(pregunta, mensaje)
         )
         return True
 
@@ -332,7 +332,7 @@ async def _ejecutar(
             usuario_id,
         )
         await responder(
-            numero,
+            destino,
             usuario_id,
             await consultar_comunidad(pregunta, usuario_id, especie or None),
         )
@@ -343,14 +343,14 @@ async def _ejecutar(
         # `usuario_id`, no de nada que escriba el modelo. Mismo criterio
         # que `registrar_huerta` (ADR-0013).
         logger.info("Herramienta %s | usuario_id=%s", nombre, usuario_id)
-        await responder(numero, usuario_id, await consultar_mi_huerta(usuario_id))
+        await responder(destino, usuario_id, await consultar_mi_huerta(usuario_id))
         return True
 
     if nombre == _AYUDA:
         # Texto fijo, sin pasar por el modelo (Fase 2, §4). El modelo
         # decidió cuándo; el qué no es suyo.
         logger.info("Herramienta %s", nombre)
-        await responder(numero, usuario_id, textos.BIENVENIDA)
+        await responder(destino, usuario_id, textos.BIENVENIDA)
         return True
 
     if nombre == _REGISTRO:
@@ -363,7 +363,7 @@ async def _ejecutar(
             # extraer ("sembré algo el otro día"). Se le pregunta en lugar
             # de proponerle guardar un borrador vacío.
             logger.info("Herramienta %s sin datos que extraer", nombre)
-            await responder(numero, usuario_id, textos.REGISTRO_NADA_QUE_ANOTAR)
+            await responder(destino, usuario_id, textos.REGISTRO_NADA_QUE_ANOTAR)
             return True
 
         logger.info("Herramienta %s | cultivos=%d", nombre, len(extraida.cultivos))
@@ -372,7 +372,7 @@ async def _ejecutar(
         # código, no el modelo (ADR-0008). El barrio y el nombre de la
         # huerta los lee del registro, no del catálogo: los fijó el
         # onboarding (ADR-0016).
-        await proponer_registro(numero, usuario_id, extraida)
+        await proponer_registro(destino, usuario_id, extraida)
         return True
 
     logger.warning("El modelo pidió una función que no existe | nombre=%s", nombre)
@@ -393,7 +393,7 @@ def _texto_de(respuesta) -> str:
     return "".join(parte.text for parte in partes if parte.text).strip()
 
 
-async def atender(numero: str, usuario_id: UUID, mensaje: str) -> None:
+async def atender(destino: str, usuario_id: UUID, mensaje: str) -> None:
     """Atiende un mensaje ya normalizado de una usuaria con consentimiento.
 
     Responde por WhatsApp y deja constancia en la memoria. No devuelve
@@ -423,7 +423,7 @@ async def atender(numero: str, usuario_id: UUID, mensaje: str) -> None:
         )
     except Exception:
         logger.exception("Gemini falló al decidir qué hacer con el mensaje")
-        await responder(numero, usuario_id, textos.AGENTE_NO_DISPONIBLE)
+        await responder(destino, usuario_id, textos.AGENTE_NO_DISPONIBLE)
         return
 
     llamadas = _seleccionar(respuesta.function_calls or [])
@@ -439,7 +439,7 @@ async def atender(numero: str, usuario_id: UUID, mensaje: str) -> None:
     respondido = False
     for llamada in llamadas:
         try:
-            respondido |= await _ejecutar(llamada, numero, usuario_id, mensaje)
+            respondido |= await _ejecutar(llamada, destino, usuario_id, mensaje)
         except Exception:
             # Una herramienta que falle no debe impedir que se ejecute la
             # otra: en un mensaje de doble intención, que falle la consulta
@@ -454,11 +454,11 @@ async def atender(numero: str, usuario_id: UUID, mensaje: str) -> None:
     texto = _texto_de(respuesta)
 
     if texto:
-        await responder(numero, usuario_id, texto)
+        await responder(destino, usuario_id, texto)
         return
 
     # Ni funciones ni texto. Pasa si el modelo corta por filtros de
     # seguridad. Sin esto la usuaria se quedaría sin respuesta y creería
     # que el bot está caído.
     logger.error("El agente no produjo ni función ni texto")
-    await responder(numero, usuario_id, textos.BIENVENIDA)
+    await responder(destino, usuario_id, textos.BIENVENIDA)

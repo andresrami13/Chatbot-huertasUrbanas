@@ -12,6 +12,11 @@ consentimiento y solo después el resto. Centralizarlo aquí evita
 duplicarlo en cada flujo y cierra la posibilidad de procesar datos de
 alguien que no ha autorizado.
 
+**A quién pertenece el mensaje lo decide `_resolver_identidad`**, y desde
+el ADR-0023 es el BSUID, no el teléfono. Meta dejó de mandar el número de
+quien tiene nombre de usuario, y el 15/09/2026 eso dejó a ocho mensajes
+de setenta sin respuesta ninguna.
+
 Orden interno, y el orden importa: identificar el mensaje -> compuerta de
 consentimiento -> normalización de la entrada -> memoria -> agente. La
 transcripción va **después** de la compuerta a propósito (ADR-0006), y la
@@ -43,14 +48,18 @@ import logging
 
 from app import textos
 from app.agent.agente import atender
-from app.core.identidad import huella_wamid, referencia_wamid
+from app.core.identidad import es_telefono, huella_wamid, referencia_wamid
 from app.services.consentimiento import compuerta
 from app.services.espera import acusar_audio
 from app.services.memoria import recordar_usuaria
 from app.services.normalizacion import transcribir_audio
 from app.services.onboarding import atender_onboarding, iniciar_onboarding
 from app.services.registro import confirmar_registro, descartar_registro
-from app.services.repositorio import marcar_procesado, reclamar_wamid
+from app.services.repositorio import (
+    marcar_procesado,
+    reclamar_wamid,
+    rellavear_identidad,
+)
 from app.services.whatsapp import enviar_texto, marcar_escribiendo
 
 logger = logging.getLogger(__name__)
@@ -86,39 +95,83 @@ async def procesar_evento(payload: dict) -> None:
                 if mensajes and campo != "messages":
                     logger.warning("Mensajes en un campo inesperado | field=%s", campo)
 
-                # --- Diagnóstico temporal del BSUID (17/09/2026) ---------
-                #
-                # Meta dejó de mandar el teléfono de quien tiene nombre de
-                # usuario y en su lugar manda un Business-Scoped User ID.
-                # La documentación dice que el BSUID viaja también en
-                # `contacts[].user_id`, que sería el respaldo si algún día
-                # faltara en el mensaje. Pero la documentación describe la
-                # versión vigente y este webhook está suscrito en v25.0, así
-                # que hay que comprobar contra producción que ese bloque
-                # llega y con qué campos (CLAUDE.md §12).
-                #
-                # Solo los NOMBRES de los campos, nunca sus valores:
-                # `contacts[]` trae el nombre de perfil y el número.
-                #
-                # **Se borra en cuanto la identidad pase al BSUID.**
-                if mensajes:
-                    contactos = valor.get("contacts", [])
-                    logger.info(
-                        "Cambio con mensajes | mensajes=%d | contactos=%d | "
-                        "campos_contacto=%s",
-                        len(mensajes),
-                        len(contactos),
-                        sorted(contactos[0]) if contactos else [],
-                    )
+                # El BSUID viaja por partida doble: en cada mensaje y en
+                # `contacts[]`. El segundo solo sirve de respaldo si hay
+                # **un** mensaje y **un** contacto; con varios de cada uno,
+                # emparejarlos por su posición en la lista sería adivinar, y
+                # equivocarse ahí es atribuirle a una usuaria lo que dijo
+                # otra. Ver `_resolver_identidad`.
+                contactos = valor.get("contacts", [])
+                respaldo = (
+                    contactos[0].get("user_id")
+                    if len(mensajes) == 1 and len(contactos) == 1
+                    else None
+                )
 
                 for mensaje in mensajes:
-                    await _procesar_mensaje(mensaje)
+                    await _procesar_mensaje(mensaje, respaldo)
 
     except Exception:
         # El despachador corre fuera del ciclo de la petición: si estalla
         # aquí, la excepción se pierde en silencio. Registrarla es la
         # única forma de enterarse.
         logger.exception("Error no controlado procesando el evento")
+
+
+# --- De quién es el mensaje (ADR-0023) --------------------------------
+#
+# Meta identifica a la usuaria con un **Business-Scoped User ID**, un
+# identificador propio de este portafolio de negocio que llega en todos
+# los mensajes, tenga ella nombre de usuario o no. El teléfono, en
+# cambio, **desaparece** del webhook en cuanto ella activa el suyo.
+#
+# Eso se descubrió el 16/09/2026 leyendo la bitácora: ocho mensajes de
+# unos setenta se estaban descartando con `Mensaje sin remitente`, todos
+# del 15/09 en adelante y con el mismo despliegue corriendo desde el 10.
+# No lo causó ningún cambio nuestro.
+#
+# La escalera tiene respaldo porque lo comprobado contra producción son
+# dos mensajes: confirman la **forma** del webhook, no que el BSUID venga
+# siempre. Cada peldaño se cuenta en la bitácora, y esa cuenta es la
+# medición permanente de si el supuesto sigue en pie.
+
+
+def _resolver_identidad(
+    mensaje: dict,
+    respaldo_contacto: str | None,
+    ref: str,
+) -> str | None:
+    """Con qué se reconoce a la usuaria, y a dónde se le responde.
+
+    Devuelve None si no hay nada con lo que identificarla, y entonces el
+    mensaje se descarta: sin identidad no hay a quién responderle ni bajo
+    qué fila guardar nada.
+    """
+    bsuid = mensaje.get("from_user_id")
+    if bsuid:
+        logger.info("Identidad | origen=mensaje | ref=%s", ref)
+        return bsuid
+
+    if respaldo_contacto:
+        # No es lo esperado: la documentación dice que el BSUID va en
+        # todos los mensajes. Que se use este peldaño significa que la
+        # forma del webhook cambió.
+        logger.warning("Identidad | origen=contacto | ref=%s", ref)
+        return respaldo_contacto
+
+    telefono = mensaje.get("from")
+    if telefono:
+        # Red de seguridad, no funcionamiento normal. Si se usa, esta
+        # usuaria queda identificada por su número y **se duplicará** en
+        # cuanto vuelva a llegar su BSUID: son dos huellas distintas y el
+        # sistema no puede saber que son la misma persona.
+        logger.warning(
+            "Identidad | origen=telefono | ref=%s | sin BSUID en el webhook",
+            ref,
+        )
+        return telefono
+
+    return None
 
 
 # --- El reclamo del mensaje cuando la base falla (ADR-0019) -----------
@@ -217,7 +270,7 @@ async def _reclamar_con_reintentos(huella: str, ref: str) -> bool:
 # disculpas seguidas eran un escenario de laboratorio.
 
 
-async def _avisar_base_caida(numero: str | None, ref: str) -> None:
+async def _avisar_base_caida(destino: str, ref: str) -> None:
     """Le dice que vuelva a escribir, sin mencionar ninguna tecnología.
 
     Se envía con `enviar_texto` y **no se recuerda**, que es la segunda
@@ -229,7 +282,7 @@ async def _avisar_base_caida(numero: str | None, ref: str) -> None:
 
     Va antes de la compuerta, sin saber si autorizó, por el mismo motivo
     que el indicador de «escribiendo» (ADR-0017, decisión B): es un texto
-    fijo devuelto al número que acaba de escribir. No lee su mensaje, no lo
+    fijo devuelto a quien acaba de escribir. No lee su mensaje, no lo
     transcribe, no llama al modelo y no persiste nada suyo.
 
     **Avisa siempre.** Si la caída dura, ella recibe la misma disculpa por
@@ -237,16 +290,12 @@ async def _avisar_base_caida(numero: str | None, ref: str) -> None:
     es inequívoco, mientras que callar después de haberle pedido que
     vuelva a escribir la deja peor que si nunca le hubiéramos hablado.
     """
-    if not numero:
-        logger.warning("Fallo de base sin remitente al que avisar | ref=%s", ref)
-        return
-
     # `enviar_texto` no toca la base y no lanza: devuelve None si falla.
-    await enviar_texto(numero, textos.SERVICIO_NO_DISPONIBLE)
+    await enviar_texto(destino, textos.SERVICIO_NO_DISPONIBLE)
     logger.info("Avisado de que el servicio no está disponible | ref=%s", ref)
 
 
-async def _procesar_mensaje(mensaje: dict) -> None:
+async def _procesar_mensaje(mensaje: dict, respaldo_contacto: str | None) -> None:
     """Reclama el mensaje, lo atiende y solo entonces lo cierra.
 
     El orden es el que exige el ADR-0005: `procesado` se marca **al
@@ -269,6 +318,15 @@ async def _procesar_mensaje(mensaje: dict) -> None:
     ref = referencia_wamid(wamid)
     huella = huella_wamid(wamid)
 
+    # Antes del reclamo, porque el aviso de base caída ya necesita saber a
+    # dónde responder. Un mensaje sin identidad ni se reclama: así no
+    # gasta una fila de idempotencia que impediría atenderlo si Meta lo
+    # reenviara con la forma buena.
+    identidad = _resolver_identidad(mensaje, respaldo_contacto, ref)
+    if identidad is None:
+        logger.warning("Mensaje sin identidad; se descarta | ref=%s", ref)
+        return
+
     try:
         reclamado = await _reclamar_con_reintentos(huella, ref)
     except Exception:
@@ -277,7 +335,7 @@ async def _procesar_mensaje(mensaje: dict) -> None:
         logger.exception(
             "No se pudo reclamar el mensaje; la base no responde | ref=%s", ref
         )
-        await _avisar_base_caida(mensaje.get("from"), ref)
+        await _avisar_base_caida(identidad, ref)
         return
 
     if not reclamado:
@@ -285,7 +343,7 @@ async def _procesar_mensaje(mensaje: dict) -> None:
         return
 
     try:
-        await _atender_mensaje(mensaje, ref)
+        await _atender_mensaje(mensaje, identidad, ref)
     except Exception:
         # Se deja a propósito en 'recibido': es lo que permite recuperarlo.
         logger.exception("Fallo atendiendo el mensaje | ref=%s", ref)
@@ -294,35 +352,21 @@ async def _procesar_mensaje(mensaje: dict) -> None:
     await marcar_procesado(huella)
 
 
-async def _atender_mensaje(mensaje: dict, ref: str) -> None:
+async def _atender_mensaje(mensaje: dict, identidad: str, ref: str) -> None:
     """El trabajo en sí. Que lance una excepción es aceptable: quien llama
-    la captura y deja el mensaje disponible para el reintento."""
+    la captura y deja el mensaje disponible para el reintento.
+
+    `identidad` es también el destino de la respuesta (ADR-0023), y por eso
+    de aquí en adelante viaja con el nombre `destino`: los módulos que la
+    reciben no identifican a nadie, solo le responden.
+    """
     tipo = mensaje.get("type")
-    numero = mensaje.get("from")
+    destino = identidad
 
-    # Minimización de datos (Fase 3, capa 6): no se registra el número del
-    # remitente ni el contenido del mensaje en la bitácora. Tampoco el
+    # Minimización de datos (Fase 3, capa 6): no se registra la identidad
+    # de la usuaria ni el contenido del mensaje en la bitácora. Tampoco el
     # wamid, que contiene el número (ver `huella_wamid`).
-    #
-    # `campos` son los NOMBRES de lo que trae el objeto, nunca sus valores:
-    # son nombres de la API de Meta, no datos de la usuaria, así que no
-    # incumple el CLAUDE.md §11.
-    #
-    # **Diagnóstico temporal (17/09/2026), y se borra con el anterior.** El
-    # 16/09 se descubrió que Meta manda `from_user_id` —el BSUID— en lugar
-    # del teléfono cuando la usuaria tiene nombre de usuario. La
-    # documentación dice que el BSUID llega en **todos** los mensajes, con
-    # nombre de usuario o sin él, pero describe la versión vigente y este
-    # webhook está suscrito en v25.0. Antes de rehacer la identidad sobre
-    # ese campo hay que verlo llegar en los mensajes que hoy **sí**
-    # funcionan, no solo en los que fallan.
-    logger.info(
-        "Mensaje entrante | tipo=%s | ref=%s | campos=%s", tipo, ref, sorted(mensaje)
-    )
-
-    if not numero:
-        logger.warning("Mensaje sin remitente; se descarta | ref=%s", ref)
-        return
+    logger.info("Mensaje entrante | tipo=%s | ref=%s", tipo, ref)
 
     # Los tres puntitos de "escribiendo", lo primero de todo (ADR-0017,
     # segunda revisión). Sustituye al aviso de texto que se puso y se retiró
@@ -365,12 +409,26 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     else:
         logger.info("Tipo de mensaje no soportado aún | tipo=%s", tipo)
 
+    # Re-llaveo transitorio del ADR-0023, **y se borra**. Cuando el mensaje
+    # trae las dos cosas —BSUID y teléfono, que es lo que llega hoy en la
+    # mayoría—, se aprovecha para cambiarle la llave a quien se registró
+    # cuando la identidad era el número. Sin esto, la compuerta no la
+    # reconocería y volvería a pedirle el consentimiento y el onboarding
+    # enteros, perdiendo su huerta y sus cultivos.
+    #
+    # Va antes de la compuerta porque es ella quien decide si está
+    # registrada, y no crea ninguna fila: solo cambia la llave de una que
+    # ya existe, con su fecha de consentimiento intacta.
+    telefono = mensaje.get("from")
+    if telefono and not es_telefono(identidad):
+        await rellavear_identidad(identidad, telefono)
+
     # Compuerta de consentimiento. Si devuelve None, ya atendió el
     # mensaje: pidió autorización, la registró o respondió la ayuda.
     #
     # El audio llega aquí sin texto, y es correcto: quien no ha autorizado
     # recibe la solicitud de permiso, sin que su voz salga del backend.
-    usuaria = await compuerta(numero, texto, boton_id)
+    usuaria = await compuerta(identidad, texto, boton_id)
     if usuaria is None:
         return
 
@@ -381,7 +439,7 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     # memoria —la memoria empieza donde termina la compuerta (ADR-0012)—,
     # pero la primera pregunta sí, porque la envía `memoria.responder`.
     if boton_id == textos.BOTON_ACEPTO:
-        await iniciar_onboarding(numero, usuaria.id)
+        await iniciar_onboarding(destino, usuaria.id)
         return
 
     # Normalización de la entrada (CLAUDE.md §4.4). Una sola vez, en un
@@ -390,13 +448,13 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     if media_id_audio is not None:
         # Se le confirma que la nota de voz llegó antes de ponerse a
         # transcribirla, que es lo más lento del flujo. No bloquea.
-        acusar_audio(numero)
+        acusar_audio(destino)
         texto = await transcribir_audio(media_id_audio)
         if texto is None:
             # No se registra nada en la memoria: no hay contenido que
             # guardar, y anotar solo la disculpa dejaría una respuesta sin
             # la pregunta que la provocó (ADR-0012).
-            await enviar_texto(numero, textos.AUDIO_NO_ENTENDIDO)
+            await enviar_texto(destino, textos.AUDIO_NO_ENTENDIDO)
             return
 
     # Memoria de la conversación (ADR-0012). Aquí y no antes: después de la
@@ -421,18 +479,18 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     #
     # Mientras no complete las tres preguntas no hay huerta donde registrar
     # nada, de modo que tampoco hay nada que el agente pueda enrutar.
-    if await atender_onboarding(numero, usuaria.id, texto, boton_id):
+    if await atender_onboarding(destino, usuaria.id, texto, boton_id):
         return
 
     # Botones del registro (CU3). Van antes de cualquier interpretación:
     # una pulsación no es un mensaje que haya que entender, es una respuesta
     # a algo que ya se le preguntó.
     if boton_id == textos.BOTON_REGISTRO_CONFIRMO:
-        await confirmar_registro(numero, usuaria.id)
+        await confirmar_registro(destino, usuaria.id)
         return
 
     if boton_id == textos.BOTON_REGISTRO_DESCARTO:
-        await descartar_registro(numero, usuaria.id)
+        await descartar_registro(destino, usuaria.id)
         return
 
     if not texto:
@@ -445,7 +503,7 @@ async def _atender_mensaje(mensaje: dict, ref: str) -> None:
     # A partir de aquí decide el agente: saludo, orientación, comunidad,
     # registro, o varias a la vez (Fase 2, §4; ADR-0013). Él responde y
     # deja constancia en la memoria.
-    await atender(numero, usuaria.id, texto)
+    await atender(destino, usuaria.id, texto)
 
 
 def _tipo_entrante(media_id_audio: str | None, boton_id: str | None) -> str:

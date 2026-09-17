@@ -2,12 +2,22 @@
 
 Resuelve los datos personales del sistema:
 
-- El **teléfono** nunca se almacena. Se convierte en un HMAC-SHA256 con
-  un pepper secreto y se guarda solo esa huella. Es determinista a
-  propósito: el mismo número produce siempre la misma huella, lo que
-  permite reconocer a la usuaria en cada mensaje con una consulta
-  directa, sin haber guardado nunca el número. El número en claro existe
-  únicamente en memoria durante la petición.
+- La **identidad** de la usuaria es su **BSUID** —el Business-Scoped
+  User ID que Meta manda en cada mensaje— y ya no su teléfono
+  (ADR-0023). De ella se guarda un HMAC-SHA256 con un pepper secreto y
+  solo esa huella. Es determinista a propósito: la misma identidad
+  produce siempre la misma huella, lo que permite reconocer a la usuaria
+  en cada mensaje con una consulta directa, sin haber guardado nunca el
+  identificador. El valor en claro existe únicamente en memoria durante
+  la petición.
+
+  El **teléfono** dejó de guardarse, ni siquiera hasheado, y en el
+  funcionamiento normal ya ni se lee. Quedan dos usos, los dos declarados:
+  la rama de respaldo del despachador —si un mensaje llegara sin BSUID, se
+  identifica por número y entonces sí se guarda esa huella— y el re-llaveo
+  transitorio, que compara la huella vieja para reconocer a quien se
+  registró antes del ADR-0023. Por eso siguen aquí `normalizar_telefono` y
+  el dominio del teléfono.
 
 - El **nombre** se cifra con AES-GCM del lado de la aplicación, de modo
   que la base solo almacena texto cifrado y la clave nunca viaja a
@@ -47,6 +57,33 @@ _MAX_DIGITOS = 15
 
 _SOLO_DIGITOS = re.compile(r"\D")
 
+# Forma que puede tener un teléfono escrito: dígitos y su puntuación
+# habitual, nada más. Deja fuera cualquier letra y el punto, que es lo que
+# distingue a un BSUID. Ver `es_telefono`.
+_FORMA_TELEFONO = re.compile(r"^[\d+()\-\s]+$")
+
+# Etiquetas de dominio del HMAC. Separan los tres espacios de
+# identificadores aunque compartan el pepper, de modo que ninguna huella de
+# uno pueda coincidir con la de otro.
+#
+# El teléfono no lleva etiqueta, y es deliberado: su huella se calculaba
+# así desde el primer día y cambiarla ahora equivaldría a cambiar el
+# pepper —las usuarias que quedaran identificadas por número dejarían de
+# ser reconocidas— sin ganar nada, porque los otros dos dominios ya la
+# separan de todo lo demás.
+_DOMINIO_TELEFONO = ""
+_DOMINIO_BSUID = "bsuid:"
+_DOMINIO_WAMID = "wamid:"
+
+
+def _huella(dominio: str, valor: str) -> str:
+    """HMAC-SHA256 del valor dentro de su dominio, en hexadecimal."""
+    return hmac.new(
+        key=settings.PHONE_HASH_PEPPER.encode("utf-8"),
+        msg=(dominio + valor).encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+
 
 def normalizar_telefono(numero: str) -> str:
     """Deja el número en dígitos, sin signos ni espacios.
@@ -73,24 +110,50 @@ def normalizar_telefono(numero: str) -> str:
     return digitos
 
 
-def calcular_telefono_hash(numero: str) -> str:
-    """Devuelve el HMAC-SHA256 del número en hexadecimal (64 caracteres).
+def es_telefono(identidad: str | None) -> bool:
+    """Indica si un identificador es un número de teléfono.
 
-    Coincide con la restricción CHECK de `usuario.telefono_hash`.
+    Decide dos cosas que **no pueden discrepar**: con qué dominio se
+    calcula la huella (ver `calcular_identidad_hash`) y en qué campo sale
+    el destinatario hacia Meta —`to` para un teléfono, `recipient` para un
+    BSUID (`whatsapp._campo_destino`)—. Por eso es una sola función y no
+    dos comprobaciones parecidas en sitios distintos.
+
+    No basta con preguntarle a `normalizar_telefono`, que **quita** todo lo
+    que no sea dígito: un BSUID corto como `CO.12345678` quedaría en ocho
+    dígitos y pasaría por teléfono. De ahí el filtro de forma previo, que
+    no adivina qué es un BSUID —eso lo fija Meta y puede cambiar— sino que
+    exige que un teléfono tenga solo dígitos y su puntuación. Un BSUID
+    nunca la cumple: siempre empieza por dos letras de código de país y un
+    punto (`US.13491208655302741918`).
     """
-    normalizado = normalizar_telefono(numero)
+    if not identidad or not _FORMA_TELEFONO.match(identidad):
+        return False
 
-    return hmac.new(
-        key=settings.PHONE_HASH_PEPPER.encode("utf-8"),
-        msg=normalizado.encode("utf-8"),
-        digestmod=hashlib.sha256,
-    ).hexdigest()
+    try:
+        normalizar_telefono(identidad)
+    except ValueError:
+        return False
+
+    return True
 
 
-# Etiqueta de dominio del HMAC. Separa el espacio de los `wamid` del de
-# los teléfonos aunque compartan el pepper: así ninguna huella de un
-# espacio puede coincidir con la del otro.
-_DOMINIO_WAMID = "wamid:"
+def calcular_identidad_hash(identidad: str) -> str:
+    """Huella HMAC-SHA256 de la identidad, en hexadecimal (64 caracteres).
+
+    Es la llave de `usuario.identidad_hash`, y coincide con su restricción
+    CHECK. Único punto por el que se calcula, para que la huella de una
+    usuaria no dependa de por dónde entró.
+
+    Cada espacio de identificadores lleva su propia etiqueta de dominio,
+    igual que el `wamid`: así la huella de un BSUID no puede coincidir con
+    la de un teléfono aunque compartan pepper y columna.
+    """
+    if es_telefono(identidad):
+        return _huella(_DOMINIO_TELEFONO, normalizar_telefono(identidad))
+
+    return _huella(_DOMINIO_BSUID, identidad)
+
 
 # Longitud de la referencia que va a la bitácora. 16 caracteres hex bastan
 # para no confundir dos mensajes y caben en una línea de registro.
@@ -106,15 +169,11 @@ def huella_wamid(wamid: str) -> str:
     que un reintento de Meta se reconoce igual de bien que con el valor en
     claro.
 
-    Depende del pepper, con la misma consecuencia que el teléfono: si el
+    Depende del pepper, con la misma consecuencia que la identidad: si el
     pepper cambia, las huellas viejas dejan de coincidir. Para la
     idempotencia eso solo significa olvidar qué mensajes ya se procesaron.
     """
-    return hmac.new(
-        key=settings.PHONE_HASH_PEPPER.encode("utf-8"),
-        msg=(_DOMINIO_WAMID + wamid).encode("utf-8"),
-        digestmod=hashlib.sha256,
-    ).hexdigest()
+    return _huella(_DOMINIO_WAMID, wamid)
 
 
 def referencia_wamid(wamid: str) -> str:

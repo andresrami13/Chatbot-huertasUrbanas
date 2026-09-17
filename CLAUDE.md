@@ -140,8 +140,14 @@ encuesta (Fase 1, n=11). No las revises ni las "mejores" por tu cuenta.
    médico para una persona concreta.
 7. **Confirmar antes de guardar.** Toda extracción de entidades se muestra a la
    usuaria y se persiste solo tras su confirmación.
-8. **Identidad por número de celular.** Sin cédula, sin dirección
-   (minimización, Ley 1581 de 2012).
+8. **Identidad por el BSUID que manda Meta, no por el celular**
+   (ADR-0023, 17/09/2026). Sin cédula, sin dirección y **sin teléfono,
+   ni siquiera hasheado** (minimización, Ley 1581 de 2012). El
+   Business-Scoped User ID llega en todos los mensajes; el número
+   desaparece del webhook en cuanto ella activa su nombre de usuario de
+   WhatsApp, y el 15/09/2026 eso dejó a ocho mensajes de setenta sin
+   respuesta ninguna. La identidad **es también el destino del envío**,
+   que sale en `recipient` y no en `to`.
 9. **Las intenciones se resuelven con function calling**, no con un
    clasificador aparte.
 
@@ -231,6 +237,14 @@ así que no puede llevar `usuario_id` ni ningún dato personal.
 columna booleana: el CU1 prohíbe persistir nada antes de autorizar y el
 ADR-0003 prohíbe guardar el rechazo.
 
+**La llave de esa fila es `identidad_hash`**, la huella del BSUID que
+manda Meta (ADR-0023, migración `010`). Se llamaba `telefono_hash` hasta
+el 17/09/2026, y el nombre viejo mentiría: el teléfono ya no se guarda
+de ninguna forma. Cada espacio de identificadores lleva su propia
+etiqueta de dominio en el HMAC —`bsuid:`, como ya se hacía con
+`wamid:`—, así que dos huellas de espacios distintos no pueden coincidir
+aunque compartan pepper y columna.
+
 Dos colecciones vectoriales **separadas** (no una sola con discriminador):
 `fragmento_oficial` (vinculada a `fuente`) y `fragmento_comunitario` (vinculada
 a `huerta`).
@@ -256,17 +270,19 @@ que no se versiona.
 |---|---|
 | 1 | Filtrado por `usuario_id` en cada consulta — **barrera principal** |
 | 2 | RLS en Supabase — defensa en profundidad, no barrera primaria (el backend usa service role, que omite RLS) |
-| 3 | `telefono_hash` con HMAC-SHA256 + pepper; `nombre_usuario` cifrado con AES-GCM del lado de la aplicación |
+| 3 | `identidad_hash` con HMAC-SHA256 + pepper y etiqueta de dominio (ADR-0023); `nombre_usuario` cifrado con AES-GCM del lado de la aplicación |
 | 4 | El flujo del CU4 selecciona solo columnas compartibles |
 | 5 | Secretos en variables de entorno; verify token y firma de Meta |
-| 6 | Minimización: sin cédula ni dirección |
+| 6 | Minimización: sin cédula, sin dirección y sin teléfono en ninguna forma (ADR-0023) |
 
 **No cifres la información agronómica.** Alimenta la búsqueda vectorial y
 cifrarla rompe la recuperación.
 
 **`PHONE_HASH_PEPPER` y `NAME_ENCRYPTION_KEY` son críticos.** Si el pepper
-cambia, los números entrantes dejan de coincidir con los hashes guardados y las
-usuarias registradas dejan de ser reconocidas.
+cambia, las identidades entrantes dejan de coincidir con las huellas guardadas
+y las usuarias registradas dejan de ser reconocidas. El nombre de la variable
+quedó impreciso con el ADR-0023 y **no se cambia**: renombrarla no es gratis y
+tocar su valor es irreversible.
 
 **Límite declarado:** esto no es cifrado de conocimiento cero. El operador del
 backend tiene las claves en tiempo de ejecución, y los mensajes viajan en claro
@@ -429,25 +445,30 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 
 ## 10. Estado de la infraestructura
 
-- **Meta:** app creada, número de prueba operativo, token permanente de usuario
-  del sistema generado. Restricción de portfolio apelada; **la revisión sigue
-  abierta**, así que el acceso puede considerarse provisional.
+- **Meta:** token permanente de usuario del sistema generado. Restricción
+  de portfolio apelada; **la revisión sigue abierta**, así que el acceso
+  puede considerarse provisional.
 - **Número de producción desde el 09/09/2026.** Se migró del número de
-  prueba —que admitía un máximo de 5 destinatarios verificados— a un número
-  propio, con WABA y token de acceso nuevos, todo actualizado en Railway.
-  **Ya le puede escribir cualquiera.** El `PHONE_NUMBER_ID` cambió al
-  migrar; **nunca lo escribas en el código**.
+  prueba —que admitía un máximo de 5 destinatarios verificados— a un
+  número propio, con WABA y token de acceso nuevos, todo actualizado en
+  Railway. **Ya le puede escribir cualquiera.** El `PHONE_NUMBER_ID`
+  cambió al migrar; **nunca lo escribas en el código**.
 - **Supabase:** operativo. PostgreSQL 17.6, RLS activo sin políticas.
   Conexión por **session pooler, puerto 5432**. **765 fragmentos oficiales
   en nueve fuentes** desde el 19/08/2026. Escribir ahí cambia lo que
   responde el bot **en el acto**, con o sin despliegue: Railway lee esta
-  misma base. Al 08/09/2026 hay **4 usuarias, 4 huertas con 13 cultivos** y
-  sus fragmentos comunitarios.
+  misma base. **Al 17/09/2026 hay 9 usuarias, 7 huertas con 56 cultivos**
+  y 204 mensajes — contado al exportar las conversaciones antes de tocar
+  la identidad. Los documentos decían 4 y 4: el número de producción
+  llevaba ocho días abierto y la gente escribió.
 - **Migraciones aplicadas: hasta la `008`.** Comprobado el 08/09/2026
   contra `information_schema` —la columna `fecha_siembra_aprox` ya no
   existe—, lo que cierra la duda que este archivo arrastraba. **La `009`
   está sin correr**, y el listado del CU4 la necesita en cuanto haya más
-  huertas que `CU4_HUERTAS_POR_TANDA`.
+  huertas que `CU4_HUERTAS_POR_TANDA`. **La `010` tampoco**, y esa va
+  junto con su despliegue: renombra `usuario.telefono_hash` a
+  `identidad_hash` (ADR-0023) y, mientras una cosa y otra no coincidan,
+  ningún mensaje se atiende.
 - **Railway:** desplegado y con el servicio en marcha. `/health` dice qué
   commit está corriendo, así que confirmar un despliegue no exige mandar un
   WhatsApp. **`/health` dice también qué modelo generativo corre**, desde
@@ -496,9 +517,11 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   motivo: lleva el nombre, que va cifrado en `usuario` mientras
   `mensaje.contenido` va en claro (ADR-0016).
 - **Los scripts de `scripts/` que escriben en la base crean datos
-  temporales y los borran en un `finally`**, con teléfonos que empiezan por
-  `57000000`. Hay **una fila real** en `usuario`, la del celular de pruebas
-  del autor: no la toques.
+  temporales y los borran en un `finally`**, con identidades que llevan
+  `57000000` dentro —con forma de BSUID desde el ADR-0023, como
+  `CO.570000000601`—. Al 17/09/2026 hay **nueve filas reales** en
+  `usuario`, siete de ellas con huerta, y son el material de la Fase 7: no
+  las toques.
 - **Ninguna fuente oficial se ingiere a mano.** Se declara en
   `scripts/catalogo_fuentes.py` y se ingiere con
   `python -m scripts.ingesta_fuente --fuente <clave>` (ADR-0014). Los PDF

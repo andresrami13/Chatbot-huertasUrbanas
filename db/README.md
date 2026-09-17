@@ -18,6 +18,7 @@ En el editor SQL de Supabase, **en este orden**:
 | [`007_onboarding_pendiente.sql`](007_onboarding_pendiente.sql) | Estado del onboarding de tres preguntas ([ADR-0016](../docs/adr/0016-onboarding-de-preguntas-cerradas.md)) |
 | [`008_sin_fecha_de_siembra.sql`](008_sin_fecha_de_siembra.sql) | Retira `fecha_siembra_aprox` y `fecha_imprecisa` de `cultivo` ([ADR-0018](../docs/adr/0018-sin-fecha-de-siembra.md)) |
 | [`009_listado_comunitario_pendiente.sql`](009_listado_comunitario_pendiente.sql) | Por dónde va el listado de otras huertas del CU4 ([ADR-0021](../docs/adr/0021-listado-de-la-comunidad-y-busqueda-por-cultivo.md)) |
+| [`010_identidad_bsuid.sql`](010_identidad_bsuid.sql) | `usuario.telefono_hash` pasa a `identidad_hash` ([ADR-0023](../docs/adr/0023-identidad-por-bsuid.md)) |
 
 Todas son idempotentes: reejecutarlas no duplica nada.
 
@@ -27,6 +28,15 @@ revés, cada confirmación del CU3 falla mientras dure la ventana, porque
 Railway lee esta misma base. Ese código está en `main` desde el commit
 `d6cac90`; **compruebe con `/health` que es lo que Railway está corriendo
 antes de aplicarla**, que para eso ese endpoint dice el commit.
+
+**La `010` va con su despliegue, y esta vez al revés que la `008`:** el
+código de ahora lee `identidad_hash` y el desplegado lee `telefono_hash`,
+así que entre el uno y el otro **cada mensaje que llegue falla y la
+usuaria se queda sin respuesta**. Es cosa de un minuto y no se pierde
+nada —la fila de idempotencia queda en 'recibido'—, pero hágalo a una
+hora tranquila y compruebe con `/health` cuál commit está corriendo. No
+borra ninguna fila: a las usuarias registradas por teléfono les cambia la
+llave el propio despachador la primera vez que escriban.
 
 **La `009` va después, y el CU4 la necesita.** Sin la tabla, una consulta
 a la comunidad falla en cuanto haya más huertas que `CU4_HUERTAS_POR_TANDA`
@@ -80,7 +90,7 @@ Solo dos columnas contienen datos personales, y ninguna en claro:
 
 | Columna | Protección |
 |---|---|
-| `usuario.telefono_hash` | HMAC-SHA256 + pepper, desde la aplicación |
+| `usuario.identidad_hash` | HMAC-SHA256 + pepper y etiqueta de dominio, desde la aplicación. Es la huella del BSUID de Meta; **el teléfono ya no se guarda de ninguna forma** ([ADR-0023](../docs/adr/0023-identidad-por-bsuid.md)) |
 | `usuario.nombre_usuario_cifrado` | AES-GCM, desde la aplicación |
 
 Toda la información agronómica queda **sin cifrar a propósito**: alimenta

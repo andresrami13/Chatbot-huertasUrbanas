@@ -63,7 +63,7 @@ def es_saludo_o_ayuda(texto: str | None) -> bool:
 
 
 async def compuerta(
-    numero: str,
+    identidad: str,
     texto: str | None,
     boton_id: str | None,
 ) -> Usuaria | None:
@@ -72,6 +72,11 @@ async def compuerta(
     Devuelve la usuaria si el mensaje puede seguir al agente, o None si la
     compuerta ya lo atendió (pidió autorización, la registró, o respondió
     la ayuda).
+
+    `identidad` es a la vez con qué se la reconoce y a dónde se le
+    responde, porque desde el ADR-0023 son el mismo valor: el BSUID que
+    Meta manda en cada mensaje. De ahí en adelante los demás módulos solo
+    lo usan para enviar, y por eso allí se llama `destino`.
     """
     # 1. La usuaria acepta. Es el único punto del sistema donde se crea
     #    una fila a partir de un mensaje entrante.
@@ -81,18 +86,18 @@ async def compuerta(
     #    importar `onboarding`, que a su vez necesita `es_saludo_o_ayuda`
     #    de este módulo y formaría un ciclo.
     if boton_id == textos.BOTON_ACEPTO:
-        usuaria = await registrar_consentimiento(numero)
-        await enviar_texto(numero, textos.CONSENTIMIENTO_ACEPTADO)
+        usuaria = await registrar_consentimiento(identidad)
+        await enviar_texto(identidad, textos.CONSENTIMIENTO_ACEPTADO)
         return usuaria
 
     # 2. La usuaria rechaza. Se responde una sola vez y no se insiste
     #    (ADR-0003). No se guarda nada: el sistema no recuerda el rechazo.
     if boton_id == textos.BOTON_NO_ACEPTO:
         logger.info("Autorización rechazada; no se persiste nada")
-        await enviar_texto(numero, textos.CONSENTIMIENTO_RECHAZADO)
+        await enviar_texto(identidad, textos.CONSENTIMIENTO_RECHAZADO)
         return None
 
-    usuaria = await buscar_usuaria(numero)
+    usuaria = await buscar_usuaria(identidad)
 
     # 3. Ya autorizó: el mensaje sigue su camino.
     if usuaria is not None:
@@ -101,10 +106,10 @@ async def compuerta(
     # 4. No ha autorizado. Solo la bienvenida y la ayuda están
     #    disponibles; todo lo demás termina en la solicitud de permiso.
     if es_saludo_o_ayuda(texto):
-        await enviar_texto(numero, textos.BIENVENIDA)
+        await enviar_texto(identidad, textos.BIENVENIDA)
 
     await enviar_botones(
-        numero,
+        identidad,
         textos.SOLICITUD_CONSENTIMIENTO,
         [
             (textos.BOTON_ACEPTO, "Acepto"),

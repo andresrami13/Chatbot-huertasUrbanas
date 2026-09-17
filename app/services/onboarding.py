@@ -44,11 +44,11 @@ from app.services.repositorio import (
     Barrio,
     borrar_onboarding,
     guardar_huerta,
+    guardar_nombre,
     guardar_onboarding,
     listar_barrios,
     obtener_huerta_de_usuaria,
     obtener_onboarding,
-    registrar_consentimiento,
 )
 
 logger = logging.getLogger(__name__)
@@ -275,7 +275,7 @@ def componer_resumen(nombre: str | None, barrio: str, huerta: str) -> str:
 
 
 async def _preguntar(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     paso: str,
     datos: dict,
@@ -283,10 +283,10 @@ async def _preguntar(
 ) -> None:
     """Guarda el estado y hace la pregunta correspondiente."""
     await guardar_onboarding(usuario_id, paso, datos)
-    await responder(numero, usuario_id, texto)
+    await responder(destino, usuario_id, texto)
 
 
-async def iniciar_onboarding(numero: str, usuario_id: UUID) -> None:
+async def iniciar_onboarding(destino: str, usuario_id: UUID) -> None:
     """Arranca el onboarding por la primera pregunta.
 
     Se llama justo después de que ella acepte, y también cuando vuelve
@@ -296,7 +296,7 @@ async def iniciar_onboarding(numero: str, usuario_id: UUID) -> None:
     """
     logger.info("Onboarding iniciado | usuario_id=%s", usuario_id)
     await _preguntar(
-        numero,
+        destino,
         usuario_id,
         PASO_NOMBRE,
         {"fallos": 0},
@@ -305,7 +305,7 @@ async def iniciar_onboarding(numero: str, usuario_id: UUID) -> None:
 
 
 async def atender_onboarding(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     texto: str | None,
     boton_id: str | None,
@@ -327,7 +327,7 @@ async def atender_onboarding(
         if await obtener_huerta_de_usuaria(usuario_id) is not None:
             return False
 
-        await iniciar_onboarding(numero, usuario_id)
+        await iniciar_onboarding(destino, usuario_id)
         return True
 
     # El CU5 no tiene precondición: se atiende la ayuda y se repite la
@@ -335,31 +335,31 @@ async def atender_onboarding(
     # nada porque "ayuda" es una respuesta válida a cualquier paso.
     if es_saludo_o_ayuda(texto):
         logger.info("Ayuda dentro del onboarding | paso=%s", estado.paso)
-        await responder(numero, usuario_id, textos.BIENVENIDA)
-        await _repetir_pregunta(numero, usuario_id, estado.paso, estado.datos)
+        await responder(destino, usuario_id, textos.BIENVENIDA)
+        await _repetir_pregunta(destino, usuario_id, estado.paso, estado.datos)
         return True
 
     if estado.paso == PASO_NOMBRE:
-        await _atender_nombre(numero, usuario_id, texto, estado.datos)
+        await _atender_nombre(destino, usuario_id, texto, estado.datos)
     elif estado.paso == PASO_BARRIO:
-        await _atender_barrio(numero, usuario_id, texto, estado.datos)
+        await _atender_barrio(destino, usuario_id, texto, estado.datos)
     elif estado.paso == PASO_BARRIO_OPCIONES:
-        await _atender_opcion_barrio(numero, usuario_id, texto, estado.datos)
+        await _atender_opcion_barrio(destino, usuario_id, texto, estado.datos)
     elif estado.paso == PASO_HUERTA:
-        await _atender_huerta(numero, usuario_id, texto, estado.datos)
+        await _atender_huerta(destino, usuario_id, texto, estado.datos)
     elif estado.paso == PASO_CONFIRMACION:
-        await _atender_confirmacion(numero, usuario_id, boton_id, estado.datos)
+        await _atender_confirmacion(destino, usuario_id, boton_id, estado.datos)
     else:
         # Paso desconocido: el estado quedó de una versión anterior. Se
         # reinicia en lugar de dejarla atascada.
         logger.warning("Paso de onboarding desconocido | paso=%s", estado.paso)
-        await iniciar_onboarding(numero, usuario_id)
+        await iniciar_onboarding(destino, usuario_id)
 
     return True
 
 
 async def _repetir_pregunta(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     paso: str,
     datos: dict,
@@ -377,16 +377,16 @@ async def _repetir_pregunta(
         mensaje = textos.ONBOARDING_PREGUNTA_HUERTA
     elif paso == PASO_CONFIRMACION:
         # Lleva botones, así que se rehace entero por el camino que los pone.
-        await _proponer_cierre(numero, usuario_id, datos)
+        await _proponer_cierre(destino, usuario_id, datos)
         return
     else:
         mensaje = textos.ONBOARDING_PREGUNTA_NOMBRE
 
-    await responder(numero, usuario_id, mensaje)
+    await responder(destino, usuario_id, mensaje)
 
 
 async def _atender_nombre(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     texto: str | None,
     datos: dict,
@@ -404,21 +404,17 @@ async def _atender_nombre(
             if fallos >= 2
             else textos.ONBOARDING_PREGUNTA_NOMBRE
         )
-        await _preguntar(numero, usuario_id, PASO_NOMBRE, datos, mensaje)
+        await _preguntar(destino, usuario_id, PASO_NOMBRE, datos, mensaje)
         return
 
     nombre = (texto or "").strip()
 
     # El nombre se persiste YA, cifrado, porque su fila de `usuario` existe
-    # desde el consentimiento. `registrar_consentimiento` es idempotente y
-    # hace coalesce sobre el nombre, así que sirve para completarlo sin una
-    # función nueva. Por eso el eco dice "guardé" y no "anoté".
-    await registrar_consentimiento(numero, nombre)
-
-    logger.info("Onboarding: nombre guardado | usuario_id=%s", usuario_id)
+    # desde el consentimiento. Por eso el eco dice "guardé" y no "anoté".
+    await guardar_nombre(usuario_id, nombre)
 
     await _preguntar(
-        numero,
+        destino,
         usuario_id,
         PASO_BARRIO,
         {"fallos": 0, "nombre": nombre},
@@ -429,7 +425,7 @@ async def _atender_nombre(
 
 
 async def _atender_barrio(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     texto: str | None,
     datos: dict,
@@ -437,7 +433,7 @@ async def _atender_barrio(
     """Segunda pregunta: el barrio, en lenguaje natural."""
     if not _es_respuesta_util(texto, maximo_palabras=8):
         await _preguntar(
-            numero,
+            destino,
             usuario_id,
             PASO_BARRIO,
             datos,
@@ -449,7 +445,7 @@ async def _atender_barrio(
 
     if not candidatos:
         await _preguntar(
-            numero,
+            destino,
             usuario_id,
             PASO_BARRIO,
             datos,
@@ -463,11 +459,11 @@ async def _atender_barrio(
         datos.get("intentos_ninguno", 0) >= _NINGUNO_PARA_OFRECER_OTRO,
     )
 
-    await _preguntar(numero, usuario_id, PASO_BARRIO_OPCIONES, datos, mensaje)
+    await _preguntar(destino, usuario_id, PASO_BARRIO_OPCIONES, datos, mensaje)
 
 
 async def _atender_opcion_barrio(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     texto: str | None,
     datos: dict,
@@ -483,13 +479,13 @@ async def _atender_opcion_barrio(
     if eleccion is None:
         # No es un número. Una quinta opción no arregla esto: si no consigue
         # escribir "3", tampoco escribirá "5". Se repite y ya.
-        await responder(numero, usuario_id, textos.ONBOARDING_NUMERO_NO_ENTENDIDO)
+        await responder(destino, usuario_id, textos.ONBOARDING_NUMERO_NO_ENTENDIDO)
         return
 
     # La última opción, cuando está ofrecida, es "mi barrio no está".
     if ofrecer_otro and eleccion == maximo:
         logger.info("Onboarding: barrio 'otro' por descarte | usuario_id=%s", usuario_id)
-        await _pasar_a_huerta(numero, usuario_id, datos, _CODIGO_OTRO, None)
+        await _pasar_a_huerta(destino, usuario_id, datos, _CODIGO_OTRO, None)
         return
 
     # "Ninguno de estos": se repregunta el barrio y se cuenta el intento.
@@ -502,7 +498,7 @@ async def _atender_opcion_barrio(
             intentos + 1,
         )
         await _preguntar(
-            numero,
+            destino,
             usuario_id,
             PASO_BARRIO,
             datos,
@@ -511,11 +507,11 @@ async def _atender_opcion_barrio(
         return
 
     codigo, nombre = candidatos[eleccion - 1]
-    await _pasar_a_huerta(numero, usuario_id, datos, codigo, nombre)
+    await _pasar_a_huerta(destino, usuario_id, datos, codigo, nombre)
 
 
 async def _pasar_a_huerta(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     datos: dict,
     codigo: str,
@@ -539,7 +535,7 @@ async def _pasar_a_huerta(
         cabecera = ""
 
     await _preguntar(
-        numero,
+        destino,
         usuario_id,
         PASO_HUERTA,
         datos,
@@ -548,7 +544,7 @@ async def _pasar_a_huerta(
 
 
 async def _atender_huerta(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     texto: str | None,
     datos: dict,
@@ -564,14 +560,14 @@ async def _atender_huerta(
             if fallos >= 2
             else textos.ONBOARDING_PREGUNTA_HUERTA
         )
-        await _preguntar(numero, usuario_id, PASO_HUERTA, datos, mensaje)
+        await _preguntar(destino, usuario_id, PASO_HUERTA, datos, mensaje)
         return
 
     datos["nombre_huerta"] = (texto or "").strip()
-    await _proponer_cierre(numero, usuario_id, datos)
+    await _proponer_cierre(destino, usuario_id, datos)
 
 
-async def _proponer_cierre(numero: str, usuario_id: UUID, datos: dict) -> None:
+async def _proponer_cierre(destino: str, usuario_id: UUID, datos: dict) -> None:
     """Muestra los tres datos y pide la confirmación con botones.
 
     Es el único momento con botones del onboarding, y reutiliza los del CU3
@@ -586,7 +582,7 @@ async def _proponer_cierre(numero: str, usuario_id: UUID, datos: dict) -> None:
     )
 
     await responder_con_botones(
-        numero,
+        destino,
         usuario_id,
         resumen,
         [
@@ -603,7 +599,7 @@ async def _proponer_cierre(numero: str, usuario_id: UUID, datos: dict) -> None:
 
 
 async def _atender_confirmacion(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     boton_id: str | None,
     datos: dict,
@@ -611,22 +607,22 @@ async def _atender_confirmacion(
     """El botón del cierre. Aquí es donde se crea la fila de `huerta`."""
     if boton_id == textos.BOTON_REGISTRO_DESCARTO:
         logger.info("Onboarding descartado por la usuaria | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.ONBOARDING_DESCARTADO)
-        await iniciar_onboarding(numero, usuario_id)
+        await responder(destino, usuario_id, textos.ONBOARDING_DESCARTADO)
+        await iniciar_onboarding(destino, usuario_id)
         return
 
     if boton_id != textos.BOTON_REGISTRO_CONFIRMO:
         # Escribió en vez de pulsar. Se le vuelve a mostrar el resumen con
         # los botones en lugar de interpretar el texto: lo que falta es su
         # confirmación, no otro dato.
-        await _proponer_cierre(numero, usuario_id, datos)
+        await _proponer_cierre(destino, usuario_id, datos)
         return
 
     barrio_codigo = datos.get("barrio_codigo")
     if not barrio_codigo:
         # No debería ocurrir: no se llega a la confirmación sin barrio.
         logger.warning("Confirmación de onboarding sin barrio | usuario_id=%s", usuario_id)
-        await iniciar_onboarding(numero, usuario_id)
+        await iniciar_onboarding(destino, usuario_id)
         return
 
     try:
@@ -642,7 +638,7 @@ async def _atender_confirmacion(
         # El estado NO se borra: así puede reintentar el botón sin volver a
         # contestar las tres preguntas.
         logger.exception("Falló el cierre del onboarding | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.ONBOARDING_FALLO)
+        await responder(destino, usuario_id, textos.ONBOARDING_FALLO)
         return
 
     # No se genera el fragmento comunitario: sin cultivos no hay especies
@@ -653,4 +649,4 @@ async def _atender_confirmacion(
     logger.info(
         "Onboarding completado | usuario_id=%s | huerta_id=%s", usuario_id, huerta_id
     )
-    await responder(numero, usuario_id, textos.ONBOARDING_GUARDADO)
+    await responder(destino, usuario_id, textos.ONBOARDING_GUARDADO)

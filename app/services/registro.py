@@ -120,7 +120,7 @@ def componer_resumen(extraida: HuertaExtraida, huerta: HuertaDeUsuaria) -> str:
 
 
 async def proponer_registro(
-    numero: str,
+    destino: str,
     usuario_id: UUID,
     extraida: HuertaExtraida,
 ) -> None:
@@ -133,7 +133,7 @@ async def proponer_registro(
         # porque callar dejaría en la memoria un hueco que el agente no
         # puede detectar (ADR-0012).
         logger.warning("Registro propuesto sin huerta | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.REGISTRO_SIN_HUERTA)
+        await responder(destino, usuario_id, textos.REGISTRO_SIN_HUERTA)
         return
 
     previa = await obtener_borrador(usuario_id)
@@ -149,7 +149,7 @@ async def proponer_registro(
     )
 
     await responder_con_botones(
-        numero,
+        destino,
         usuario_id,
         componer_resumen(extraida, huerta),
         [
@@ -165,14 +165,14 @@ async def proponer_registro(
     )
 
 
-async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
+async def confirmar_registro(destino: str, usuario_id: UUID) -> None:
     """Persiste el borrador. Es el único punto que escribe en `cultivo`."""
     datos = await obtener_borrador(usuario_id)
 
     if datos is None:
         # Caducó, o pulsó el botón de un mensaje viejo ya resuelto.
         logger.info("Confirmación sin borrador vigente | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.REGISTRO_SIN_BORRADOR)
+        await responder(destino, usuario_id, textos.REGISTRO_SIN_BORRADOR)
         return
 
     extraida = _deserializar(datos)
@@ -185,14 +185,14 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
         # El borrador NO se borra: así puede reintentar sin volver a
         # contarlo todo.
         logger.exception("Falló el guardado del registro | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.REGISTRO_FALLO)
+        await responder(destino, usuario_id, textos.REGISTRO_FALLO)
         return
 
     if huerta_id is None:
         # La huerta desapareció entre la propuesta y la confirmación. El
         # borrador se conserva por si vuelve a haberla.
         logger.warning("Confirmación sin huerta | usuario_id=%s", usuario_id)
-        await responder(numero, usuario_id, textos.REGISTRO_SIN_HUERTA)
+        await responder(destino, usuario_id, textos.REGISTRO_SIN_HUERTA)
         return
 
     # Fuera de la transacción y después de confirmar el guardado, a
@@ -208,11 +208,11 @@ async def confirmar_registro(numero: str, usuario_id: UUID) -> None:
     await regenerar_fragmento(huerta_id)
 
     await borrar_borrador(usuario_id)
-    await responder(numero, usuario_id, textos.REGISTRO_GUARDADO)
+    await responder(destino, usuario_id, textos.REGISTRO_GUARDADO)
 
 
-async def descartar_registro(numero: str, usuario_id: UUID) -> None:
+async def descartar_registro(destino: str, usuario_id: UUID) -> None:
     """Tira el borrador sin guardar nada."""
     await borrar_borrador(usuario_id)
     logger.info("Registro descartado por la usuaria | usuario_id=%s", usuario_id)
-    await responder(numero, usuario_id, textos.REGISTRO_DESCARTADO)
+    await responder(destino, usuario_id, textos.REGISTRO_DESCARTADO)

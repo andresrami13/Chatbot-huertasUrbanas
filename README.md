@@ -18,9 +18,11 @@ usuarias de la comunidad.
 
 ## Estado
 
-**Fase 7 — calibración y pruebas.** Los cinco casos de uso están
-construidos, desplegados y probados desde un celular real. Lo que queda es
-medirlos y calibrarlos.
+**Fase 7 — calibración y pruebas.** Los ocho casos de uso están
+construidos y desplegados. El bot está en un **número de producción**
+desde el 09/09/2026 —ya no hay límite de destinatarios— y cuatro personas
+distintas se registraron por su cuenta desde sus celulares. Lo que queda
+es medir y calibrar.
 
 Lo que **no** está cerrado, y conviene saberlo antes de leer cualquier
 número de este repositorio:
@@ -31,9 +33,9 @@ número de este repositorio:
 - **El corpus no es del todo reproducible.** La fuente
   `jbb_practicas_2022` tiene 62 fragmentos en la base y el código produce
   83. Mientras siga así, toda calibración hereda esa debilidad.
-- **El CU4 no se ha ejercitado de verdad**, y no por un fallo: excluye a
-  propósito la huerta de quien pregunta, y hasta ahora nunca ha habido más
-  de una registrada. Necesita las 5–7 huertas de la evaluación.
+- **El CU4, el CU7 y el CU8 se desplegaron el 08 y el 09/09/2026 y todavía
+  no han pasado por un celular real.** Están probados contra la base real
+  y con `spike_despachador`, no desde un teléfono.
 
 El detalle, con las mediciones que respaldan cada decisión, está en
 [`docs/ESTADO.md`](docs/ESTADO.md).
@@ -45,8 +47,11 @@ El detalle, con las mediciones que respaldan cada decisión, está en
 | CU1 | Iniciar y autorizar el tratamiento de datos | Primer contacto |
 | CU2 | Consultar orientación agroecológica sobre fuentes oficiales | Consentimiento |
 | CU3 | Registrar la información de su huerta | Consentimiento |
-| CU4 | Consultar qué siembran otras huertas | Consentimiento + datos existentes |
+| CU4 | Consultar qué siembran otras huertas (listado) | Consentimiento + datos existentes |
 | CU5 | Pedir ayuda | Ninguna |
+| CU6 | Onboarding (nombre, barrio, nombre de huerta) | Consentimiento |
+| CU7 | Buscar un cultivo concreto en otras huertas | Consentimiento + datos existentes |
+| CU8 | Consultar mi propia huerta | Consentimiento + onboarding |
 
 Acepta mensajes escritos y notas de voz. La respuesta es siempre escrita:
 la salida por voz y la búsqueda en internet están fuera del alcance.
@@ -80,9 +85,10 @@ El orden importa y está fijado en
 
 ### El agente
 
-Un modelo con **function calling** elige entre cuatro herramientas
-—`consultar_orientacion`, `consultar_comunidad`, `registrar_huerta` y
-`mostrar_ayuda`— y el backend ejecuta lo que pidió.
+Un modelo con **function calling** elige entre cinco herramientas
+—`consultar_orientacion`, `consultar_comunidad`, `registrar_huerta`,
+`mostrar_ayuda` y `consultar_mi_huerta`— y el backend ejecuta lo que
+pidió.
 
 - **Enruta, no relata.** Lo que devuelve cada herramienta se envía tal
   cual, sin volver a pasar por el modelo. Una segunda pasada a temperatura
@@ -96,9 +102,25 @@ Un modelo con **function calling** elige entre cuatro herramientas
   extracción corre aparte, a temperatura 0.1 y sobre el mensaje literal.
   Si los datos vinieran del modelo, «cebolla larga» volvería como
   «cebolla».
+- **`consultar_comunidad` cubre el CU4 y el CU7 con un parámetro.** Si
+  viene `especie`, es una búsqueda (CU7); si no, es el listado (CU4). El
+  agente decide la vía **antes** de recuperar, porque decidirla después
+  —mirando si la búsqueda encontró algo— hacía que preguntar por un
+  cultivo que nadie tiene se contestara con un listado de huertas que no
+  lo tienen.
+- **`consultar_mi_huerta` tampoco lleva parámetros.** Sin ella el agente
+  respondía «qué tengo sembrado» leyendo la ventana de memoria, y nombraba
+  solo el último cultivo registrado.
 - **Multi-intención:** un mensaje puede disparar varias funciones. El
   orden lo impone el código, no el modelo — el registro va siempre el
   último, porque lleva botones.
+- **El modelo generativo lo manda una variable de Railway** —
+  `GEMINI_GENERATIVE_MODEL`—, con el mismo valor de vuelta en
+  `app/config.py` para que el repositorio deje constancia de con qué
+  corre. Importa más de lo que parece: medido con las mismas 19 frases,
+  un modelo acertó el enrutamiento 100 % y otro 66 %, y en el 66 % el
+  fallo era «no llamó a ninguna herramienta» — el agente le manda entonces
+  el texto que el modelo haya escrito, saltándose el caso de uso entero.
 
 ### Jerarquía de fuentes
 
@@ -141,6 +163,7 @@ desviación declarada respecto de la Fase 3.
         identidad.py                HMAC del teléfono y cifrado del nombre
         basedatos.py                Pool de asyncpg contra Supabase
         gemini.py                   Cliente único; modelo de embeddings fijo
+        texto.py                    Normalización para comparar (sin tildes/signos)
       services/
         dispatcher.py               Orden del flujo e idempotencia
         consentimiento.py           CU1 — la compuerta
@@ -148,10 +171,11 @@ desviación declarada respecto de la Fase 3.
         registro.py                 CU3 — borrador, botones y persistencia
         extraccion.py               Los cultivos, a temperatura 0.1
         orientacion.py              CU2 — RAG y respaldo del modelo
-        comunidad.py                CU4 — qué siembran otras huertas
+        comunidad.py                CU4 y CU7 — listado propio y búsqueda de otras huertas
+        mi_huerta.py                CU8 — qué tiene registrado la propia usuaria
         recuperacion.py             Búsqueda por similitud y atribución
         embeddings.py               Vectorización y normalización L2
-        fragmento_comunitario.py    El derivado que alimenta el CU4
+        fragmento_comunitario.py    El derivado que alimenta la búsqueda del CU7
         memoria.py                  Ventana de conversación; enviar y recordar
         normalizacion.py            Transcripción de la nota de voz
         media.py                    Descarga del audio desde Meta
@@ -171,15 +195,17 @@ carga con un `KeyError`**.
 
 ## Datos
 
-Once tablas. Las siete entidades de la Fase 3 —`usuario`, `huerta`,
+Doce tablas. Las siete entidades de la Fase 3 —`usuario`, `huerta`,
 `cultivo`, `mensaje`, `fuente`, `fragmento_oficial`,
-`fragmento_comunitario`—, el catálogo `barrio`, y tres tablas de estado
-efímero: idempotencia del webhook, borrador del registro y onboarding en
-curso.
+`fragmento_comunitario`—, el catálogo `barrio`, y cuatro tablas de estado
+efímero: idempotencia del webhook, borrador del registro, onboarding en
+curso y el recorrido del listado del CU4.
 
 **Dos colecciones vectoriales separadas**, no una sola con discriminador:
 `fragmento_oficial` cuelga de `fuente` y `fragmento_comunitario` de
-`huerta`.
+`huerta`. Desde el ADR-0021 la colección comunitaria solo la consulta el
+CU7 (búsqueda por cultivo); el listado del CU4 lee `cultivo` directamente,
+sin pasar por pgvector ni por el modelo.
 
 - **Corpus oficial: 765 fragmentos de nueve fuentes.** Siete son del
   Jardín Botánico de Bogotá, una de la FAO y una de la UNAD. La entidad
@@ -202,10 +228,10 @@ El barrio **no filtra** la recuperación comunitaria; solo atribuye.
 |---|---|
 | 1 | Filtrado por `usuario_id` en cada consulta — **la barrera real** |
 | 2 | RLS activo en Supabase, sin políticas — defensa en profundidad |
-| 3 | `telefono_hash` con HMAC-SHA256 + pepper; nombre cifrado con AES-GCM |
+| 3 | `identidad_hash` con HMAC-SHA256 + pepper; nombre cifrado con AES-GCM |
 | 4 | El CU4 selecciona solo columnas compartibles |
 | 5 | Secretos en variables de entorno; verify token y firma de Meta |
-| 6 | Minimización: identidad por celular, sin cédula ni dirección |
+| 6 | Minimización: identidad por el BSUID de Meta, sin teléfono, sin cédula ni dirección |
 
 El backend usa la clave de *service role*, que omite el RLS por diseño:
 por eso la barrera primaria es la capa 1 y no la 2.
@@ -217,6 +243,13 @@ búsqueda vectorial y cifrarla rompería la recuperación.
 teléfono del remitente en ASCII, recuperable con un `base64 -d`. Para la
 bitácora se usa `referencia_wamid`; para almacenar y comparar,
 `huella_wamid`.
+
+**El teléfono no se guarda en ninguna forma desde el 17/09/2026.** La
+usuaria se identifica por el *Business-Scoped User ID* que Meta manda en
+cada mensaje, y de él se guarda solo una huella
+([ADR-0023](docs/adr/0023-identidad-por-bsuid.md)). El cambio nació de un
+fallo: Meta deja de mandar el número de quien activa su nombre de usuario
+de WhatsApp, y esas personas le escribían al bot sin recibir nada.
 
 Tres límites que conviene declarar y no maquillar:
 
@@ -270,12 +303,12 @@ Supabase, y son idempotentes: reejecutarlos no duplica nada.
 | `005_registro_pendiente.sql` | Borrador del CU3 a la espera de confirmación (ADR-0008) |
 | `006_memoria_mensaje.sql` | El `wamid` sale de `mensaje` y entra la huella (ADR-0012) |
 | `007_onboarding_pendiente.sql` | Onboarding en curso (ADR-0016) |
-| `008_sin_fecha_de_siembra.sql` | Retira la fecha de siembra de `cultivo` (ADR-0018) |
+| `008_sin_fecha_de_siembra.sql` | Retira la fecha de siembra de `cultivo` (ADR-0018). **Aplicada**, comprobado el 08/09/2026 contra `information_schema` |
+| `009_listado_comunitario_pendiente.sql` | Por dónde va el recorrido del listado del CU4 (ADR-0021) |
 
-Dos avisos: **hay dos archivos con el prefijo `003`** —el de RLS y el
-catálogo de barrios, que llegó después—, y el `002` quedó superado por ese
-catálogo. Y [`db/README.md`](db/README.md) **está desactualizado**: describe
-el esquema tal como estaba en la migración `005`.
+**Hay dos archivos con el prefijo `003`** —el de RLS y el catálogo de
+barrios, que llegó después—, y el `002` quedó superado por ese catálogo.
+[`db/README.md`](db/README.md) sí está al día, con las nueve migraciones.
 
 ## Scripts
 
@@ -289,13 +322,16 @@ Todos se ejecutan con `python -m scripts.<nombre>` desde la raíz.
 | `catalogo_fuentes` | No se ejecuta: es la declaración de las nueve fuentes y sus parámetros medidos |
 | `generar_catalogo_barrios` | Escribe `db/003_catalogo_barrios_bosa.sql`. No toca la base |
 | `regenerar_fragmentos` | Rehace los fragmentos comunitarios |
-| `calibrar_umbral`, `calibrar_fragmento_comunitario` | Las mediciones de los ADR-0010 y 0011 |
 | `calibrar_umbral_real` | La revalidación de la Fase 7, con consultas de la prueba real |
+| `calibrar_enrutamiento` | A qué herramienta enruta el agente. Repite porque a 0.7 no es determinista; no ejecuta ninguna herramienta |
 | `revisar_prueba_real` | Reconstruye una sesión hecha desde el celular y remide cada consulta. Solo lee |
-| `spike_despachador` | La rama completa, entrando por `procesar_evento`. El más útil para comprobar que nada se rompió |
-| `spike_agente`, `spike_memoria` | El agente con espías en vez de envíos, y la ventana de memoria |
-| `spike_orientacion`, `spike_comunidad` | El CU2 y el CU4 por separado |
-| `spike_extraccion`, `spike_transcripcion`, `spike_embeddings` | Piezas sueltas de la Fase 5 |
+| `spike_despachador` | La rama completa, entrando por `procesar_evento`. El único que queda de la Fase 5, y el más útil para comprobar que nada se rompió |
+
+**El 08/09/2026 se borraron nueve scripts** —los siete spikes sueltos de
+la Fase 5 y las dos calibraciones con consultas imaginadas por el
+autor—: quedan en el historial de git, que es de donde salen los anexos
+del documento de grado. `spike_despachador` se conservó porque es la
+única prueba de extremo a extremo que queda.
 
 **Ninguna fuente oficial se ingiere a mano.** Se declara en
 `scripts/catalogo_fuentes.py` con sus parámetros, que son mediciones y no
@@ -311,8 +347,14 @@ una respuesta rara puede venir de código viejo con corpus nuevo.
 
 Railway, con el arranque definido en el [`Procfile`](Procfile). Las
 credenciales se configuran como variables del servicio y nunca se
-versionan. `/health` informa del commit desplegado, así que confirmar un
-despliegue no obliga a gastar un mensaje del número de prueba.
+versionan. `/health` informa del commit desplegado y **del modelo
+generativo que corre**, así que confirmar un despliegue no obliga a
+gastar ningún mensaje.
+
+**Número de producción desde el 09/09/2026.** Se migró del número de
+prueba de Meta —que admitía un máximo de 5 destinatarios verificados— a
+un número propio, con WABA y token de acceso nuevos. Ya le puede escribir
+cualquiera.
 
 Los umbrales, el top-k, la ventana de memoria, el modelo generativo y el
 interruptor del respaldo del CU2 son variables de entorno con valor por
@@ -321,14 +363,22 @@ la calibración necesita. **El modelo de embeddings no**, y es deliberado:
 cambiarlo invalidaría todos los vectores guardados sin dar ningún error,
 solo con peor recuperación.
 
+**El modelo generativo lo manda la variable de Railway**, y todo lo demás
+—`config.py`, este documento, `CLAUDE.md`, `AGENTS.md`, `docs/ESTADO.md`—
+tiene que decir lo mismo. No es un formalismo: el 08/09/2026 los tres
+sitios decían valores distintos y ninguno acertaba, y con eso se llegó a
+medir el enrutamiento del agente contra dos modelos que no eran
+producción.
+
 ## Documentación
 
 | Documento | Contenido |
 |---|---|
 | [`docs/ESTADO.md`](docs/ESTADO.md) | Dónde está el trabajo, qué falta y las mediciones que respaldan cada paso |
-| [`docs/adr/`](docs/adr/) | Dieciocho decisiones tomadas durante la implementación. Prevalecen sobre los `.docx` |
+| [`docs/adr/`](docs/adr/) | Veintidós decisiones tomadas durante la implementación. Prevalecen sobre los `.docx` |
 | [`docs/correcciones-a-los-documentos.md`](docs/correcciones-a-los-documentos.md) | Qué dice cada documento de fase y qué hace el sistema, por fase y sección |
 | [`CLAUDE.md`](CLAUDE.md) | Instrucciones de trabajo y decisiones no negociables |
+| `AGENTS.md` | Las mismas instrucciones, para el agente Codex |
 | `docs/*.docx` | Anteproyecto y fases de diseño 2, 3 y 4 |
 
 Los `.docx` son la especificación del sistema, pero tienen puntos

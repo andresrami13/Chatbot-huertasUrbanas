@@ -7,7 +7,8 @@ aquí se prueba **la rama por la que pasa todo mensaje**, entrando por
 `procesar_evento` con cargas útiles con la forma real de las de Meta.
 
 **Escribe en la base y lo borra al terminar**, incluidas las filas de
-idempotencia que crea. Los números empiezan por `5700000006`.
+idempotencia que crea. Las identidades llevan `5700000006` dentro, con
+la forma de BSUID que manda Meta: `CO.570000000601` (ADR-0023).
 
 **No envía nada por WhatsApp**: los tres módulos que envían se sustituyen
 por espías.
@@ -28,6 +29,12 @@ se reemplaza código que funcionaba:
    04/08/2026.
 7. Que el **CU8 le cuente lo que ella tiene sembrado**, y que no se
    confunda con un registro (ADR-0022).
+8. Que un mensaje **sin teléfono** —el que Meta manda desde que ella
+   tiene nombre de usuario— se atienda igual, y que la respuesta salga
+   hacia el BSUID (ADR-0023). Es la rama que el 15/09/2026 dejó a ocho
+   mensajes sin respuesta ninguna.
+9. Que a quien se registró cuando la identidad era el teléfono **se le
+   cambie la llave sola**, sin pedirle otra vez el consentimiento.
 """
 
 import asyncio
@@ -35,30 +42,43 @@ import logging
 
 from app import textos
 from app.core.basedatos import abrir_pool, cerrar_pool, obtener_pool
-from app.core.identidad import calcular_telefono_hash, huella_wamid
+from app.core.identidad import calcular_identidad_hash, huella_wamid
 from app.services import consentimiento, dispatcher, memoria
 from app.services.dispatcher import procesar_evento
 from app.services.fragmento_comunitario import regenerar_fragmento
 from app.services.repositorio import guardar_huerta, registrar_consentimiento
 
 _PREFIJO = "5700000006"
-_NUMERO_ANA = f"{_PREFIJO}01"      # autoriza
-_NUMERO_DESCONOCIDA = f"{_PREFIJO}02"  # nunca autoriza
-_NUMERO_VECINA = f"{_PREFIJO}03"   # tiene huerta, para el CU4
+
+# Identidades con la forma que manda Meta: código de país, punto y
+# dígitos (ADR-0023). El `5700000006` de dentro es la marca de dato
+# temporal de siempre, para reconocerlo en la base si algo se quedara.
+_BSUID_ANA = f"CO.{_PREFIJO}01"          # autoriza
+_BSUID_DESCONOCIDA = f"CO.{_PREFIJO}02"  # nunca autoriza
+_BSUID_VECINA = f"CO.{_PREFIJO}03"       # tiene huerta, para el CU4
+_BSUID_MIGRADA = f"CO.{_PREFIJO}04"      # se registró siendo un teléfono
+
+# El número con el que se registró la que hay que re-llavear. Es el único
+# teléfono del spike, y está aquí justo porque el re-llaveo es lo único
+# que todavía los mira.
+_TELEFONO_MIGRADA = f"{_PREFIJO}04"
 
 _enviados: list[tuple[str, str]] = []
+_destinos: list[str] = []
 _resultados: list[tuple[bool, str]] = []
 _wamids: list[str] = []
 
 
 async def _espia_texto(destino: str, texto: str) -> str | None:
     _enviados.append(("texto", texto))
+    _destinos.append(destino)
     return None
 
 
 async def _espia_botones(destino: str, cuerpo: str, botones) -> str | None:
     rotulos = " | ".join(rotulo for _, rotulo in botones)
     _enviados.append(("botones", f"{cuerpo}\n   [{rotulos}]"))
+    _destinos.append(destino)
     return None
 
 
@@ -76,19 +96,31 @@ def _wamid(sufijo: str) -> str:
     return valor
 
 
-def _evento(numero: str, wamid: str, **cuerpo) -> dict:
-    """Envuelve un mensaje en la estructura anidada que manda Meta."""
+def _evento(bsuid: str, wamid: str, telefono: str | None = None, **cuerpo) -> dict:
+    """Envuelve un mensaje en la estructura anidada que manda Meta.
+
+    Con la forma comprobada contra producción el 17/09/2026: el BSUID va
+    en el mensaje **y** en `contacts[]`, y el teléfono puede no venir
+    —es lo que pasa desde que ella tiene nombre de usuario (ADR-0023)—.
+    """
+    mensaje = {"from_user_id": bsuid, "id": wamid, **cuerpo}
+    contacto = {"profile": {"name": "-"}, "user_id": bsuid}
+
+    if telefono:
+        mensaje["from"] = telefono
+        contacto["wa_id"] = telefono
+
     return {
         "entry": [
             {
                 "changes": [
                     {
+                        "field": "messages",
                         "value": {
                             "messaging_product": "whatsapp",
-                            "messages": [
-                                {"from": numero, "id": wamid, **cuerpo}
-                            ],
-                        }
+                            "contacts": [contacto],
+                            "messages": [mensaje],
+                        },
                     }
                 ]
             }
@@ -96,14 +128,17 @@ def _evento(numero: str, wamid: str, **cuerpo) -> dict:
     }
 
 
-def _texto(numero: str, wamid: str, cuerpo: str) -> dict:
-    return _evento(numero, wamid, type="text", text={"body": cuerpo})
-
-
-def _boton(numero: str, wamid: str, boton_id: str) -> dict:
+def _texto(bsuid: str, wamid: str, cuerpo: str, telefono: str | None = None) -> dict:
     return _evento(
-        numero,
+        bsuid, wamid, telefono, type="text", text={"body": cuerpo}
+    )
+
+
+def _boton(bsuid: str, wamid: str, boton_id: str) -> dict:
+    return _evento(
+        bsuid,
         wamid,
+        None,
         type="interactive",
         interactive={"button_reply": {"id": boton_id, "title": "-"}},
     )
@@ -111,6 +146,7 @@ def _boton(numero: str, wamid: str, boton_id: str) -> dict:
 
 async def _entra(payload: dict, rotulo: str) -> list[tuple[str, str]]:
     _enviados.clear()
+    _destinos.clear()
     await procesar_evento(payload)
 
     print(f"\n  ENTRA: {rotulo}")
@@ -131,11 +167,20 @@ async def _borrar_temporales() -> None:
     pool = obtener_pool()
 
     hashes = [
-        calcular_telefono_hash(n)
-        for n in (_NUMERO_ANA, _NUMERO_DESCONOCIDA, _NUMERO_VECINA)
+        calcular_identidad_hash(identificador)
+        for identificador in (
+            _BSUID_ANA,
+            _BSUID_DESCONOCIDA,
+            _BSUID_VECINA,
+            _BSUID_MIGRADA,
+            # Por si el re-llaveo no llegó a ocurrir: entonces la fila
+            # se quedó con la huella del teléfono y hay que borrarla
+            # igual.
+            _TELEFONO_MIGRADA,
+        )
     ]
     usuarias = await pool.execute(
-        "delete from usuario where telefono_hash = any($1::text[])", hashes
+        "delete from usuario where identidad_hash = any($1::text[])", hashes
     )
 
     # La idempotencia no cuelga de ninguna usuaria —se escribe antes de la
@@ -165,7 +210,7 @@ async def main() -> None:
     dispatcher.enviar_texto = _espia_texto
 
     try:
-        vecina = await registrar_consentimiento(_NUMERO_VECINA)
+        vecina = await registrar_consentimiento(_BSUID_VECINA)
         huerta_id = await guardar_huerta(
             usuario_id=vecina.id,
             barrio_codigo="el_regalo",
@@ -183,7 +228,7 @@ async def main() -> None:
         print("1. La compuerta sigue cerrada")
         print("=" * 70)
         enviados = await _entra(
-            _texto(_NUMERO_DESCONOCIDA, _wamid("01"), "mi tomate tiene bichos"),
+            _texto(_BSUID_DESCONOCIDA, _wamid("01"), "mi tomate tiene bichos"),
             "consulta de alguien que NO ha autorizado",
         )
         texto = _todo(enviados)
@@ -198,9 +243,9 @@ async def main() -> None:
             "su consulta no se procesó",
         )
 
-        huella_desconocida = calcular_telefono_hash(_NUMERO_DESCONOCIDA)
+        huella_desconocida = calcular_identidad_hash(_BSUID_DESCONOCIDA)
         existe = await obtener_pool().fetchval(
-            "select count(*) from usuario where telefono_hash = $1",
+            "select count(*) from usuario where identidad_hash = $1",
             huella_desconocida,
         )
         _comprobar(
@@ -214,7 +259,7 @@ async def main() -> None:
         print("2. El saludo previo al consentimiento (camino permanente)")
         print("=" * 70)
         enviados = await _entra(
-            _texto(_NUMERO_DESCONOCIDA, _wamid("02"), "hola"),
+            _texto(_BSUID_DESCONOCIDA, _wamid("02"), "hola"),
             "saludo de alguien que NO ha autorizado",
         )
         texto = _todo(enviados)
@@ -234,13 +279,13 @@ async def main() -> None:
         print("3. Autoriza y consulta: el mensaje llega al agente")
         print("=" * 70)
         await _entra(
-            _boton(_NUMERO_ANA, _wamid("03"), textos.BOTON_ACEPTO),
+            _boton(_BSUID_ANA, _wamid("03"), textos.BOTON_ACEPTO),
             "pulsa [Acepto]",
         )
 
         ana_id = await obtener_pool().fetchval(
-            "select id from usuario where telefono_hash = $1",
-            calcular_telefono_hash(_NUMERO_ANA),
+            "select id from usuario where identidad_hash = $1",
+            calcular_identidad_hash(_BSUID_ANA),
         )
         _comprobar(ana_id is not None, "queda registrado su consentimiento")
 
@@ -248,7 +293,7 @@ async def main() -> None:
         # cerradas, una por mensaje. Mientras no las conteste, el agente no
         # ve nada — es lo que se comprueba de paso al final del bloque.
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("03a"), "Carmen"),
+            _texto(_BSUID_ANA, _wamid("03a"), "Carmen"),
             "contesta el nombre",
         )
         _comprobar(
@@ -263,7 +308,7 @@ async def main() -> None:
         )
 
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("03b"), "Holanda"),
+            _texto(_BSUID_ANA, _wamid("03b"), "Holanda"),
             "contesta el barrio",
         )
         texto = _todo(enviados)
@@ -284,7 +329,7 @@ async def main() -> None:
         )
 
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("03c"), "1"),
+            _texto(_BSUID_ANA, _wamid("03c"), "1"),
             "elige la opción 1",
         )
         _comprobar(
@@ -298,7 +343,7 @@ async def main() -> None:
         )
 
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("03d"), "La Milagrosa"),
+            _texto(_BSUID_ANA, _wamid("03d"), "La Milagrosa"),
             "contesta el nombre de la huerta",
         )
         _comprobar(
@@ -313,7 +358,7 @@ async def main() -> None:
         _comprobar(huertas == 0, "todavía NO hay huerta: solo se propuso")
 
         enviados = await _entra(
-            _boton(_NUMERO_ANA, _wamid("03e"), textos.BOTON_REGISTRO_CONFIRMO),
+            _boton(_BSUID_ANA, _wamid("03e"), textos.BOTON_REGISTRO_CONFIRMO),
             "pulsa [Sí, guardar] del onboarding",
         )
 
@@ -328,7 +373,7 @@ async def main() -> None:
 
         enviados = await _entra(
             _texto(
-                _NUMERO_ANA, _wamid("04"),
+                _BSUID_ANA, _wamid("04"),
                 "a mi mata de tomate le salieron unos bichitos verdes, que le echo",
             ),
             "consulta agroecológica",
@@ -354,7 +399,7 @@ async def main() -> None:
         print("4. El CU4, que llevaba desde el 04/08 sin enrutar")
         print("=" * 70)
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("05"), "que estan sembrando las otras huertas"),
+            _texto(_BSUID_ANA, _wamid("05"), "que estan sembrando las otras huertas"),
             "consulta a la comunidad",
         )
         texto = _todo(enviados)
@@ -386,7 +431,7 @@ async def main() -> None:
         print("5. Registro y botones, sin pasar por el agente")
         print("=" * 70)
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("06"), "sembre cilantro en marzo, en holanda"),
+            _texto(_BSUID_ANA, _wamid("06"), "sembre cilantro en marzo, en holanda"),
             "cuenta de su huerta",
         )
 
@@ -406,7 +451,7 @@ async def main() -> None:
         _comprobar(cultivos == 0, "todavía NO hay cultivos: solo se propuso")
 
         enviados = await _entra(
-            _boton(_NUMERO_ANA, _wamid("07"), textos.BOTON_REGISTRO_CONFIRMO),
+            _boton(_BSUID_ANA, _wamid("07"), textos.BOTON_REGISTRO_CONFIRMO),
             "pulsa [Sí, guardar]",
         )
         texto = _todo(enviados)
@@ -431,7 +476,7 @@ async def main() -> None:
         print("6. El CU8: qué tengo yo sembrado")
         print("=" * 70)
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("08"), "que tengo sembrado"),
+            _texto(_BSUID_ANA, _wamid("08"), "que tengo sembrado"),
             "pregunta por su propia huerta",
         )
         texto = _todo(enviados)
@@ -459,7 +504,7 @@ async def main() -> None:
         print("7. Idempotencia: el reintento de Meta se descarta")
         print("=" * 70)
         enviados = await _entra(
-            _texto(_NUMERO_ANA, _wamid("05"), "que estan sembrando las otras huertas"),
+            _texto(_BSUID_ANA, _wamid("05"), "que estan sembrando las otras huertas"),
             "el mismo wamid del caso 4, reenviado",
         )
 
@@ -467,6 +512,87 @@ async def main() -> None:
             not enviados,
             "no se le responde dos veces",
             "el wamid ya estaba procesado",
+        )
+
+        # -----------------------------------------------------------------
+        print("\n" + "=" * 70)
+        print("8. Un mensaje sin teléfono, que es lo que Meta manda ahora")
+        print("=" * 70)
+        # Ninguna de las cargas útiles de este spike trae `from`, así que
+        # todo lo de arriba ya corrió por la rama nueva. Lo que falta por
+        # comprobar es el caso exacto del 15/09/2026 —alguien que escribe
+        # por primera vez y no recibe nada— y a dónde sale la respuesta.
+        #
+        # Con un saludo y sin consentimiento, a propósito: lo resuelve la
+        # compuerta por palabras clave (ADR-0006), sin pasar por el modelo,
+        # así que esta comprobación no depende de que el enrutamiento
+        # acierte a temperatura 0.7.
+        enviados = await _entra(
+            _texto(_BSUID_DESCONOCIDA, _wamid("09"), "buenas"),
+            "saluda por primera vez, y el webhook no trae `from`",
+        )
+        texto = _todo(enviados)
+
+        _comprobar(
+            textos.SOLICITUD_CONSENTIMIENTO in texto,
+            "se le responde aunque el webhook no traiga teléfono",
+            "antes del ADR-0023 esto era `Mensaje sin remitente; se descarta`",
+        )
+        _comprobar(
+            bool(_destinos) and set(_destinos) == {_BSUID_DESCONOCIDA},
+            "la respuesta sale hacia el BSUID",
+            "y el cliente la mandará en `recipient`, no en `to`",
+        )
+
+        # -----------------------------------------------------------------
+        print("\n" + "=" * 70)
+        print("9. El re-llaveo: la que se registró siendo un teléfono")
+        print("=" * 70)
+        migrada = await registrar_consentimiento(_TELEFONO_MIGRADA)
+        await guardar_huerta(
+            usuario_id=migrada.id,
+            barrio_codigo="el_regalo",
+            nombre_huerta="La de antes",
+            especies=["papa"],
+        )
+        print("  Preparada: usuaria identificada por teléfono, con huerta.")
+
+        enviados = await _entra(
+            _texto(
+                _BSUID_MIGRADA, _wamid("10"), "que tengo sembrado",
+                telefono=_TELEFONO_MIGRADA,
+            ),
+            "escribe, y el webhook trae BSUID y teléfono",
+        )
+        texto = _todo(enviados)
+
+        _comprobar(
+            textos.SOLICITUD_CONSENTIMIENTO not in texto,
+            "no se le vuelve a pedir el consentimiento",
+            "se la reconoció por la fila que ya tenía",
+        )
+
+        misma = await obtener_pool().fetchval(
+            "select id from usuario where identidad_hash = $1",
+            calcular_identidad_hash(_BSUID_MIGRADA),
+        )
+        _comprobar(
+            misma == migrada.id,
+            "su fila es la misma, ahora con la llave del BSUID",
+            "conserva huerta, cultivos y conversación",
+        )
+
+        cuantas = await obtener_pool().fetchval(
+            "select count(*) from usuario where identidad_hash = any($1::text[])",
+            [
+                calcular_identidad_hash(_BSUID_MIGRADA),
+                calcular_identidad_hash(_TELEFONO_MIGRADA),
+            ],
+        )
+        _comprobar(
+            cuantas == 1,
+            "no quedó duplicada",
+            "la huella vieja desapareció al re-llavear",
         )
 
         # -----------------------------------------------------------------
