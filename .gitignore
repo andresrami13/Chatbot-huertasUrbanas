@@ -28,4 +28,15 @@ fuentes/
 #
 # Los .docx de las fases YA CERRADAS sí se versionan a propósito: son la
 # especificación del sistema (CLAUDE.md §2) y están desde el primer commit.
-docs/Proyecto de grado.docx
+#
+# **Con comodín desde el 19/09/2026, y por poco vuelve a pasar.** La regla
+# nombraba el archivo exacto, y el borrador se había renombrado a
+# «Proyecto de grado Chatbot huertas urbanas.docx»: dejó de coincidir, y
+# volvía a estar sin seguimiento, a un `git add .` de subirse al
+# repositorio público por segunda vez.
+docs/Proyecto de grado*.docx
+
+# Archivos de bloqueo que deja Word abierto («~$nombre.docx»). Llevan
+# dentro el nombre de quien tiene el documento abierto y no son el
+# documento: uno se coló al repositorio y se sacó el 19/09/2026.
+~$*
