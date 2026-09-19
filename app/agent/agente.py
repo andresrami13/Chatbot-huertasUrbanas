@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 # Sin huecos de `str.format`: se carga tal cual. Es deliberado, porque un
 # prompt largo lleno de ejemplos es justo donde una llave literal rompería
 # la carga (CLAUDE.md §11).
-_PROMPT = "agente_v1.md"
+_PROMPT = "agente_v2.md"
 
 # Fase 4 / CLAUDE.md §8. Más alta que la redacción del RAG (0.4) porque
 # aquí sí se conversa. Consecuencia que conviene tener presente al probar:
@@ -118,7 +118,7 @@ def _esquema_pregunta(descripcion: str) -> types.Schema:
 
 # Las descripciones son parte del prompt, aunque no vivan en el archivo:
 # son lo que el modelo lee para elegir. Se mantienen cortas porque
-# `agente_v1.md` ya explica los matices.
+# `agente_v2.md` ya explica los matices.
 _HERRAMIENTAS = types.Tool(
     function_declarations=[
         types.FunctionDeclaration(

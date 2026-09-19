@@ -375,7 +375,7 @@ producción.
 | Documento | Contenido |
 |---|---|
 | [`docs/ESTADO.md`](docs/ESTADO.md) | Dónde está el trabajo, qué falta y las mediciones que respaldan cada paso |
-| [`docs/adr/`](docs/adr/) | Veintidós decisiones tomadas durante la implementación. Prevalecen sobre los `.docx` |
+| [`docs/adr/`](docs/adr/) | Veinticuatro decisiones tomadas durante la implementación. Prevalecen sobre los `.docx` |
 | [`docs/correcciones-a-los-documentos.md`](docs/correcciones-a-los-documentos.md) | Qué dice cada documento de fase y qué hace el sistema, por fase y sección |
 | [`CLAUDE.md`](CLAUDE.md) | Instrucciones de trabajo y decisiones no negociables |
 | `AGENTS.md` | Las mismas instrucciones, para el agente Codex |

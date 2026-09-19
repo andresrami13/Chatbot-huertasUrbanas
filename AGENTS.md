@@ -36,7 +36,7 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Veintidós decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Veinticuatro decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 | `docs/correcciones-a-los-documentos.md` | **Qué dice cada `.docx` y qué hace el sistema**, por fase y sección. Consolidado de las desviaciones |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
@@ -438,7 +438,7 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   mensajes que envías, que lleva el número del destinatario.
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
 - Los prompts viven en `app/agent/prompts/` como archivos versionados
-  (`agente_v1.md`, `extraccion_v2.md`, `barrio_v1.md`,
+  (`agente_v2.md`, `extraccion_v3.md`, `barrio_v1.md`,
   `redaccion_rag_v1.md`, `redaccion_comunidad_v2.md`,
   `respuesta_general_v1.md`), conforme a la
   práctica de versionamiento

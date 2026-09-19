@@ -36,7 +36,7 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Veintidós decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Veinticuatro decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 | `docs/correcciones-a-los-documentos.md` | **Qué dice cada `.docx` y qué hace el sistema**, por fase y sección. Consolidado de las desviaciones |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
@@ -495,10 +495,11 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
 - Los prompts viven en `app/agent/prompts/` como archivos versionados,
   conforme a la práctica de versionamiento declarada en la metodología.
-  **Los seis vigentes son** `agente_v1.md`, `extraccion_v3.md`,
+  **Los seis vigentes son** `agente_v2.md`, `extraccion_v3.md`,
   `barrio_v1.md`, `redaccion_rag_v1.md`, `redaccion_comunidad_v2.md` y
-  `respuesta_general_v1.md`. `extraccion_v1.md` y `extraccion_v2.md` siguen
-  en el repositorio a propósito, como historial citable, pero **no los carga
+  `respuesta_general_v1.md`. `agente_v1.md`, `extraccion_v1.md`,
+  `extraccion_v2.md` y `redaccion_comunidad_v1.md` siguen en el
+  repositorio a propósito, como historial citable, pero **no los carga
   nadie**: no los edites creyendo que están en uso.
   **Se rellenan con `str.format`: una llave literal rompe la carga con un
   `KeyError`.** El del agente no lleva huecos y se carga tal cual, a

@@ -41,7 +41,20 @@ ROTULOS_BOTONES_REGISTRO = {
 # CU5. Sirve de bienvenida y de ayuda: la Fase 2 define un solo texto para
 # ambos casos. Los ejemplos están en lenguaje natural, para enseñar cómo
 # se pide sin convertir el bot en un menú.
-BIENVENIDA = """👋 Buenas. Soy el asistente virtual de huertas urbanas de Bosa Occidental.
+#
+# **Declara que es un prototipo** (ADR-0024). Es el sitio más importante
+# de los cuatro donde se dice, por tres razones: es lo primero que ve
+# cualquiera, es también el texto de la ayuda, y es el ÚNICO mensaje que
+# recibe quien todavía no ha autorizado —`consentimiento.py` lo envía
+# antes de la compuerta—. Va dentro del renglón que ya existía, no como
+# párrafo aparte, para no gastar ninguna de las 6-8 líneas del §11.
+#
+# **Dice «Bosa», no «Bosa Occidental»** (ADR-0024). El catálogo de
+# barrios son los 312 de la localidad entera desde el ADR-0016, y las
+# usuarias reales están en PIAMONTE, VILLA DE SUAITA y CHICO SUR: seguir
+# diciendo «Bosa Occidental» describía un alcance que el sistema dejó de
+# tener hace un mes.
+BIENVENIDA = """👋 Buenas. Soy el asistente virtual de huertas urbanas de Bosa. Estoy en pruebas todavía, así que a veces me equivoco o no sé algo.
 
 Le puedo ayudar a:
 🌱 Cuidar su huerta: "mi tomate tiene bichos"
@@ -52,9 +65,24 @@ Escríbame con sus propias palabras, o mándeme una nota de voz 🎤."""
 
 
 # CU1. Cuerpo del mensaje con los botones [Acepto] / [No acepto].
-SOLICITUD_CONSENTIMIENTO = """Antes de empezar necesito su permiso.
+#
+# **Declara que es un prototipo, y va primero** (ADR-0024). Un
+# consentimiento se enmarca ANTES de pedir el dato, no después: saber que
+# el asistente está en pruebas es parte de lo que ella está autorizando.
+# Nombrar a la Universidad Distrital juega además a favor de la Ley 1581,
+# que pide identificar al responsable del tratamiento.
+#
+# Los dos párrafos del medio se fundieron en uno para hacerle sitio sin
+# pasar de las 6-8 líneas del §11. Se conservó «para que aprendan unas de
+# otras» a propósito: es la finalidad del tratamiento, y la finalidad no
+# es adorno en un consentimiento.
+#
+# **Solo lo ve quien llegue de ahora en adelante.** Las once que ya
+# pasaron la compuerta no vuelven a ver este texto nunca; a ellas les
+# llega por `SALUDO_PERSONALIZADO`, que es el otro canal del ADR-0024.
+SOLICITUD_CONSENTIMIENTO = """Antes de empezar le cuento qué soy: un asistente en pruebas, hecho como trabajo de grado de la Universidad Distrital. Todavía me equivoco y hay cosas que no sé.
 
-Para poder ayudarle guardo el nombre de su huerta, el barrio y lo que tiene sembrado. Eso se comparte con las demás huertas, para que aprendan unas de otras.
+Para ayudarle guardo el nombre de su huerta, el barrio y lo que tiene sembrado, y eso se comparte con las demás huertas para que aprendan unas de otras.
 
 Su número de celular y su nombre no se le muestran a nadie.
 
@@ -407,9 +435,22 @@ ONBOARDING_BARRIO_REINTENTO = """Perdone, no le entendí el barrio.
 
 
 # El modelo no encontró ningún barrio parecido en el catálogo.
-ONBOARDING_BARRIO_SIN_CANDIDATOS = """No encontré ese barrio en mi lista.
+#
+# **Dice que la lista está incompleta porque lo está** (ADR-0024).
+# Comprobado el 19/09/2026 contra `db/003_catalogo_barrios_bosa.sql`: ni
+# EL RECREO ni LA DESPENSA están entre las 313 filas, y El Recreo es una
+# de las urbanizaciones más grandes de Bosa. El texto anterior le echaba
+# a ella la culpa de un hueco del catálogo, y una usuaria lo recibió tres
+# veces seguidas el 15/09 y abandonó el onboarding sin registrarse.
+#
+# **No se le ofrece ninguna salida, y es deliberado.** Decirle «si no
+# aparece, seguimos sin barrio» sería prometer algo que hoy no existe: la
+# única escapatoria es la opción «Mi barrio no está en la lista», que
+# solo sale cuando hay candidatos que listar. Darle esa salida aquí es
+# cambio de código, no de texto.
+ONBOARDING_BARRIO_SIN_CANDIDATOS = """No encontré ese barrio en mi lista, que todavía está incompleta.
 
-¿Me lo escribe otra vez, por favor?"""
+¿Me lo escribe de otra forma? A veces lo tengo guardado con otro nombre."""
 
 
 # Encabezado de la lista numerada de candidatos. El cuerpo con los nombres
@@ -475,7 +516,25 @@ No se guardó nada. ¿Lo intentamos de nuevo en un ratico?"""
 # al ENVIAR y **no entra en la memoria**: el nombre va cifrado en
 # `usuario.nombre_usuario_cifrado` y `mensaje.contenido` va en claro
 # (ADR-0012), así que guardarlo ahí anularía el cifrado.
-SALUDO_PERSONALIZADO = "Hola, {nombre}."
+# **Lleva el recordatorio de prototipo** (ADR-0024), y es el único de los
+# cuatro sitios que alcanza a quien YA está registrado: el texto del
+# consentimiento no se repite nunca, así que las once personas que ya
+# pasaron la compuerta no lo verían de otra forma. La bienvenida tampoco
+# sirve para eso: tres de las siete que han consultado entraron
+# preguntando directo, sin saludar, y no la han visto desde el primer día.
+#
+# Sale una vez cada 24 horas y no entra en la memoria, así que el
+# recordatorio no gasta ninguno de los diez huecos de la ventana.
+#
+# **Se acepta una redundancia conocida:** si ella saluda, esto se antepone
+# a BIENVENIDA, que también dice que está en pruebas. Pasa una vez al día
+# y solo a quien salude en vez de preguntar; evitarlo exigiría que
+# `mostrar_ayuda` se saltara el saludo, que es código y no texto.
+#
+# Y no diga nunca «todavía estoy aprendiendo»: suena mejor y es falso —el
+# sistema no aprende nada de lo que ella cuenta—, justo lo que la regla 6
+# de `agente_v2.md` le prohíbe al modelo.
+SALUDO_PERSONALIZADO = "Hola, {nombre}. Sigo en pruebas, así que puedo equivocarme."
 
 
 # --- Acuse de la nota de voz (Fase 7) ---------------------------------

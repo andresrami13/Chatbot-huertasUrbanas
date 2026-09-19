@@ -57,7 +57,7 @@ es por donde salen ahora todas las respuestas.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
-(veintitrés decisiones tomadas durante la implementación).
+(veinticuatro decisiones tomadas durante la implementación).
 
 **Si retoma en una conversación nueva, vaya directo a
 [Por dónde seguir](#por-dónde-seguir).** Lo de más abajo es historia.
@@ -97,7 +97,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
-| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v1`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v1`, `respuesta_general_v1` |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v2`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v2`, `respuesta_general_v1` |
 | Catálogo de fuentes oficiales | `scripts/catalogo_fuentes.py` | Nueve fuentes declaradas, con sus parámetros medidos (ADR-0014) |
 | Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **765 fragmentos de nueve fuentes en Supabase**; descarta los renglones de índice |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
@@ -109,7 +109,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Sin probar desde el celular** |
 | Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Sin probar desde el celular** |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
-| Agente orquestador | `app/agent/agente.py`, `agente_v1.md` | **Probado en producción desde el celular** |
+| Agente orquestador | `app/agent/agente.py`, `agente_v2.md` | **Probado en producción desde el celular**; la regla 6 del `v2` (ADR-0024) **sin probar** |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
 | Acuse de la nota de voz | `app/services/espera.py` | Se manda al recibir el audio, sin umbral (ADR-0017, revisado) |
 | Indicador de «escribiendo» | `whatsapp.marcar_escribiendo` | Los tres puntitos nativos de WhatsApp, en todos los mensajes (ADR-0017, 2.ª revisión). **Sin probar desde el celular** |
@@ -413,7 +413,7 @@ credibilidad al repartir el enlace.
   usuarias con identidad nueva y pedirles que volvieran a autorizar; al
   ver que eran nueve y no cuatro, se hizo un re-llaveo silencioso en su
   lugar (ADR-0023, decisión 4). Nadie repite el onboarding.
-- **Pasar al documento de grado los veintitrés ADR y las correcciones**
+- **Pasar al documento de grado los veinticuatro ADR y las correcciones**
   de [`docs/adr/README.md`](adr/README.md) y
   [`docs/correcciones-a-los-documentos.md`](correcciones-a-los-documentos.md).
   Los últimos en incorporarse fueron el 0019 a 0023 (aviso de base caída,

@@ -1,4 +1,4 @@
-"""Backend API del chatbot de huertas urbanas de la UPZ 84 Bosa Occidental.
+"""Backend API del chatbot de huertas urbanas de la localidad de Bosa.
 
 Punto de entrada de la aplicación FastAPI.
 """
@@ -91,10 +91,10 @@ async def ciclo_de_vida(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(
-    title="Chatbot Huertas Urbanas UPZ 84",
+    title="Chatbot Huertas Urbanas Bosa",
     description=(
         "Prototipo de agente conversacional sobre WhatsApp para el apoyo a "
-        "la creación y gestión de huertas urbanas en Bosa Occidental."
+        "la creación y gestión de huertas urbanas en la localidad de Bosa."
     ),
     version="0.1.0",
     lifespan=ciclo_de_vida,

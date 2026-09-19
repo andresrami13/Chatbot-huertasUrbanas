@@ -79,6 +79,23 @@ prever porque solo aparecen al ponerlo a hablar con una persona.
   sería procesarlo antes de tener permiso.
 - **Justifica:** [ADR-0006](adr/0006-saludo-y-ayuda-sin-modelo.md)
 
+### CU5 y Fase 4 — el asistente dice que es un prototipo
+
+- **Dice:** el asistente se presenta como «asistente virtual de huertas
+  urbanas» y nada más. Ni la Fase 2 ni la Fase 4 contemplan que declare
+  ser un prototipo en pruebas.
+- **Hace:** lo declara en **cuatro sitios**: el consentimiento (completo,
+  nombrando a la Universidad Distrital), el saludo de las 24 horas (un
+  renglón), la bienvenida del CU5 (media línea) y el texto del barrio que
+  no aparece en el catálogo. Y el agente tiene prohibido prometer nada
+  que no haga.
+- **Por qué:** el bot se repartió en un número de producción sin decir que
+  era un trabajo de grado. La trazabilidad del 19/09/2026 encontró 12 de
+  17 respuestas citadas que dicen «no tengo esa información» con sello del
+  Jardín Botánico, y dos promesas falsas de reportar preguntas a un
+  equipo que no existe.
+- **Justifica:** [ADR-0024](adr/0024-el-bot-dice-que-es-un-prototipo.md)
+
 ### CU2 — qué hacer sin respaldo oficial
 
 - **Dice:** nada sobre qué hacer cuando ninguna fuente supera el umbral.
@@ -393,6 +410,20 @@ números se fijaron antes de que existiera el corpus real**.
 - **Justifica:** [ADR-0016](adr/0016-onboarding-de-preguntas-cerradas.md),
   corrige en sentido contrario al
   [ADR-0002](adr/0002-catalogo-de-barrios.md)
+
+### §1 y §5.3 — el alcance que el bot declara es Bosa entera
+
+- **Dice:** el alcance es la **UPZ 84 Bosa Occidental**, y así se
+  presentaba el asistente ante la usuaria.
+- **Hace:** dice «la localidad de Bosa». Desaparece «UPZ 84 Bosa
+  Occidental» de los textos que ella lee y de los prompts vigentes.
+- **Por qué:** no es una ampliación, es poner al día lo que el sistema ya
+  hacía. El catálogo son los 312 barrios de la localidad entera desde el
+  ADR-0016 (17/08/2026), y las usuarias reales están en PIAMONTE I ETAPA,
+  VILLA DE SUAITA, CHICO SUR y LA PAZ. Decir «Bosa Occidental» describía
+  un alcance que el sistema había dejado de tener un mes antes.
+- **Justifica:** [ADR-0024](adr/0024-el-bot-dice-que-es-un-prototipo.md),
+  que extiende el [ADR-0016](adr/0016-onboarding-de-preguntas-cerradas.md)
 
 ### §7.2 y §8 — la entrada por voz
 
