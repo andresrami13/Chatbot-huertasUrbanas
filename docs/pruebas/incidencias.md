@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `INC-CHU-001`, versión 1.3 |
+| **Identificador** | `INC-CHU-001`, versión 1.4 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Abierto, en actualización continua |
@@ -16,6 +16,7 @@
 | 23/09/2026 | 1.1 | INC-004 tras la primera ejecución del humo de despliegue. Traslado de las catorce incidencias históricas (actividad A-7) y registro de las pruebas estáticas ya realizadas | A. Ramírez |
 | 24/09/2026 | 1.2 | INC-019 del barrido del corpus, e INC-020 e INC-021 de la ejecución del banco de preguntas. Retirada de INC-011, que no era una incidencia | A. Ramírez |
 | 24/09/2026 | 1.3 | INC-022 e INC-023, de refactorizar los scripts de prueba sobre un arnés común | A. Ramírez |
+| 25/09/2026 | 1.4 | **Cerrada INC-004**: corregidas en `docs/ESTADO.md` las tres afirmaciones que desmentía, con el commit y los contadores verificados de nuevo contra el sistema. **Cero incidencias de severidad 1 o 2 abiertas** | A. Ramírez |
 
 ## Introducción
 
@@ -63,27 +64,9 @@ Cuatro niveles cada una, 1 el más grave.
 
 # 1. Incidencias abiertas
 
-Son cuatro. Las de severidad 1 y 2 tienen que quedar resueltas o aceptadas
+Son tres. Las de severidad 1 y 2 tienen que quedar resueltas o aceptadas
 por escrito antes de dar la Fase 7 por cerrada (criterio de terminación 2
 del [plan](plan-de-pruebas.md) §6.6).
-
-## INC-004 — `docs/ESTADO.md` describe un estado de despliegue que no es el real
-
-| Campo | Contenido |
-|---|---|
-| **Detectada** | 23/09/2026, durante la primera ejecución de `PR-03` |
-| **Origen** | A. Ramírez, autor |
-| **Contexto** | Ítem: **la base de prueba**. `docs/ESTADO.md`, secciones «Infraestructura operativa» y «Por dónde seguir». Nivel de instalabilidad |
-| **Descripción** | El documento afirma tres cosas que la comprobación desmiente: que **la migración `009` está sin correr** —existe la tabla `listado_comunitario_pendiente`—, que **la `010` tampoco** —existe la columna `usuario.identidad_hash`— y que **`origin/main` está al día en `c0d2303`** —el commit desplegado es `7b136e7`—. Comprobado contra `/health` y contra `information_schema` |
-| **Severidad** | **2** |
-| **Prioridad** | 2 |
-| **Riesgo** | Alto y ya materializado dentro del propio proceso de prueba: el [plan](plan-de-pruebas.md) se redactó el 23/09/2026 apoyándose en este documento y **heredó los tres errores**, incluida la afirmación de que «hoy hay gente que escribe y no recibe nada». Hubo que corregirlo |
-| **Estado** | **Abierta.** El plan ya está corregido; `docs/ESTADO.md` **no**, y es del autor |
-
-**Lo que esto obliga a cambiar en el proceso.** Antes de planificar sobre
-el estado del despliegue hay que **consultarlo**, no leerlo. Para eso está
-`python -m scripts.humo_despliegue`, que responde en dos segundos y sin
-gastar un mensaje de WhatsApp.
 
 ## INC-010 — Dos defectos de extracción en *Sembrando Biodiversidad*
 
@@ -127,6 +110,25 @@ gastar un mensaje de WhatsApp.
 ---
 
 # 2. Incidencias cerradas
+
+## INC-004 — `docs/ESTADO.md` describe un estado de despliegue que no es el real
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 23/09/2026, durante la primera ejecución de `PR-03`. **Cerrada el 25/09/2026** |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: **la base de prueba**. `docs/ESTADO.md`, secciones «Infraestructura operativa» y «Por dónde seguir». Nivel de instalabilidad |
+| **Descripción** | El documento afirmaba tres cosas que la comprobación desmentía: que **la migración `009` estaba sin correr** —existe la tabla `listado_comunitario_pendiente`—, que **la `010` tampoco** —existe la columna `usuario.identidad_hash`— y que `origin/main` estaba al día en un commit viejo. Comprobado contra `/health` y contra `information_schema` |
+| **Severidad** | 2 |
+| **Prioridad** | 2 |
+| **Riesgo** | Alto y ya materializado dentro del propio proceso de prueba: el [plan](plan-de-pruebas.md) se redactó el 23/09/2026 apoyándose en este documento y **heredó los tres errores**, incluida la afirmación de que «hoy hay gente que escribe y no recibe nada». Hubo que corregirlo |
+| **Estado** | **Cerrada el 25/09/2026.** Las tres afirmaciones se corrigieron en `docs/ESTADO.md`, con los contadores de infraestructura y el commit desplegado (`e7a5ec9`) verificados de nuevo contra el sistema, no copiados a mano |
+
+**Lo que esto obliga a cambiar en el proceso, y ya quedó dicho ahí.** Antes
+de planificar sobre el estado del despliegue hay que **consultarlo**, no
+leerlo. Para eso está `python -m scripts.humo_despliegue`, que responde en
+dos segundos y sin gastar un mensaje de WhatsApp. El propio `ESTADO.md`
+ahora se lo recuerda a quien vuelva a editarlo a mano.
 
 ## Del trabajo del 24/09/2026
 
@@ -301,12 +303,12 @@ el estado en el que quedan los defectos que no se buscaron.
 
 # 4. Medidas
 
-| Métrica | Valor al 24/09/2026 |
+| Métrica | Valor al 25/09/2026 |
 |---|---|
 | Incidencias registradas | 21 |
-| Abiertas | 4 |
-| **Abiertas de severidad 1 o 2** | **1** (INC-004) |
-| Cerradas | 17 |
+| Abiertas | 3 |
+| **Abiertas de severidad 1 o 2** | **0** |
+| Cerradas | 18 |
 | Contra el producto | 14 |
 | Contra los casos de prueba | 4 (INC-001 a INC-003, INC-022) |
 | **Contra la base de prueba** | **2** (INC-004, INC-012) |

@@ -1,22 +1,18 @@
 # Estado del proyecto
 
-Última actualización: 2026-09-17. **La Fase 6 se cerró el 15/08/2026 con la
+Última actualización: 2026-09-25. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
-pruebas).** Los casos de uso están construidos y desplegados, y la
-conversación ya se probó desde un celular real. **Son siete contando el CU6
-(onboarding) del documento de grado y el CU7 (buscar un cultivo en otras
-huertas), separado del CU4 el 08/09/2026, y el CU8 (consultar mi huerta),
-añadido el 09/09.** El CU4, el CU7 y el CU8 son los únicos que no han
-pasado todavía por un teléfono: se desplegaron el 08 y el 09/09.
+pruebas).** Los ocho casos de uso están construidos, desplegados y **los
+ocho tienen aceptación ejecutada con usuarias reales desde celulares
+reales** (CU6 onboarding, CU7 búsqueda por cultivo separado del CU4 el
+08/09/2026, y CU8 consultar mi huerta, añadido el 09/09).
 
 **Y desde el 09/09/2026 el bot está en un número de producción**, sin el
-límite de 5 destinatarios del número de prueba. Al 17/09/2026 en la base
-hay **siete huertas de nueve personas distintas, con 56 cultivos y 204
-mensajes, todo registrado por ellas mismas desde sus celulares** — el
-onboarding y el CU3 ya están ejercitados por usuarias reales. Eran cuatro
-y cuatro el 08/09: el número abierto se notó en una semana.
+límite de 5 destinatarios del número de prueba. Al 25/09/2026 en la base
+hay **12 usuarias, 10 huertas, 61 cultivos y 273 mensajes**, todo
+registrado por ellas mismas desde sus celulares.
 
-De la Fase 7 van hechas once cosas, las dos primeras nacidas de esa prueba:
+De la Fase 7 van hechas doce cosas, las dos primeras nacidas de esa prueba:
 
 - **El corpus oficial pasó de 81 a 765 fragmentos en nueve fuentes**
   (ADR-0014), y dos de ellas ya no son del Jardín Botánico. Fueron 774
@@ -50,10 +46,24 @@ De la Fase 7 van hechas once cosas, las dos primeras nacidas de esa prueba:
   nuevas le escribían al bot y **no recibían nada**, porque Meta deja de
   mandar el número de quien activa su nombre de usuario de WhatsApp. Eran
   8 de unos 69 mensajes.
+- **Hay un proceso de prueba formal** (23/09/2026): 231 casos de
+  componente e integración en `pytest`, humo de despliegue contra
+  `/health`, integración continua sin secretos, y cinco documentos
+  conforme a ISO/IEC/IEEE 29119 en `docs/pruebas/`.
+- **El corpus se limpió de basura de extracción y el CU2 dejó de citar
+  cuando no respondía** (24/09/2026, ADR-0025). El banco de veinte
+  preguntas —el que compromete el anteproyecto §6.1.7— midió que 6 de 20
+  respuestas decían «no tengo esa información» y firmaban igual con el
+  Jardín Botánico; ahora la cita la pone el backend y solo cuando el
+  modelo dice haber usado el contexto. De 6 de 20 a 0 de 20, medido.
 
-Falta lo principal: **revalidar el umbral**, que hoy no lo respalda ninguna
-medición. Y antes que eso, **probar en vivo el envío por `recipient`**, que
-es por donde salen ahora todas las respuestas.
+**Desde el 23/09/2026 hay un proceso de prueba formal** conforme a
+ISO/IEC/IEEE 29119, documentado en `docs/pruebas/` —política, plan,
+especificación, incidencias y el banco de veinte preguntas—. **Ese
+directorio es ahora la fuente viva de qué falta**, no este documento: aquí
+abajo, en «Por dónde seguir», solo quedan los punteros. El plan de pruebas
+(`docs/pruebas/plan-de-pruebas.md`) §7 tiene la lista completa con
+estimación.
 
 Este documento existe para retomar el trabajo sin releer toda la historia.
 Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
@@ -69,10 +79,13 @@ Léalo junto con `CLAUDE.md` (instrucciones del proyecto) y `docs/adr/`
 El bot recibe mensajes escritos y hablados, aplica la compuerta de
 consentimiento, transcribe las notas de voz y **un agente con function
 calling decide qué hacer**: responder con la guía oficial (CU2), contar qué
-siembran otras huertas (CU4), ofrecer guardar lo que le contaron (CU3) o
-mostrar la ayuda (CU5). Recuerda los últimos diez mensajes. **Los cinco
-casos de uso están construidos y desplegados, y la conversación se probó
-desde un celular real.** Lo que queda es medirlo y calibrarlo.
+siembran otras huertas (CU4), ofrecer guardar lo que le contaron (CU3),
+contarle lo que ella tiene sembrado (CU8) o mostrar la ayuda (CU5).
+Recuerda los últimos diez mensajes. **Los ocho casos de uso están
+construidos, desplegados y probados con usuarias reales.** Lo que queda es
+lo que dice `docs/pruebas/plan-de-pruebas.md` §7: cerrar la calibración del
+umbral comunitario, la regresión de la ingesta y el registro normalizado
+de la aceptación.
 
 ---
 
@@ -85,7 +98,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Idempotencia con dos estados | `db/004_idempotencia.sql`, `repositorio.py` | En Supabase, probada |
 | Esquema de base de datos | `db/*.sql` | Aplicado en Supabase |
 | Identidad (HMAC) y cifrado (AES-GCM) | `app/core/identidad.py` | Probado. **Identifica por el BSUID de Meta desde el 17/09/2026** (ADR-0023) |
-| Escalera de identidad y re-llaveo | `dispatcher._resolver_identidad`, `repositorio.rellavear_identidad` | Comprobado sin base ni red y con el spike. **El envío por `recipient` no se ha probado en vivo** |
+| Escalera de identidad y re-llaveo | `dispatcher._resolver_identidad`, `repositorio.rellavear_identidad` | Comprobado sin base ni red, con el spike y **en producción**: el envío por `recipient` funcionó en la aceptación de los ocho casos de uso |
 | Conexión a PostgreSQL | `app/core/basedatos.py` | Pool con `asyncpg` |
 | Repositorio de datos | `app/services/repositorio.py` | Cubre el esquema entero |
 | Cliente de WhatsApp | `app/services/whatsapp.py` | Texto y botones |
@@ -97,7 +110,7 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
-| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v2`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v1`, `redaccion_comunidad_v2`, `respuesta_general_v1` |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v2`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v2`, `redaccion_comunidad_v2`, `respuesta_general_v1` |
 | Catálogo de fuentes oficiales | `scripts/catalogo_fuentes.py` | Nueve fuentes declaradas, con sus parámetros medidos (ADR-0014) |
 | Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **765 fragmentos de nueve fuentes en Supabase**; descarta los renglones de índice |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
@@ -105,15 +118,15 @@ desde un celular real.** Lo que queda es medirlo y calibrarlo.
 | Respuesta sin respaldo oficial | `respuesta_general_v1.md`, `CU2_RESPALDO_MODELO` | Activo desde el 15/08; se apaga en Railway sin desplegar |
 | Advertencia de contenido médico | `app/textos.py`, `orientacion.py` | La pone el backend, no el prompt (ADR-0015) |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
-| Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. **La migración `009` está sin correr** (ADR-0021) |
-| Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Sin probar desde el celular** |
-| Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Sin probar desde el celular** |
+| Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. Migración `009` aplicada. **Probado en la aceptación** |
+| Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Probado en la aceptación** |
+| Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Probado en la aceptación** |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
 | Agente orquestador | `app/agent/agente.py`, `agente_v2.md` | **Probado en producción desde el celular**; la regla 6 del `v2` (ADR-0024) **sin probar** |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
 | Acuse de la nota de voz | `app/services/espera.py` | Se manda al recibir el audio, sin umbral (ADR-0017, revisado) |
 | Indicador de «escribiendo» | `whatsapp.marcar_escribiendo` | Los tres puntitos nativos de WhatsApp, en todos los mensajes (ADR-0017, 2.ª revisión). **Sin probar desde el celular** |
-| CU3 sin fecha de siembra | `extraccion_v3.md`, `db/008_*.sql` | Código listo; **la migración `008` está sin correr** (ADR-0018) |
+| CU3 sin fecha de siembra | `extraccion_v3.md`, `db/008_*.sql` | Migración `008` aplicada (ADR-0018) |
 | Catálogo de barrios de Bosa | `db/003_catalogo_barrios_bosa.sql` | **313 filas en Supabase** desde el 17/08/2026 |
 
 Flujo comprobado en un celular real: `"Hola"` → bienvenida + botones
@@ -138,23 +151,22 @@ desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
   **765 fragmentos oficiales de nueve fuentes** desde el 19/08/2026, y
   **313 barrios** desde el 17/08. Escribir ahí cambia lo que responde el
   bot **en el acto**, con o sin despliegue: Railway lee esta misma base.
-  **Al 17/09/2026: 9 usuarias, 7 huertas, 56 cultivos y 204 mensajes**,
-  contados al exportar las conversaciones antes de tocar la identidad.
-  El 18/08/2026 se vaciaron a propósito `usuario`, `mensaje`, `huerta`,
+  **Al 25/09/2026: 12 usuarias, 10 huertas, 61 cultivos, 273 mensajes y
+  6 fragmentos comunitarios**, medido directo contra la base. El
+  18/08/2026 se vaciaron a propósito `usuario`, `mensaje`, `huerta`,
   `cultivo` y `fragmento_comunitario` —incluida la fila real del autor—
   para volver a recorrer el camino completo, y con eso desapareció la
   conversación de la prueba del 15/08, que solo sobrevive exportada en
   `fuentes/conversacion_prueba_real.json` —fuera del repositorio, que es
-  público—. **Al 08/09/2026 hay otra vez 4 usuarias, 4 huertas con 13
-  cultivos y sus 4 fragmentos comunitarios**, que son los que por fin
-  permiten ejercitar el CU4 y el CU7.
-  **La `010` está sin correr y va junto con su despliegue** (ADR-0023):
-  renombra `usuario.telefono_hash` a `identidad_hash`, y mientras el
-  código desplegado y la columna no coincidan, ningún mensaje se
-  atiende.
-  **Migraciones aplicadas: hasta la `008`** —comprobado el 08/09 contra
-  `information_schema`: la columna `fecha_siembra_aprox` ya no existe—.
-  **La `009` está sin correr.**
+  público—. Son las **nueve filas reales** de material de la Fase 7 que
+  `CLAUDE.md` §12 dice que no se tocan, más las que fue dejando cada
+  ejecución posterior de `spike_despachador` y `ejecutar_banco`, que se
+  borran solas en un `finally`.
+  **Migraciones aplicadas: hasta la `010`.** Comprobado el 25/09/2026
+  contra `information_schema`: existe `usuario.identidad_hash` y no queda
+  `telefono_hash`, y existe la tabla `listado_comunitario_pendiente` de la
+  `009`. **Las dos que este documento arrastraba como pendientes ya
+  corrieron**; fue una de las tres afirmaciones falsas de INC-004.
 - **Meta:** app `Chatbot Huertas Urbanas` (id `4332318797098432`).
   **Número de producción desde el 09/09/2026**, con WABA y token de acceso
   nuevos, todo actualizado en Railway. Se acabó el límite de 5
@@ -164,18 +176,20 @@ desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
   no implica que lleguen mensajes, y al cambiar de WABA hay que rehacerlos.
   Hay además una **página de Facebook**, «Chatbot Huertas Urbanas |
   Bogotá», creada para dar credibilidad al repartir el enlace.
-- **GitHub:** repositorio **público**. `origin/main` al día en `c0d2303`.
+- **GitHub:** repositorio **público**. `origin/main` desplegado y
+  comprobado en `e7a5ec9` (25/09/2026, `python -m scripts.humo_despliegue`).
   **Antes de dar por probado nada, compruebe con `/health` qué commit está
   corriendo:** desde el 15/08 lo dice, y el corpus vive en Supabase, así que
-  el bot puede estar respondiendo con fragmentos nuevos y código viejo.
+  el bot puede estar respondiendo con fragmentos nuevos y código viejo. Este
+  documento **ya se equivocó una vez** dando por cierto un commit viejo sin
+  consultarlo (INC-004): no vuelva a copiar el SHA aquí a mano sin correr el
+  humo primero.
 
 ## Lo que NO funciona todavía (esperado)
 
-- **El envío por `recipient` no está probado contra Meta.** Desde el
-  ADR-0023 todas las respuestas salen por ahí, y es el único punto donde
-  equivocarse deja a alguien sin recibir nada. Está comprobado contra la
-  documentación oficial y con el spike, que no llega a Meta. **Hay que
-  escribirle al bot desde un celular en cuanto se despliegue.**
+- ~~El envío por `recipient` no está probado contra Meta~~ **Ya está**:
+  la migración `010` se desplegó, y la aceptación de los ocho casos de uso
+  se ejecutó desde celulares reales sin que faltara ninguna respuesta.
 - **Ocho mensajes se perdieron y no vuelven.** Los del 15/09 en adelante
   que se descartaron por no traer teléfono quedaron marcados
   `procesado`, así que ni un reintento de Meta los recuperaría.
@@ -219,72 +233,44 @@ desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
 
 ## Por dónde seguir
 
-### 0. Desplegar la identidad por BSUID y probarla en vivo
+### 0. ~~Desplegar la identidad por BSUID y probarla en vivo~~ Hecho
 
-**Es lo primero porque hoy hay gente que le escribe al bot y no recibe
-nada.** El código está escrito (ADR-0023) y falta ponerlo a andar:
+La `010` se desplegó, `recipient` funciona —comprobado en la aceptación de
+los ocho casos de uso desde celulares reales— y las nueve usuarias de
+entonces ya escribieron con la identidad nueva. **Sigue pendiente el
+paso 5**, borrar el re-llaveo transitorio: `dispatcher` y
+`repositorio.rellavear_identidad` siguen con el código marcado como tal.
+No es urgente —no hace daño quedarse, solo es peso muerto— pero conviene
+llevarlo al informe de cierre (A-13) para no perderlo de vista.
 
-1. **Confirmar el export.** Las nueve conversaciones se exportaron el
-   17/09 a `fuentes/`, fuera del repositorio, que es público. Son el
-   material de la Fase 7 y no hay otra copia.
-2. **Desplegar y correr la `010` seguido**, a una hora tranquila. El
-   código nuevo lee `identidad_hash` y el desplegado lee
-   `telefono_hash`: entre lo uno y lo otro, **ningún mensaje se
-   atiende**. Compruebe con `/health` qué commit está corriendo.
-3. **Escribirle al bot desde un celular.** Es la única forma de saber si
-   `recipient` funciona, y por ahí salen ahora **todas** las respuestas.
-   Si falla, la bitácora lo dice (`WhatsApp rechazó el envío`) y se
-   revierte con un commit.
-4. **Mirar la bitácora unos días.** Cada mensaje registra de dónde salió
-   la identidad (`origen=mensaje`, `origen=contacto`, `origen=telefono`)
-   y cada re-llaveo deja su línea. Si aparece `origen=contacto`, la forma
-   del webhook cambió; si aparece `origen=telefono`, el BSUID no llegó.
-5. **Borrar el re-llaveo** cuando las nueve hayan escrito una vez. Está
-   en `dispatcher` y en `repositorio.rellavear_identidad`, marcado como
-   transitorio en los dos sitios.
+### 1. El umbral del CU2: decisión tomada, no calibración cerrada
 
-### 1. Cerrar la calibración del umbral del CU2
+**Decisión del autor, 24/09/2026: se mantiene en 0.66**, sostenida por la
+medición de 19 consultas reales del banco de preguntas —15 de 19 lo
+superan—, y queda declarada como **no recalibrada**. El detalle completo,
+con lo que se midió y lo que no, está en el
+[banco de preguntas](pruebas/banco-de-preguntas.md) y en el criterio de
+terminación 4 de la
+[política de pruebas](pruebas/politica-y-practicas-de-prueba.md) §4.2.
 
-**Ya no está en cero, pero tampoco cerrada.** El 19/08/2026 se midieron
-**81 consultas reales** —las 63 de la usuaria de la prueba del 15/08 más
-las 32 de las pruebas del 18 y el 19— contra el corpus ya limpio, y de ahí
-salió el **0.66** que está puesto hoy. Lo que falta son dos cosas
-concretas.
+Lo que queda de esto, sin repetir lo ya medido:
 
-**La supuesta desviación de `jbb_practicas_2022` no existía.** Los 62 de
-la base y los 83 del código no son dos cuentas de lo mismo: los 83 son el
-troceo y los 62 lo que queda tras descartar 21 fragmentos ya presentes en
-el resto del corpus. `--simular` corta **antes** del descarte, y de ahí la
-falsa discrepancia. Comprobado el 23/09/2026 con `--simular
---comprobar-duplicados`.
+- **`RAG_TOP_K` sin revisar.** Vale 4 y hay respuestas que superan el
+  umbral y quedan fuera del top-4 —el ADR-0025 lo destapó buscando otra
+  cosa—. Medirlo con 6 y 8 contra el banco es la actividad A-17.
+- **`scripts/calibrar_umbral_real.py` sigue desfasado**, mide 21 consultas
+  escritas a mano en vez de leer las reales de `mensaje`. El banco de
+  preguntas lo reemplazó en la práctica; conviene decidir si se conserva o
+  se retira (regla del §12 de `CLAUDE.md`: si no sale la frase de para qué
+  sirve, se borra).
+- **Etiquetar leyendo el fragmento de cada consulta real** sigue sin
+  hacerse. Es lo único que convertiría «se mantiene por decisión» en «se
+  calibró», y es trabajo de criterio, no automatizable.
 
-**Lo que falta: etiquetar leyendo el fragmento.** La frontera que importa no es
-«del dominio o no», es «el fragmento recuperado responde de verdad o no».
-Eso exige leer los 81 textos recuperados uno por uno. Es criterio del
-autor, no automatizable, y sin ello el 0.66 es un número razonable pero no
-demostrado.
-
-Lo que sí quedó medido y no hay que repetir:
-
-- **Ningún umbral separa la intención.** Los rangos se solapan: «Que
-  conocimiento en agricultura sabes» (no es CU2) puntúa **0.6779** y «Qué
-  puedo hacer si mis plantas no dan frutos» (sí lo es) puntúa **0.6775**.
-  Quien filtra la intención es el agente (ADR-0013), no esto.
-- **Los mensajes del CU3 y del CU4 puntúan entre los mejores.** «Y que
-  están sembrando las otras huertas» da **0.7194**. Subir el umbral no
-  protegería de ellos.
-- **Lo verdaderamente ajeno se separa solo:** «Que carro está barato hoy en
-  día» **0.5782**, los barrios entre 0.587 y 0.612, y el mensaje de
-  emergencia familiar **0.5687**.
-- **El umbral decide citar o no citar**, no responder o callar
-  (`CU2_RESPALDO_MODELO`). El modo de fallo de citar sin contenido se
-  observó en producción el 17/08 con el 0.68 puesto, en una consulta de
-  **0.7232**, así que no aparecía solo al bajar el umbral.
-
-**Las etiquetas de `scripts/calibrar_umbral_real.py` siguen desfasadas** y
-el script se quedó corto: mide 21 consultas escritas a mano contra las 81
-reales que ya existen. Conviene rehacerlo leyendo de `mensaje` y del
-export, que es lo que hizo la medición del 19/08.
+Lo que ya no hay que remedir, porque el banco de preguntas de
+`docs/pruebas/` lo volvió a comprobar con datos más recientes: que ningún
+umbral separa la intención, que los mensajes del CU3 y del CU4 puntúan
+entre los mejores, y que lo verdaderamente ajeno se separa solo.
 
 ### 2. El resto de la Fase 7
 
@@ -304,9 +290,9 @@ Lo que ya está identificado y esperando datos de las pruebas por WhatsApp:
   Desde el ADR-0021 ese umbral gobierna **solo el CU7**: la pregunta
   general del CU4 ya no consulta la colección vectorial, así que la
   remedición pesa menos que antes pero sigue haciendo falta.
-  Sigue sin tocar desde el 04/08. **Ya es posible**: al 09/09/2026 hay
-  cuatro huertas de cuatro personas distintas, así que quien pregunta ve
-  tres.
+  Sigue sin tocar desde el 04/08, y ahora hay más margen para medirlo:
+  al 25/09/2026 son 10 huertas de 12 personas distintas (actividad A-12
+  del [plan de pruebas](pruebas/plan-de-pruebas.md)).
 - **Cuántas veces responde el CU2 sin respaldo oficial.** Cada vez queda
   contado en la bitácora, y es la señal honesta de dónde le falta corpus
   —que el respaldo del modelo volvió invisible para la usuaria—.
