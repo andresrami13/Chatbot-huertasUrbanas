@@ -165,6 +165,44 @@ def _obtener_pdf(fuente: FuenteDocumento, ruta: Path | None) -> Path:
 # =========================================================================
 
 
+# Restos de extracción que ninguna normalización de Unicode arregla, con lo
+# que la maqueta quería decir en su lugar. Inventariados sobre los 765
+# fragmentos ya ingeridos el 24/09/2026 (incidencia INC-019).
+#
+# El orden importa: `\x93\x93 ` antes que `\x93y `, o el primero se comería
+# medio par. La lista se recorre en orden y cada regla se aplica entera.
+#
+# **Lo que deliberadamente NO está aquí:** `ã ç å ä ö õ ć` y las rachas de
+# consonantes. El inventario las miró una por una y son legítimas —apellidos
+# de las bibliografías y nombres científicos—. Buscar sospechosos en vez de
+# inventariar habría «arreglado» *Symphytum*.
+_BASURA_DE_EXTRACCION: tuple[tuple[str, str], ...] = (
+    # Viñetas de Wingdings/Symbol que `pypdf` devuelve sin traducir.
+    ("\x93\x93 ", "• "),
+    ("\x93y ", "• "),
+    ("", "•"),
+    # Marcador de objeto incrustado: la imagen no está, el hueco sí.
+    ("￼ ", ""),
+    ("￼", ""),
+    # Rótulo de sección del catálogo de plantas que salió con basura
+    # pegada, 15 veces y siempre igual: `ENREDADERA KJBNVBJNBHJ BHJ`. Se
+    # quita la basura y se deja el rótulo, que sí dice algo.
+    ("KJBNVBJNBHJ BHJ ", ""),
+)
+
+# Acento combinante que quedó **solo**, donde iba una letra griega: en la
+# lista de compuestos de *Sembrando biodiversidad*, `α-pineno` salió como
+# ` ́-pineno`. No se puede saber qué letra era, así que se quita el acento
+# huérfano y se deja el resto de la palabra.
+#
+# Se aplica **después** de NFKC y solo si detrás no hay letra. Quitarlo
+# antes sería un desastre silencioso: en un texto con las tildes
+# descompuestas, `a`+U+0301 es una `á` de verdad, y borrar el acento la
+# convertiría en `a`. NFKC ya recompuso todas las legítimas, así que
+# después solo quedan las huérfanas.
+_ACENTO_HUERFANO = re.compile(r"(?<![^\W\d_])́")
+
+
 def _normalizar_texto(texto: str) -> str:
     """Unifica espacios raros y deshace las ligaduras tipográficas.
 
@@ -191,9 +229,44 @@ def _normalizar_texto(texto: str) -> str:
     cambiarlo: el documento del Jardín Botánico no tiene ni una ligadura y
     NFKC solo le altera 9 caracteres de 130 719, sin mover ningún límite de
     fragmento. Sigue dando los mismos 81.
+
+    **Viñetas de fuente simbólica.** Añadido el 24/09/2026 tras inventariar
+    el corpus ya ingerido (incidencia INC-019). Cuando la viñeta de una
+    lista se maqueta con Wingdings o Symbol, `pypdf` devuelve el byte de la
+    fuente sin traducir, no el carácter: salen `\\x93y ` (95 veces) y
+    `\\x93\\x93 ` (3) en la cartilla de fertilización, y `U+F0B7` (19) en el
+    catálogo de plantas. `U+F0B7` está en la zona de uso privado de
+    Unicode, así que ninguna normalización lo toca. Se traducen a `•`, que
+    es lo que la maqueta quería decir.
     """
     texto = texto.replace("​", "")
+
+    # Viñetas de fuente simbólica y restos de maquetación (INC-019). Van
+    # antes de NFKC: son caracteres que la normalización no reconoce.
     return unicodedata.normalize("NFKC", texto)
+
+
+def limpiar_fragmento(texto: str) -> str:
+    """Quita los restos de extracción que ninguna normalización arregla.
+
+    Se aplica a cada fragmento **ya troceado**, y no al texto de la página,
+    por una razón que se midió antes de decidirla: las viñetas simbólicas
+    ocupan dos caracteres y su reemplazo uno, así que limpiarlas antes de
+    trocear **mueve los límites de los fragmentos**. Comprobado el
+    24/09/2026: el catálogo de plantas pasaba de 120 fragmentos a 119 y la
+    cartilla de fertilización de 30 a 29. Ese corpus es el que sostiene la
+    calibración (`CLAUDE.md` §11), así que la limpieza no puede tocarlo.
+
+    Al aplicarla después, el número de fragmentos es el mismo y solo cambia
+    el texto de dentro. Es también lo que permite reparar lo ya ingerido
+    sin reingerir: `scripts/limpiar_corpus.py` llama a esta misma función.
+
+    Es idempotente: limpiar un fragmento ya limpio no lo cambia.
+    """
+    for basura, limpio in _BASURA_DE_EXTRACCION:
+        texto = texto.replace(basura, limpio)
+
+    return _ACENTO_HUERFANO.sub("", texto)
 
 
 def _quitar_numero_pagina(texto: str, folio: int, variable: bool = False) -> str:
@@ -1295,7 +1368,7 @@ async def main() -> None:
         )
         print(f"Fichas detectadas, y por las que se corta fragmento: {len(inicios)}")
 
-    fragmentos = _trocear(parrafos, ratio, inicios)
+    fragmentos = [limpiar_fragmento(t) for t in _trocear(parrafos, ratio, inicios)]
     _informar(fragmentos, argumentos.muestra, ratio)
 
     if argumentos.medir_tokens:
