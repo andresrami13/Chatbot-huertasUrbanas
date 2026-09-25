@@ -1,0 +1,13 @@
+# Dependencias para ejecutar las pruebas. NO se despliegan.
+#
+# Están aparte de `requirements.txt` por el mismo criterio que
+# `requirements-scripts.txt`: Railway instala solo el primero, así que
+# nada de aquí llega al servicio. Probar no debe cambiar lo que corre en
+# producción.
+#
+# Para instalarlas:
+#     pip install -r requirements.txt -r requirements-dev.txt
+#
+# Versiones fijas, no rangos, por el mismo motivo que en los otros dos
+# archivos: una prueba que pasa hoy tiene que poder repetirse en la Fase 8.
+pytest==9.1.1

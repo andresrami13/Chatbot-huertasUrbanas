@@ -1,0 +1,49 @@
+# Ejecuta las pruebas de componente e integración en cada empujón.
+#
+# Procedimiento PR-01 del plan de pruebas. Corre los 217 casos de los
+# modelos MP-01 a MP-23, que no abren la base de datos, no llaman a Meta
+# y no llaman a Gemini: por eso este flujo **no necesita ni un secreto**.
+# El entorno falso lo pone `tests/conftest.py`.
+#
+# Lo que NO corre aquí, y es deliberado:
+#
+#   - `spike_despachador`, que escribe en Supabase —la misma instancia
+#     que produce— y llama a Gemini, que cuesta dinero.
+#   - Las calibraciones del umbral y del enrutamiento, que llaman al
+#     modelo y cuyo resultado no es determinista: una prueba que falla
+#     una de cada cinco veces se acaba ignorando, y entonces estorba.
+#   - El humo de despliegue, que se corre contra Railway después de
+#     promover, no antes.
+#
+# Sirve además como prueba de instalabilidad de las dependencias: si las
+# versiones fijas de `requirements.txt` dejaran de instalarse juntas, se
+# sabría aquí y no al desplegar.
+
+name: Pruebas
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  componente-e-integracion:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Traer el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          # La misma que declara `.python-version` y que corre en Railway.
+          python-version-file: .python-version
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Ejecutar las pruebas
+        run: python -m pytest -q
