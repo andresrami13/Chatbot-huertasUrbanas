@@ -183,15 +183,10 @@ desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
   llama al número en vez de escribir, no pasa nada: ni respuesta ni
   rastro en la bitácora. Lo destapó la revisión del webhook del 16/09.
 - **El umbral está en 0.66 desde el 19/08/2026**, medido contra 81
-  consultas reales y el corpus ya limpio. **No es una calibración
-  cerrada:** falta etiquetar leyendo el fragmento recuperado de cada
-  consulta, y falta resolver la desviación de `jbb_practicas_2022`. Ver
-  [Por dónde seguir](#por-dónde-seguir).
-- **`jbb_practicas_2022` no se puede reproducir.** En la base hay 62
-  fragmentos y el código produce 83, comprobado el 19/08 revirtiendo a
-  `b159cd2`, así que no lo causó la limpieza de índices. Mientras siga
-  así, el corpus entero no es reproducible y toda calibración hereda esa
-  debilidad.
+  consultas reales y el corpus ya limpio. **Decisión del autor del
+  24/09/2026: se mantiene**, sostenido por la medición de 19 consultas
+  reales del banco de preguntas —15 de 19 lo superan— y declarado como
+  **no recalibrado**, no como calibrado.
 - **El modelo generativo quedó alineado el 08/09/2026.** Manda
   `GEMINI_GENERATIVE_MODEL` de Railway, que vale **`gemini-3.6-flash`**, y
   el defecto de `app/config.py` la copia. Antes había **tres valores y
@@ -256,15 +251,14 @@ las 32 de las pruebas del 18 y el 19— contra el corpus ya limpio, y de ahí
 salió el **0.66** que está puesto hoy. Lo que falta son dos cosas
 concretas.
 
-**Falta 1: la desviación de `jbb_practicas_2022`.** En la base hay 62
-fragmentos de esa fuente y el código produce **83**, comprobado revirtiendo
-el árbol a `b159cd2`, así que no lo causó la limpieza de índices. Mientras
-siga así, **el corpus entero no es reproducible** y cualquier calibración
-hereda esa debilidad. Es lo primero que hay que resolver, y hay que
-decidirlo con cuidado: reingerir esa fuente cambia el corpus otra vez y
-obliga a remedir.
+**La supuesta desviación de `jbb_practicas_2022` no existía.** Los 62 de
+la base y los 83 del código no son dos cuentas de lo mismo: los 83 son el
+troceo y los 62 lo que queda tras descartar 21 fragmentos ya presentes en
+el resto del corpus. `--simular` corta **antes** del descarte, y de ahí la
+falsa discrepancia. Comprobado el 23/09/2026 con `--simular
+--comprobar-duplicados`.
 
-**Falta 2: etiquetar leyendo el fragmento.** La frontera que importa no es
+**Lo que falta: etiquetar leyendo el fragmento.** La frontera que importa no es
 «del dominio o no», es «el fragmento recuperado responde de verdad o no».
 Eso exige leer los 81 textos recuperados uno por uno. Es criterio del
 autor, no automatizable, y sin ello el 0.66 es un número razonable pero no

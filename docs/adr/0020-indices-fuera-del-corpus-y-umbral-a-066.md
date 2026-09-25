@@ -141,12 +141,21 @@ cuarta vez en el proyecto y ya está anotado como tal en el CLAUDE.md §12.
 
 ## Lo que este ADR no resuelve
 
-**`jbb_practicas_2022` no se puede reproducir**, y no lo causó esta
+~~**`jbb_practicas_2022` no se puede reproducir**, y no lo causó esta
 limpieza: la base tiene **62 fragmentos** de esa fuente y el código produce
 **83**, comprobado revirtiendo el árbol a `b159cd2`. No se reingirió porque
 no estaba autorizado y habría cambiado el corpus más de lo pedido. Mientras
 siga así, **el corpus entero no es reproducible y toda calibración hereda
-esa debilidad**, incluida esta.
+esa debilidad**, incluida esta.~~
+
+> **Corrección del 24/09/2026.** Lo tachado era falso y no había nada que
+> resolver. Los 83 son el resultado del **troceo** y los 62 lo que queda
+> tras descartar **21 fragmentos ya presentes en el resto del corpus**;
+> `--simular` corta antes de ese descarte, así que comparar su salida con
+> el recuento de la base produce una discrepancia que no existe. Se
+> comprueba con `--simular --comprobar-duplicados`, que imprime
+> «Se ingieren 62 de 83». El corpus sí se reproduce, ingiriendo las nueve
+> fuentes en el mismo orden.
 
 **Falta etiquetar leyendo el fragmento recuperado de cada consulta.** La
 frontera que importa no es «del dominio o no», es «el fragmento responde de

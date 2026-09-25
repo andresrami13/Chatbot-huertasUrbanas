@@ -60,11 +60,12 @@ cosas:
 7. La **fecha de siembra salió del CU3 entero** por ser un dato de solo
    escritura (ADR-0018).
 
-**La calibración sigue sin cerrarse, y ahora se sabe por qué:** falta
-etiquetar leyendo el fragmento recuperado de cada consulta, y
-`jbb_practicas_2022` no se puede reproducir —62 fragmentos en la base
-contra 83 que produce el código—. El detalle está en `docs/ESTADO.md`,
-sección «Por dónde seguir».
+**El umbral se mantiene por decisión del autor (24/09/2026)** y queda
+declarado como **no recalibrado**, no como calibrado: lo sostiene la
+medición de 19 consultas reales del banco de preguntas, de las que 15
+superan el 0.66. Lo que falta para cerrarlo de verdad es etiquetar
+leyendo el fragmento recuperado de cada consulta. El detalle está en
+`docs/ESTADO.md`, sección «Por dónde seguir».
 
 La limpieza de índices y la bajada a 0.66 son el **ADR-0020**, escrito el
 08/09/2026. Sus mediciones siguen además en el comentario de
@@ -496,11 +497,11 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - Los prompts viven en `app/agent/prompts/` como archivos versionados,
   conforme a la práctica de versionamiento declarada en la metodología.
   **Los seis vigentes son** `agente_v2.md`, `extraccion_v3.md`,
-  `barrio_v1.md`, `redaccion_rag_v1.md`, `redaccion_comunidad_v2.md` y
+  `barrio_v1.md`, `redaccion_rag_v2.md`, `redaccion_comunidad_v2.md` y
   `respuesta_general_v1.md`. `agente_v1.md`, `extraccion_v1.md`,
-  `extraccion_v2.md` y `redaccion_comunidad_v1.md` siguen en el
-  repositorio a propósito, como historial citable, pero **no los carga
-  nadie**: no los edites creyendo que están en uso.
+  `extraccion_v2.md`, `redaccion_comunidad_v1.md` y `redaccion_rag_v1.md`
+  siguen en el repositorio a propósito, como historial citable, pero **no
+  los carga nadie**: no los edites creyendo que están en uso.
   **Se rellenan con `str.format`: una llave literal rompe la carga con un
   `KeyError`.** El del agente no lleva huecos y se carga tal cual, a
   propósito.
@@ -538,11 +539,10 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   ingesta tiene que seguir dando los mismos fragmentos en las fuentes ya
   ingeridas —81, 62, 220, 30, 46, 120, 68, 92, 46— porque ese corpus es el
   que sostiene la calibración.
-  **`jbb_practicas_2022` está desviada y no es culpa de nadie de hoy:** en
-  la base hay 62 fragmentos y el código actual produce 83, comprobado el
-  19/08/2026 revirtiendo el árbol a `b159cd2`. No se ha reingerido para no
-  cambiar el corpus más de lo pedido, pero **ese 62 no se puede reproducir**
-  y hay que resolverlo antes de dar la calibración por buena.
+  **Cuidado al comparar ese recuento con `--simular`, que corta antes de
+  descartar duplicados.** En `jbb_practicas_2022` el troceo da 83 y se
+  ingieren 62: los otros 21 ya estaban en el resto del corpus. Para
+  comparar contra la base hay que pasar además `--comprobar-duplicados`.
 
 ---
 

@@ -47,11 +47,12 @@ captura del CU3 (ADR-0016), la **limpieza de los índices** del corpus y la
 bajada del **umbral a 0.66**, medido contra 81 consultas reales
 (19/08/2026).
 
-**La calibración sigue sin cerrarse, y ahora se sabe por qué:** falta
-etiquetar leyendo el fragmento recuperado de cada consulta, y
-`jbb_practicas_2022` no se puede reproducir —62 fragmentos en la base
-contra 83 que produce el código—. El detalle está en `docs/ESTADO.md`,
-sección «Por dónde seguir».
+**El umbral se mantiene por decisión del autor (24/09/2026)** y queda
+declarado como **no recalibrado**, no como calibrado: lo sostiene la
+medición de 19 consultas reales del banco de preguntas, de las que 15
+superan el 0.66. Lo que falta para cerrarlo de verdad es etiquetar
+leyendo el fragmento recuperado de cada consulta. El detalle está en
+`docs/ESTADO.md`, sección «Por dónde seguir».
 
 ---
 
@@ -439,7 +440,7 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
 - Los prompts viven en `app/agent/prompts/` como archivos versionados
   (`agente_v2.md`, `extraccion_v3.md`, `barrio_v1.md`,
-  `redaccion_rag_v1.md`, `redaccion_comunidad_v2.md`,
+  `redaccion_rag_v2.md`, `redaccion_comunidad_v2.md`,
   `respuesta_general_v1.md`), conforme a la
   práctica de versionamiento
   declarada en la metodología. **Se rellenan con `str.format`: una llave
@@ -472,11 +473,10 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   ingesta tiene que seguir dando los mismos fragmentos en las fuentes ya
   ingeridas —81, 62, 220, 30, 46, 120, 68, 92, 46— porque ese corpus es el
   que sostiene la calibración.
-  **`jbb_practicas_2022` está desviada y no es culpa de nadie de hoy:** en
-  la base hay 62 fragmentos y el código actual produce 83, comprobado el
-  19/08/2026 revirtiendo el árbol a `b159cd2`. No se ha reingerido para no
-  cambiar el corpus más de lo pedido, pero **ese 62 no se puede reproducir**
-  y hay que resolverlo antes de dar la calibración por buena.
+  **Cuidado al comparar ese recuento con `--simular`, que corta antes de
+  descartar duplicados.** En `jbb_practicas_2022` el troceo da 83 y se
+  ingieren 62: los otros 21 ya estaban en el resto del corpus. Para
+  comparar contra la base hay que pasar además `--comprobar-duplicados`.
 
 ---
 
