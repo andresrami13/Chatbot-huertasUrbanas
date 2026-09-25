@@ -71,7 +71,7 @@ from app.services.recuperacion import (
 
 logger = logging.getLogger(__name__)
 
-_PROMPT = "redaccion_rag_v1.md"
+_PROMPT = "redaccion_rag_v2.md"
 
 # Fase 4 / CLAUDE.md §8. Más baja que la del agente (0.7) a propósito: aquí
 # no se conversa, se reformula lo que dice un documento, y la variabilidad
@@ -96,6 +96,10 @@ _FUERA_DE_TEMA = "FUERA_DE_TEMA"
 
 # Una línea final de atribución, que es como el modelo la escribe cuando se
 # le contagia el formato del otro camino.
+#
+# **La usan los dos caminos, y por motivos distintos.** Aquí, porque sin
+# respaldo no hay nada que citar. En el camino con respaldo, porque desde el
+# ADR-0025 la línea la pone el backend y la que escriba el modelo sobra.
 _LINEA_FUENTE = re.compile(r"^[ \t]*fuente\s*:.*$", re.IGNORECASE | re.MULTILINE)
 
 # Una atribución metida dentro de la frase. Esta no se puede recortar sin
@@ -117,6 +121,66 @@ _ATRIBUCION_INVENTADA = re.compile(
     r"|(el|un) documento (dice|indica|se[ñn]ala|recomienda)",
     re.IGNORECASE,
 )
+
+
+# --- La línea de la fuente la pone el backend (ADR-0025) -----------------
+#
+# Hasta el 24/09/2026 la escribía el modelo, porque el `redaccion_rag_v1.md`
+# se lo mandaba: «termine siempre citando la fuente». Esa regla chocaba con
+# la 2 del mismo prompt —«si el contexto no alcanza, dígalo»— y el modelo
+# cumplía las dos a la vez: **6 de 20 respuestas del banco de preguntas le
+# decían a la usuaria que no tenían la información y le ponían
+# `Fuente: Jardín Botánico` al pie**.
+#
+# No era un fallo del modelo, era una contradicción del prompt. Y era la
+# violación de lo que este mismo módulo declara arriba: o se cita toda la
+# respuesta o no se cita nada, y **el camino lo elige el código**. La
+# similitud dice si el fragmento se parece, no si responde; quien sabe si
+# sirvió es el que lo leyó.
+#
+# Ahora el modelo solo declara que **no** pudo responder, con la marca de
+# abajo, y aquí se decide el texto. La marca es negativa a propósito: si el
+# modelo se la olvida se cita, que es el comportamiento de siempre, en vez
+# de perder la atribución en las respuestas que sí estaban bien (ADR-0025).
+
+# La marca que el modelo pone cuando el contexto no le alcanzó. Se acepta
+# con corchetes o sin ellos, que es como se cuelan siempre estas cosas, y en
+# cualquier caja.
+#
+# **Exige el guion bajo.** Sin él atraparía la frase corriente «sin
+# respaldo», que el propio asistente puede escribir en una respuesta
+# legítima, y suprimiría la cita sin motivo.
+_MARCA_SIN_RESPALDO = re.compile(r"\[{0,2}\s*SIN_RESPALDO\s*\]{0,2}", re.IGNORECASE)
+
+_LINEAS_VACIAS = re.compile(r"\n{3,}")
+
+
+def _con_cita(texto: str, entidad: str) -> str:
+    """Quita la marca y la fuente del modelo, y pone la del backend.
+
+    Devuelve el texto listo para enviar. Si el modelo declaró que el
+    contexto no le alcanzó, sale **sin** línea de fuente: atribuirle a una
+    guía oficial una no-respuesta es atribuirle algo que no dijo, y eso
+    ataca la jerarquía de fuentes de CLAUDE.md §6, que es lo único que le
+    permite a ella saber de dónde sale cada cosa.
+    """
+    sin_respaldo = bool(_MARCA_SIN_RESPALDO.search(texto))
+
+    limpio = _MARCA_SIN_RESPALDO.sub("", texto)
+    escribio_fuente = bool(_LINEA_FUENTE.search(limpio))
+    limpio = _LINEA_FUENTE.sub("", limpio)
+    limpio = _LINEAS_VACIAS.sub("\n\n", limpio).strip()
+
+    if escribio_fuente:
+        # Interesa para la Fase 7, igual que el contador de etiquetas:
+        # cuenta cuántas veces la regla 4 del prompt no bastó.
+        logger.info("CU2: el modelo escribió la línea de fuente y se retiró")
+
+    if sin_respaldo:
+        logger.info("CU2: el modelo declaró que el contexto no alcanzó; no se cita")
+        return limpio
+
+    return f"{limpio}\n\nFuente: {entidad}"
 
 
 # --- Advertencia sobre contenido de salud -------------------------------
@@ -162,8 +226,8 @@ _HABLA_DE_SALUD = re.compile(
 def _con_advertencia_medica(texto: str) -> str:
     """Añade la advertencia si la respuesta habla de salud.
 
-    Va al final, después de la línea de la fuente, para no romper el
-    formato de atribución que exige la regla 4 del prompt del CU2.
+    Va al final del todo, después de la línea de la fuente cuando la hay,
+    para no romper el formato de atribución que arma `_con_cita`.
     """
     from app import textos
 
@@ -342,6 +406,12 @@ async def consultar_orientacion(pregunta: str, respaldo: str | None = None) -> s
         # la usuaria recibiría un mensaje vacío.
         logger.error("La redacción del CU2 devolvió texto vacío")
         return textos.ORIENTACION_NO_DISPONIBLE
+
+    # La entidad sale de la tabla `fuente` por la clave foránea del
+    # fragmento mejor puntuado, no de lo que el modelo transcriba de la
+    # etiqueta `[OFICIAL – ...]`. Es para lo que el ADR-0009 la dejó fuera
+    # del texto vectorizado.
+    texto = _con_cita(texto, fragmentos[0].entidad)
 
     # Nunca la pregunta ni la respuesta (CLAUDE.md §11).
     logger.info(

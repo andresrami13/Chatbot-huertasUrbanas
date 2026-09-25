@@ -34,6 +34,7 @@ documento queda marcado como pendiente de corrección.
 | [0022](0022-consultar-mi-propia-huerta.md) | Consultar la propia huerta es el CU8, y son cinco herramientas | Aceptada; enmienda el «son cuatro» del [0013](0013-agente-orquestador.md) | Sin respaldo documental |
 | [0023](0023-identidad-por-bsuid.md) | La identidad de la usuaria es el BSUID, no su teléfono | Aceptada; corrige la «identidad por número de celular» de la Fase 3 | Fase 3 (§5) |
 | [0024](0024-el-bot-dice-que-es-un-prototipo.md) | El bot dice que es un prototipo, y el alcance es Bosa entera | Aceptada | Fase 2 (CU5) / Fase 4 / anteproyecto |
+| [0025](0025-la-cita-la-pone-el-backend.md) | La línea de la fuente la pone el backend, no el modelo | Aceptada; refuerza el reparto del [0015](0015-respaldo-del-modelo-y-advertencia-medica.md) | Fase 2 (§5.3) / incidencia INC-020 |
 
 ## Documentos pendientes de corrección
 
