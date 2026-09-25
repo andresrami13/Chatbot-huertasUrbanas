@@ -26,7 +26,7 @@ documentación.
 | Modelo generativo | **`gemini-3.6-flash`** | No existía al escribir la Fase 4. Lo manda `GEMINI_GENERATIVE_MODEL` de Railway y el defecto de `config.py` la copia; alineados desde el 08/09/2026 |
 | Umbral oficial (coseno) | **0.66** | La Fase 4 §7 dice 0.7. Bajó a 0.68 (ADR-0010) y a 0.66 el 19/08/2026 |
 | Umbral comunitario | 0.65 | La Fase 4 no contempla un umbral propio (ADR-0011) |
-| top-k por colección | 4 | Conforme. Gobierna el CU2 y el CU7; el listado del CU4 no pasa por él |
+| top-k por colección | **5** | La Fase 4 §7 dice 4. Subió el 25/09/2026 por decisión del autor (ADR-0026). Gobierna el CU2 y el CU7; el listado del CU4 no pasa por él |
 | Listado del CU4 | 3 huertas por tanda, 5 cultivos cada una | La Fase 2 no dice cuántas se enseñan de una vez (ADR-0021) |
 | Ventana de memoria | 10 mensajes | La Fase 4 §6 no precisa si son mensajes o turnos (ADR-0012) |
 | Temperatura · agente | 0.7 | Conforme |
@@ -296,6 +296,14 @@ números se fijaron antes de que existiera el corpus real**.
   contra **81 consultas reales** de dos pruebas con celular.
 - **Justifica:** [ADR-0010](adr/0010-umbral-de-similitud-recalibrado.md) y la
   recalibración del 19/08/2026
+
+### §7 — el top-k
+
+- **Dice:** 4 fragmentos por colección.
+- **Hace:** **5**, desde el 25/09/2026, por decisión del autor.
+- **Justifica:** [ADR-0026](adr/0026-top-k-a-cinco.md). Medido antes del
+  cambio sin beneficio ni daño apreciable; se declara como decisión, no
+  como calibración.
 
 ### §7 — el umbral no separa la intención
 

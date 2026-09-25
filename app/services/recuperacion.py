@@ -160,7 +160,7 @@ async def buscar_en_comunidad(
     llama tiene que decir que ninguna huerta tiene eso anotado.
 
     Advertencia que vale también para el documento de grado: **aquí el
-    umbral no hace todo el trabajo**. Con 5 a 7 huertas y top-k=4, casi
+    umbral no hace todo el trabajo**. Con 5 a 7 huertas y top-k=5, casi
     cualquier consulta recupera medio corpus, y por eso `comunidad.py`
     filtra después por la especie. Lo que aporta rigor es esa comprobación
     y la atribución, no el filtro por similitud.

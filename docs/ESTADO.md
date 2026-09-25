@@ -255,9 +255,11 @@ terminación 4 de la
 
 Lo que queda de esto, sin repetir lo ya medido:
 
-- **`RAG_TOP_K` sin revisar.** Vale 4 y hay respuestas que superan el
-  umbral y quedan fuera del top-4 —el ADR-0025 lo destapó buscando otra
-  cosa—. Medirlo con 6 y 8 contra el banco es la actividad A-17.
+- **`RAG_TOP_K` vale 5 desde el 25/09/2026** (ADR-0026), por decisión del
+  autor y sin beneficio medido: la pregunta que lo motivó no llega a la
+  recuperación, porque el agente la contesta sin llamar al CU2 (INC-025).
+  **Hay que comprobar en Railway** que no haya un `RAG_TOP_K` definido
+  que pise el defecto: `/health` no lo informa.
 - **`scripts/calibrar_umbral_real.py` sigue desfasado**, mide 21 consultas
   escritas a mano en vez de leer las reales de `mensaje`. El banco de
   preguntas lo reemplazó en la práctica; conviene decidir si se conserva o

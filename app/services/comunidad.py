@@ -247,7 +247,7 @@ def _tiene_la_especie(contenido: str, especie: str) -> bool:
     separadas por comas (ADR-0011), así que esto se puede comprobar sin
     modelo y sin margen de error.
 
-    Hace falta porque **el umbral no basta**: con 5 a 7 huertas y top-k=4
+    Hace falta porque **el umbral no basta**: con 5 a 7 huertas y top-k=5
     casi cualquier consulta recupera medio corpus (ADR-0011), así que la
     similitud trae huertas que no tienen lo que ella preguntó. Sin esta
     comprobación se le atribuirían cultivos a quien no los sembró, que es

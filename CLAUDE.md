@@ -307,7 +307,7 @@ llevan el ADR que lo justifica.
 | Transcripción de voz | Temperatura | 0.0 — **no está en la Fase 4**, es anterior a la entrada por voz |
 | Recuperación oficial | Umbral de similitud (coseno) | **0.66** desde el 19/08/2026; fue 0.7 y luego 0.68 (ADR-0010) |
 | Recuperación comunitaria | Umbral propio | **0.65** (ADR-0011) |
-| Recuperación | top-k | 4 por colección |
+| Recuperación | top-k | **5** por colección desde el 25/09/2026; la Fase 4 dice 4 (ADR-0026). Gobierna el CU2 y el CU7 |
 | Listado del CU4 | Huertas por tanda / cultivos por huerta | **3 / 5** (ADR-0021). Perillas propias: **no** reusan el top-k, que gobierna el contexto del CU2 |
 | Memoria | Ventana de mensajes | 10 mensajes, no turnos; el último es el de ella |
 | Ingesta | Fragmento / solape | 300–500 / 50 tokens, midiendo tokens de verdad (ADR-0009). La ratio car./token es **por documento** y vive en el catálogo (ADR-0014) |

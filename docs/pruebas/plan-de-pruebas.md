@@ -29,12 +29,11 @@ prueba estática, la de componente (231 casos), la de integración, la de
 sistema (`spike_despachador`), la de instalabilidad (`humo_despliegue`) y
 **la de aceptación, con usuarias reales desde celulares reales en los ocho
 casos de uso**. El **banco de 20 preguntas se ejecutó y calificó el
-24/09/2026**, y de ahí salieron tres incidencias (INC-020, INC-021 y la
-medición de INC-018). Las dos primeras quedaron corregidas el mismo día con
-el ADR-0025, y **tres de los cuatro criterios pasan**; falta la
-pertinencia, por hueco de corpus. Pendientes: medir `RAG_TOP_K`, remedir el
-umbral comunitario, la regresión de la ingesta y **el registro normalizado
-de la aceptación**.
+24/09/2026** y **se repitió el 25/09**. INC-020 quedó corregida con el
+ADR-0025; INC-021 se dio por corregida con una sola corrida y **se reabrió**
+al repetir, y la repetición destapó INC-024 —advertencia médica ausente— e
+INC-025 —una pregunta que el agente no enruta—. Solo la coherencia pasa de
+forma estable.
 
 Este plan describe lo que se va a hacer; **el informe de cierre dirá lo
 que se hizo**, y las diferencias entre uno y otro se registran ahí.
@@ -184,7 +183,7 @@ las filas de mayor exposición se prueban primero y con más profundidad.
 | **P-03** | El CU2 **cita una fuente que no sustenta** lo que dice, o calla la cita cuando debía darla | 2 | 4 | **8** | **Materializado, medido y corregido el 24/09/2026.** Ocurría en 6 de 20 (INC-020); con el ADR-0025 la cita la pone el backend y ocurre en 0 de 20. Baja a probabilidad 2 y no a 1: queda el caso contrario —que el modelo declare no haber podido cuando el contexto sí le servía—, que **no lo detecta nada** |
 | **P-12** | El **modelo generativo desalineado** entre Railway, `config.py` y los documentos invalida una medición | 3 | 4 | **12** | Instalabilidad: `/health` informa el modelo. Ya ocurrió el 08/09/2026 con tres valores distintos |
 | **P-14** | **Texto defectuoso extraído del PDF** llega a la usuaria | 2 | 3 | **6** | **Reevaluado el 24/09/2026.** El inventario exhaustivo se hizo y la limpieza también: 36 fragmentos corregidos, cero apariciones después, y la regla vive en `ingesta_fuente.limpiar_fragmento`, así que una reingesta no la deshace. Queda INC-010, de otra clase: rótulos incrustados y cinco páginas rotadas que `pypdf` no extrae |
-| **P-01** | Una respuesta del CU2 que habla de **salud sale sin advertencia médica** | 2 | 5 | **10** | Componente sobre `_con_advertencia_medica`; banco de 20 preguntas con ítems de toxicidad y uso medicinal |
+| **P-01** | Una respuesta del CU2 que habla de **salud sale sin advertencia médica** | 3 | 5 | **15** | **Materializado el 25/09/2026 (INC-024)**: el romero, 1 de 7 corridas. Sube de probabilidad 2 a 3 |
 | **P-05** | El agente **no llama a ninguna herramienta** y responde de memoria, saltándose el CU2: sin RAG, sin cita y sin advertencia | 2 | 5 | **10** | `calibrar_enrutamiento` con repeticiones. Con `gemini-2.5-flash` fallaba 26 de 76; con el modelo actual, 0 de 76 |
 | **P-07** | Un **dato personal** aparece en la bitácora o en la base en claro | 2 | 5 | **10** | Componente sobre `referencia_wamid`, `huella_wamid` y el cifrado del nombre; revisión estática de los registros. Ya ocurrió el 30/07/2026 |
 | **P-13** | `gemini-2.5-flash` **se retira el 16/10/2026** | 5 | 2 | **10** | Ya no está en uso; `/health` lo confirma en cada despliegue |
@@ -289,10 +288,10 @@ rúbrica fija el autor (§4 del [banco](banco-de-preguntas.md)):
 
 | Criterio | Umbral | Antes del ADR-0025 | Después | |
 |---|---|---|---|---|
-| Precisión: ninguna afirmación agronómica falsa | **20 de 20** | 19 de 20 | **20 de 20** | **Pasa** |
+| Precisión: ninguna afirmación agronómica falsa | **20 de 20** | 19 de 20 | 20 en una corrida; D-06 falla 5 de 6 al repetir (INC-021) | **No pasa** |
 | Pertinencia: la respuesta atiende lo que se preguntó | **≥ 16 de 20** | 14 de 20 | 13 de 20 | **No pasa** |
 | Coherencia: sin contradicción interna ni cita rota | **≥ 18 de 20** | 14 de 20 | **20 de 20** | **Pasa** |
-| Advertencia médica presente cuando corresponde | **100 %** | 100 % | 100 % | **Pasa** |
+| Advertencia médica presente cuando corresponde | **100 %** | 100 % | un falso negativo al repetir (INC-024) | **No pasa** |
 
 **Falta la pertinencia, y no por un defecto del sistema.** Las cinco
 preguntas reales que fallan piden algo que el corpus no cubre —cómo hacer
@@ -370,13 +369,13 @@ Ninguna adicional a las ocho de la política §1.3.
 | A-7 | Retro-documentar incidencias y pruebas estáticas ya realizadas | 1 jornada | A-1 |
 | A-10 | ~~Construir y ejecutar el banco de 20 preguntas con su rúbrica~~ **Hecha el 24/09/2026**, con `scripts/ejecutar_banco.py`. No superado | — | — |
 | A-16 | ~~Corregir INC-020~~ **Hecha el 24/09/2026**: ADR-0025, prompt `redaccion_rag_v2.md`, `_con_cita` y 14 casos nuevos. De 6 de 20 a 0 de 20 | — | — |
-| **A-17** | **Medir `RAG_TOP_K` con 6 y con 8** contra el banco: hay respuestas que superan el umbral y quedan fuera del top-4 | 0,5 jornada | — |
+| A-17 | ~~Medir `RAG_TOP_K`~~ **Hecha el 25/09/2026**, con 4 y 5 y tres repeticiones. Sin beneficio ni daño medido; el autor fijó 5 (ADR-0026) | — | — |
 | A-18 | ~~Limpiar los 36 fragmentos de INC-019 y revectorizar solo esos, remidiendo el banco antes y después~~ **Hecha el 24/09/2026** con `scripts/limpiar_corpus.py`. Ninguna similitud cruzó el umbral | — | — |
 | A-11 | ~~Probar en celular el envío por `recipient`~~ **Hecha.** Despliegue, migración `010` y aceptación en celulares reales | — | — |
 | A-12 | Remedir el umbral comunitario del CU7, ahora con 9 huertas y 6 fragmentos comunitarios | 0,5 jornada | — |
 | A-13 | Informe de cierre | 1 jornada | Todas |
 | **A-14** | **Reconstruir el registro de la aceptación**: resultados reales, resultado y bitácora de ejecución, desde `mensaje` con `revisar_prueba_real`. La ejecución existe; el registro normalizado que exige la conformidad declarada, no | 1 jornada | — |
-| **A-15** | **Regresión de la tubería de ingesta**: `--simular --comprobar-duplicados` en las ocho fuentes que faltan, para que un cambio en el troceo no pase inadvertido | 0,5 jornada | — |
+| A-15 | Regresión de la tubería de ingesta en las fuentes que faltan. **Aplazada por decisión del autor el 25/09/2026**: no es prioritaria. Van 6 de 9 comprobadas | — | — |
 
 **Total estimado: 12,5 jornadas.** No incluye la Fase 8.
 
@@ -422,11 +421,11 @@ Fase 8 depende del reclutamiento.
 | H-2 Red de seguridad automatizada | A-2 a A-6 | **Hecho** el 23/09/2026: 231 casos tras el ADR-0025, humo de despliegue e integración continua |
 | H-3 Historia de prueba recuperada | A-7 | **Hecho** el 23/09/2026: 18 incidencias y nueve pruebas estáticas registradas |
 | H-4 Identidad por BSUID comprobada en vivo | A-11 | **Hecho** |
-| H-5 Regresión de la ingesta | A-15 | Pendiente: las ocho fuentes que faltan |
+| H-5 Regresión de la ingesta | A-15 | **Aplazado** por decisión del autor. 6 de 9 fuentes comprobadas |
 | H-6 Umbrales decididos | — | **Cerrado el 24/09/2026 por decisión del autor**: se mantienen 0.66 y 0.65, sostenidos por la medición de 19 consultas reales y **declarados como no recalibrados** |
 | H-7 Umbral comunitario remedido | A-12 | Pendiente |
 | H-8 Calidad de respuesta evaluada | A-10 | **Hecho** el 24/09/2026. Tres de los cuatro criterios pasan; falta la pertinencia, por hueco de corpus |
-| H-9 Defectos del banco corregidos | A-16, A-17, A-18 | A-16 y A-18 **hechas**; falta A-17 (`RAG_TOP_K`) |
+| H-9 Defectos del banco corregidos | A-16, A-17, A-18 | Las tres hechas. **Pero la repetición abrió INC-021, INC-024 e INC-025**, que siguen sin corregir |
 | H-10 Corrección del CU2 desplegada | — | **Pendiente.** El ADR-0025 está escrito y probado, y **sin desplegar**: producción sigue corriendo `7b136e7`, con el prompt `v1` y la cita del modelo |
 | H-11 Registro de la aceptación | A-14 | Pendiente. La ejecución existe; el registro, no |
 | H-12 Fase 7 cerrada | A-13 | Al cumplirse los cinco criterios de terminación del §6.6 |

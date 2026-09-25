@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `INC-CHU-001`, versión 1.4 |
+| **Identificador** | `INC-CHU-001`, versión 1.5 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Abierto, en actualización continua |
@@ -17,6 +17,7 @@
 | 24/09/2026 | 1.2 | INC-019 del barrido del corpus, e INC-020 e INC-021 de la ejecución del banco de preguntas. Retirada de INC-011, que no era una incidencia | A. Ramírez |
 | 24/09/2026 | 1.3 | INC-022 e INC-023, de refactorizar los scripts de prueba sobre un arnés común | A. Ramírez |
 | 25/09/2026 | 1.4 | **Cerrada INC-004**: corregidas en `docs/ESTADO.md` las tres afirmaciones que desmentía, con el commit y los contadores verificados de nuevo contra el sistema. **Cero incidencias de severidad 1 o 2 abiertas** | A. Ramírez |
+| 25/09/2026 | 1.5 | Repetición con top-k 4 y 5: **se reabre INC-021**, cerrada con una sola corrida, y nacen INC-024 —el romero sin advertencia— e INC-025 —el formulario que el agente no enruta—. Vuelve a haber dos de severidad 2 abiertas | A. Ramírez |
 
 ## Introducción
 
@@ -64,7 +65,7 @@ Cuatro niveles cada una, 1 el más grave.
 
 # 1. Incidencias abiertas
 
-Son tres. Las de severidad 1 y 2 tienen que quedar resueltas o aceptadas
+Son seis. Las de severidad 1 y 2 tienen que quedar resueltas o aceptadas
 por escrito antes de dar la Fase 7 por cerrada (criterio de terminación 2
 del [plan](plan-de-pruebas.md) §6.6).
 
@@ -105,6 +106,45 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Severidad** | 4 |
 | **Prioridad** | 4 |
 | **Riesgo** | Advertir de más cuesta dos renglones y cansa; advertir de menos falla justo en el mensaje en que importaba. **Puede ser el comportamiento buscado o puede ser demasiado ancho: hace falta medirlo, no decidirlo de memoria.** Es una de las salidas del banco de 20 preguntas |
+| **Estado** | **Abierta** |
+
+## INC-021 — Una cifra agronómica que no está en ninguna fuente
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 24/09/2026, al calificar D-06 del banco leyendo los fragmentos |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: redacción del CU2 con respaldo. Criterio de **precisión** |
+| **Descripción** | La respuesta sobre cuándo trasplantar dice «de **2 a 4** hojas verdaderas». El fragmento del que sale dice «de **3 a 4**»; otros dicen «de **3 a 5**» y «**dos o tres**»; **el «2 a 4» no está en ninguna**. Todo lo demás de esa respuesta sí se comprobó textual, incluidas las horas y el «5 a 20 cm en un plazo de 4 a 5 semanas» |
+| **Severidad** | **2** |
+| **Prioridad** | 2 |
+| **Riesgo** | Es el fallo más difícil de ver: la respuesta es correcta en lo demás, va citada y suena bien. Una cifra inventada **bajo una cita oficial** es exactamente lo que la jerarquía de fuentes promete que no pasa. Una sola en veinte, y el umbral de precisión se fijó en 20 de 20 justo por esto |
+| **Estado** | **Reabierta el 25/09/2026.** Se había cerrado el 24/09 con la regla 9 del `redaccion_rag_v2.md` —no fundir cifras de fragmentos distintos— **y una sola corrida**, la afortunada. Repitiendo tres veces con top-k 4 y tres con 5, D-06 vuelve a decir «2 a 4» en **5 de 6**. La regla de prompt no basta |
+
+## INC-024 — El romero respondió usos medicinales sin advertencia médica
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 25/09/2026, en el banco completo con top-k 5 |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: `orientacion._HABLA_DE_SALUD`. Modelo MP-16. Riesgo P-01 |
+| **Descripción** | D-03, «¿Para qué sirve el romero?», respondió *«En la salud, sus aceites relajan los músculos y alivian dolores de cabeza, dolores articulares […] cicatrizar heridas, tratar problemas del estómago y aliviar males respiratorios como asma, bronquitis»* **sin la advertencia**. El vocabulario busca `dolor de` y no `dolores de`, `cicatrizante` y no `cicatrizar`, `para la salud` y no `en la salud`, y no tiene `asma`, `bronquitis` ni `respiratori`. La misma pregunta llevó advertencia en las otras 6 corridas: depende de cómo redacte el modelo |
+| **Severidad** | **2** |
+| **Prioridad** | 1 |
+| **Riesgo** | Viola una decisión no negociable, el `CLAUDE.md` §4.6: toda respuesta del CU2 que hable de salud lleva advertencia. Y la viola justo en la pregunta elegida para comprobarla. El vocabulario se amplió «a lo ancho» a propósito (ADR-0015) y aun así tiene huecos: la lista mira palabras, y el modelo conjuga |
+| **Estado** | **Abierta.** Corregirlo es ampliar el vocabulario —formas conjugadas y dolencias respiratorias—, con el coste conocido de INC-018: más falsos positivos |
+
+## INC-025 — El agente contesta sin consultar la guía una pregunta que la guía responde
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 25/09/2026, al medir el top-k (ADR-0026) |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: enrutamiento del agente, `agente_v2.md` (ADR-0013) |
+| **Descripción** | La consulta real «Cual es la dirección de enlace al JBB para obtener el formulario» tiene respuesta en el corpus —los enlaces del Protocolo de espacio público—, y el agente **no llama al CU2**: contesta por su cuenta «No tengo el enlace ni los formularios del Jardín Botánico». Comprobado envolviendo `agente.consultar_orientacion`, que no se invoca en ninguna de las corridas |
+| **Severidad** | 3 |
+| **Prioridad** | 3 |
+| **Riesgo** | Ella se queda sin un dato que el sistema tiene. Y **nada lo delata**: la respuesta es plausible y educada. Además invalida una forma de medir: el fragmento se había medido en el puesto 5 con la consulta suelta, fuera del agente, y de ahí salió la idea de subir el top-k |
 | **Estado** | **Abierta** |
 
 ---
@@ -206,19 +246,6 @@ con la entidad sacada de la tabla `fuente` por la clave foránea. Es el mismo
 reparto del ADR-0015 con la advertencia médica: el modelo decide cuándo, el
 backend decide qué texto sale.
 
-## INC-021 — Una cifra agronómica que no está en ninguna fuente
-
-| Campo | Contenido |
-|---|---|
-| **Detectada** | 24/09/2026, al calificar D-06 del banco leyendo los fragmentos |
-| **Origen** | A. Ramírez, autor |
-| **Contexto** | Ítem: redacción del CU2 con respaldo. Criterio de **precisión** |
-| **Descripción** | La respuesta sobre cuándo trasplantar dice «de **2 a 4** hojas verdaderas». El corpus dice «de **3 a 5** hojas verdaderas» en dos fuentes y «**dos o tres**» en otra; **el «2 a 4» no está en ninguna**. Todo lo demás de esa respuesta sí se comprobó textual, incluidas las horas y el «5 a 20 cm en un plazo de 4 a 5 semanas» |
-| **Severidad** | **2** |
-| **Prioridad** | 2 |
-| **Riesgo** | Es el fallo más difícil de ver: la respuesta es correcta en lo demás, va citada y suena bien. Una cifra inventada **bajo una cita oficial** es exactamente lo que la jerarquía de fuentes promete que no pasa. Una sola en veinte, y el umbral de precisión se fijó en 20 de 20 justo por esto |
-| **Estado** | **Cerrada el 24/09/2026.** La regla 9 del `redaccion_rag_v2.md` le prohíbe promediar o fundir cifras de fragmentos distintos. D-06 pasó a decir «entre 3 y 4 hojas verdaderas», que es lo que dice la fuente, y a advertir que «el tiempo varía según la planta» en vez de dar un rango inventado |
-
 ## INC-022 — La comprobación del enrutamiento al CU2 usaba la cita como prueba
 
 | Campo | Contenido |
@@ -305,11 +332,11 @@ el estado en el que quedan los defectos que no se buscaron.
 
 | Métrica | Valor al 25/09/2026 |
 |---|---|
-| Incidencias registradas | 21 |
-| Abiertas | 3 |
-| **Abiertas de severidad 1 o 2** | **0** |
-| Cerradas | 18 |
-| Contra el producto | 14 |
+| Incidencias registradas | 23 |
+| Abiertas | 6 |
+| **Abiertas de severidad 1 o 2** | **2** (INC-021, INC-024) |
+| Cerradas | 17 |
+| Contra el producto | 16 |
 | Contra los casos de prueba | 4 (INC-001 a INC-003, INC-022) |
 | **Contra la base de prueba** | **2** (INC-004, INC-012) |
 | Contra el entorno de prueba | 1 (INC-023) |
@@ -317,7 +344,7 @@ el estado en el que quedan los defectos que no se buscaron.
 | Comprobaciones de instalabilidad | 4 de 4 |
 | Casos de uso con aceptación ejecutada | **8 de 8** |
 | Casos de uso con aceptación **registrada** conforme a §8.9 y §8.10 | **0 de 8** (actividad A-14) |
-| Banco de 20 preguntas | Ejecutado tres veces el 24/09/2026. **Tras el ADR-0025: precisión 20/20, coherencia 20/20 y advertencia médica 100 % pasan; pertinencia 13/20 no** |
+| Banco de 20 preguntas | Tras el ADR-0025 y **repitiendo el 25/09**: coherencia 20/20 pasa; precisión (INC-021), advertencia médica (INC-024) y pertinencia 13/20 **no** |
 | Fuentes del corpus con regresión comprobada | **6 de 9**: `jbb_practicas_2022` el 23/09 y las cinco tocadas por la limpieza el 24/09, todas con su recuento de origen |
 | **Defectos de severidad 1 encontrados por una prueba** | **0** |
 | **Defectos de severidad 1 encontrados por el uso** | **3** (INC-005, INC-013, INC-015) |

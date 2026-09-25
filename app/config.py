@@ -121,11 +121,22 @@ class Settings(BaseSettings):
     #   barato hoy en día" 0.5782, y los barrios entre 0.587 y 0.612.
     #
     # **Esto sigue sin ser una calibración cerrada.** Falta etiquetar
-    # leyendo el fragmento recuperado de cada consulta, y queda pendiente
-    # la desviación de `jbb_practicas_2022` (CLAUDE.md §11), que impide
-    # reproducir el corpus entero.
+    # leyendo el fragmento recuperado de cada consulta. El autor decidió el
+    # 24/09/2026 mantenerlo, sostenido por 19 consultas reales del banco de
+    # preguntas (`docs/pruebas/banco-de-preguntas.md`).
     RAG_UMBRAL_SIMILITUD: float = 0.66
-    RAG_TOP_K: int = 4
+
+    # Cuántos fragmentos entran al contexto del CU2, y cuántas huertas
+    # candidatas al CU7, que comparte la perilla. La Fase 4 fija 4.
+    #
+    # **5 desde el 25/09/2026, por decisión del autor (ADR-0026)**, para
+    # alcanzar respuestas que están en el corpus y quedaban en el puesto 5.
+    # Medido antes de cambiarlo, tres repeticiones por pregunta con 4 y con
+    # 5: **no se encontró beneficio ni daño**. La pregunta que lo motivó
+    # —el enlace del formulario del JBB— no llega a la recuperación: el
+    # agente la contesta sin llamar al CU2. Y la mezcla de cifras de
+    # INC-021 ocurre con los dos valores.
+    RAG_TOP_K: int = 5
 
     # La colección comunitaria lleva umbral propio, y no por capricho de
     # simetría: sus fragmentos son listas de tres o cuatro palabras

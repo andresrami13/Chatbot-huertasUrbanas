@@ -336,9 +336,11 @@ justificación y su fecha. Las nueve decisiones no negociables de
    «se calibró el umbral».
 5. El banco de 20 preguntas ejecutado y calificado con su rúbrica.
 
-   **Ejecutado el 24/09/2026, tres veces.** Tras corregir INC-020 con el
-   ADR-0025: precisión **20/20**, coherencia **20/20** y advertencia médica
-   **100 %** cumplen; pertinencia **13/20** contra un umbral de 16 **no**.
+   **Ejecutado el 24/09/2026 tres veces y repetido el 25/09.** Tras
+   corregir INC-020 con el ADR-0025, solo la coherencia (**20/20**) cumple
+   de forma estable. La precisión falla por INC-021 —D-06 funde cifras en 5
+   de 6 repeticiones—, la advertencia médica por INC-024 —un falso
+   negativo— y la pertinencia queda en **13/20** contra un umbral de 16.
 
    El criterio queda **incumplido por la pertinencia, y por una causa que
    ningún cambio de código arregla**: cinco de las diez preguntas reales

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `BPA-CHU-001`, versión 3.0 |
+| **Identificador** | `BPA-CHU-001`, versión 3.1 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | **Ejecutado el 24/09/2026, tres veces.** Tras el ADR-0025 pasan tres de los cuatro criterios; falta la pertinencia. Ver el §7 |
@@ -16,6 +16,7 @@
 | 24/09/2026 | 2.0 | **Ejecución completa y calificación.** Cuatro preguntas de control añadidas, transcripción literal corregida en R-04 y R-09, y corrección del §3.1, que afirmaba algo falso sobre el corpus | A. Ramírez |
 | 24/09/2026 | 2.1 | Segunda ejecución tras limpiar el corpus (INC-019) y comparación de las dos (§6) | A. Ramírez |
 | 24/09/2026 | 3.0 | Tercera ejecución, tras corregir INC-020 e INC-021 con el ADR-0025. Nueva calificación (§7) | A. Ramírez |
+| 25/09/2026 | 3.1 | Repetición con top-k 4 y 5 (§8). **Corrige el §7**: INC-021 no está resuelta y la advertencia médica tiene un falso negativo | A. Ramírez |
 
 ## Introducción
 
@@ -399,10 +400,10 @@ declara, con una marca interna, que el contexto no le alcanzó.
 
 | Criterio | Umbral | Antes | Después | |
 |---|---|---|---|---|
-| **Precisión** | 20 de 20 | 19 | **20 de 20** | **Pasa** |
+| **Precisión** | 20 de 20 | 19 | 20 de 20 en esa corrida; **no se sostiene al repetir** (§8) | **No pasa** |
 | **Pertinencia** | ≥ 16 de 20 | 14 | 13 de 20 | **No pasa** |
 | **Coherencia** | ≥ 18 de 20 | 14 | **20 de 20** | **Pasa** |
-| **Advertencia médica** | 100 % | 100 % | 100 % | **Pasa** |
+| **Advertencia médica** | 100 % | 100 % | 100 % en esa corrida; **un falso negativo al repetir** (§8) | **No pasa** |
 | **Etiqueta colada** | 0 de 24 | 0 | 0 de 24 | **Pasa** |
 
 ## 7.2 Lo que se arregló
@@ -430,6 +431,13 @@ a
 
 El «3 a 4» es textual de la cartilla de fertilización, y el «varía según la
 planta» es la respuesta honesta cuando dos documentos dan cifras distintas.
+
+> **Corrección del 25/09/2026: esto no estaba arreglado.** Se dio por
+> resuelto con **una sola corrida**, que fue la afortunada. Repitiendo tres
+> veces con cada top-k, D-06 vuelve a decir «2 a 4» en **5 de 6**. La regla
+> 9 no basta; ver el §8. Es exactamente el error contra el que avisa el
+> `CLAUDE.md` §12 —«no des por bueno un resultado del agente a la
+> primera»—, cometido al escribir este documento.
 
 ## 7.3 Lo que no se arregló, y no se arregla con código
 
@@ -465,3 +473,47 @@ El backend sabe si el modelo declinó, pero no si **acertó** al declinar. Una
 respuesta que el contexto sí sostenía y el modelo no supo redactar sale
 ahora sin cita, y no la detecta nada. Está declarado como riesgo residual en
 el ADR-0025 y es la razón de que P-03 baje a probabilidad 2 y no a 1.
+
+---
+
+# 8. Repetición del 25/09/2026: top-k 4 frente a 5
+
+Hecha para la actividad A-17, antes de subir `RAG_TOP_K` a 5 (ADR-0026).
+Tres repeticiones de cada pregunta con cada valor, por el camino real, y
+el banco completo una vez con 5.
+
+| Pregunta | top-k 4 | top-k 5 |
+|---|---|---|
+| Enlace del formulario del JBB | 0 de 3 dan el enlace | 0 de 3 dan el enlace |
+| D-06, hojas verdaderas | «2 a 4» en **2 de 3** | «2 a 4» en **3 de 3** |
+| D-03, romero | advertencia 3 de 3 | advertencia 3 de 3 |
+| Banco completo, declina y cita | — | 0 de 20 |
+
+## 8.1 Lo que corrige del §7
+
+**La precisión no es 20 de 20.** D-06 funde las cifras de tres fragmentos
+en 5 de 6 repeticiones, con los dos valores de top-k. INC-021 **se
+reabre**. La calificación del §7 salió de una corrida afortunada.
+
+**La advertencia médica no es 100 %.** En el banco completo con top-k 5, el
+romero —D-03, elegido a propósito para dispararla— respondió *«En la salud,
+sus aceites relajan los músculos y alivian dolores de cabeza, dolores
+articulares […] Sirve para cicatrizar heridas, tratar problemas del
+estómago y aliviar males respiratorios como asma, bronquitis»* **sin
+advertencia**. El vocabulario de `_HABLA_DE_SALUD` busca `dolor de` y no
+`dolores de`, `cicatrizante` y no `cicatrizar`, `para la salud` y no `en
+la salud`; y no tiene `asma`, `bronquitis` ni `respiratori`. Es un falso
+negativo, 1 de 7 corridas de esa pregunta. Nueva incidencia, INC-024.
+
+## 8.2 Lo que dice del top-k
+
+**No se encontró beneficio.** La pregunta del formulario, que motivó el
+cambio, **nunca llega a la recuperación**: el agente la contesta sin llamar
+al CU2 —comprobado envolviendo `agente.consultar_orientacion`, que no se
+invoca—. El fragmento del puesto 5 se midió con la consulta suelta, fuera
+del agente, y ese no es el camino de producción. Es un fallo de
+enrutamiento, INC-025.
+
+**Tampoco se encontró daño**: el «declina y cita» sigue en 0 de 20 con 5.
+El autor decidió dejar 5 (ADR-0026), y se declara como decisión, no como
+calibración.
