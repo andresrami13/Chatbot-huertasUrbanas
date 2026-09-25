@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `INC-CHU-001`, versión 1.5 |
+| **Identificador** | `INC-CHU-001`, versión 1.6 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Abierto, en actualización continua |
@@ -18,6 +18,7 @@
 | 24/09/2026 | 1.3 | INC-022 e INC-023, de refactorizar los scripts de prueba sobre un arnés común | A. Ramírez |
 | 25/09/2026 | 1.4 | **Cerrada INC-004**: corregidas en `docs/ESTADO.md` las tres afirmaciones que desmentía, con el commit y los contadores verificados de nuevo contra el sistema. **Cero incidencias de severidad 1 o 2 abiertas** | A. Ramírez |
 | 25/09/2026 | 1.5 | Repetición con top-k 4 y 5: **se reabre INC-021**, cerrada con una sola corrida, y nacen INC-024 —el romero sin advertencia— e INC-025 —el formulario que el agente no enruta—. Vuelve a haber dos de severidad 2 abiertas | A. Ramírez |
+| 25/09/2026 | 1.6 | INC-026 e INC-027, de reconstruir el registro de aceptación (A-14) | A. Ramírez |
 
 ## Introducción
 
@@ -65,7 +66,7 @@ Cuatro niveles cada una, 1 el más grave.
 
 # 1. Incidencias abiertas
 
-Son seis. Las de severidad 1 y 2 tienen que quedar resueltas o aceptadas
+Son ocho. Las de severidad 1 y 2 tienen que quedar resueltas o aceptadas
 por escrito antes de dar la Fase 7 por cerrada (criterio de terminación 2
 del [plan](plan-de-pruebas.md) §6.6).
 
@@ -146,6 +147,32 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Prioridad** | 3 |
 | **Riesgo** | Ella se queda sin un dato que el sistema tiene. Y **nada lo delata**: la respuesta es plausible y educada. Además invalida una forma de medir: el fragmento se había medido en el puesto 5 con la consulta suelta, fuera del agente, y de ahí salió la idea de subir el top-k |
 | **Estado** | **Abierta** |
+
+## INC-026 — El nombre de pila queda en claro en `mensaje`
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 25/09/2026, al reconstruir el registro de aceptación (A-14) |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: `dispatcher.procesar_evento` y `onboarding`. Fase 3 §5, capa 3. ADR-0012 y ADR-0016 |
+| **Descripción** | El despachador guarda cada mensaje de ella **antes** de pasarlo al onboarding (`recordar_usuaria`). Su respuesta a «¿cómo se llama usted?» queda así en `mensaje.contenido` **en claro**, mientras en `usuario.nombre_usuario_cifrado` va cifrada con AES-GCM. El agente la lee de la ventana de memoria y la repite en respuestas que también se guardan: se observó al menos una |
+| **Severidad** | **2** |
+| **Prioridad** | 2 |
+| **Riesgo** | Anula la capa 3 del modelo de seguridad para el nombre: quien lea la base lo tiene, cifrado o no. No se expone a otras usuarias —`mensaje` se filtra por `usuario_id` y el CU4 no lo lee—, pero **el ADR-0016 dejó el saludo personalizado fuera de la memoria justo para que el nombre no estuviera en `mensaje`**, y la premisa no se cumple. El ADR-0012 dice que la minimización gobierna lo que el sistema pide; aquí **el sistema lo pide** |
+| **Estado** | **Abierta.** Corregirlo es decisión del autor: no recordar la respuesta al paso del nombre, o recordarla sustituida. Toca el ADR-0012 y el ADR-0016, y queda pendiente qué hacer con los nombres ya guardados |
+
+## INC-027 — CU4, CU7 y CU8 no tienen evidencia de aceptación
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 25/09/2026, al reconstruir el registro de aceptación (A-14) |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: **la base de prueba**. La especificación, el plan y `ESTADO.md` afirmaban «los ocho casos de uso han pasado por aceptación» |
+| **Descripción** | En `mensaje` —273 mensajes de 12 participantes, del 09 al 25/09— no hay ninguna respuesta del listado del CU4, de la búsqueda del CU7 ni de «mi huerta» del CU8, **ni ninguna pregunta de ellas con esa intención**. La afirmación se apoyaba en la declaración del autor, no en la base. Si se probaron desde una fila después borrada, la evidencia se perdió por cascada |
+| **Severidad** | **2** |
+| **Prioridad** | 2 |
+| **Riesgo** | Invalida una medición del trabajo de grado: la cobertura de la aceptación. Y el CU7 queda sin prueba de punta a punta de ninguna clase: solo tiene casos de componente |
+| **Estado** | **Abierta.** Se cierra con tres preguntas desde un celular real y regenerando el registro |
 
 ---
 
@@ -332,18 +359,18 @@ el estado en el que quedan los defectos que no se buscaron.
 
 | Métrica | Valor al 25/09/2026 |
 |---|---|
-| Incidencias registradas | 23 |
-| Abiertas | 6 |
-| **Abiertas de severidad 1 o 2** | **2** (INC-021, INC-024) |
+| Incidencias registradas | 25 |
+| Abiertas | 8 |
+| **Abiertas de severidad 1 o 2** | **4** (INC-021, INC-024, INC-026, INC-027) |
 | Cerradas | 17 |
-| Contra el producto | 16 |
+| Contra el producto | 17 |
 | Contra los casos de prueba | 4 (INC-001 a INC-003, INC-022) |
-| **Contra la base de prueba** | **2** (INC-004, INC-012) |
+| **Contra la base de prueba** | **3** (INC-004, INC-012, INC-027) |
 | Contra el entorno de prueba | 1 (INC-023) |
 | Casos de componente e integración ejecutados | **231 de 231**, todos en verde |
 | Comprobaciones de instalabilidad | 4 de 4 |
-| Casos de uso con aceptación ejecutada | **8 de 8** |
-| Casos de uso con aceptación **registrada** conforme a §8.9 y §8.10 | **0 de 8** (actividad A-14) |
+| Casos de uso con aceptación con evidencia | **5 de 8** —declarados 8 por el autor— (INC-027) |
+| Casos de uso con aceptación **registrada** conforme a §8.9 y §8.10 | **8 de 8** registrados, 5 con resultado «pasa» ([registro](registro-de-aceptacion.md)) |
 | Banco de 20 preguntas | Tras el ADR-0025 y **repitiendo el 25/09**: coherencia 20/20 pasa; precisión (INC-021), advertencia médica (INC-024) y pertinencia 13/20 **no** |
 | Fuentes del corpus con regresión comprobada | **6 de 9**: `jbb_practicas_2022` el 23/09 y las cinco tocadas por la limpieza el 24/09, todas con su recuento de origen |
 | **Defectos de severidad 1 encontrados por una prueba** | **0** |

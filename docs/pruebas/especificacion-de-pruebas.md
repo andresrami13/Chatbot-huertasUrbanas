@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `ESP-CHU-001`, versión 1.1 |
+| **Identificador** | `ESP-CHU-001`, versión 1.2 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Borrador para revisión |
@@ -14,6 +14,7 @@
 |---|---|---|---|
 | 23/09/2026 | 1.0 | Versión inicial: 23 modelos de prueba y 217 casos ejecutables | A. Ramírez |
 | 24/09/2026 | 1.1 | MP-24, de la corrección de INC-020 (ADR-0025): 14 casos más. PR-05, el banco de preguntas | A. Ramírez |
+| 25/09/2026 | 1.2 | Cobertura de aceptación corregida con el registro de A-14: CU4, CU7 y CU8 sin evidencia | A. Ramírez |
 
 ## Introducción
 
@@ -280,31 +281,24 @@ sale (`test_mp07_...`) y en su docstring la razón por la que existe.
 
 | Caso de uso | Modelos que lo cubren en este nivel | Sistema | Aceptación |
 |---|---|---|---|
-| CU1 Consentimiento | MP-10 | `spike_despachador`, comprob. 1 y 2 | Sí |
-| CU2 Orientación | MP-15, MP-16, MP-17, MP-24 | Banco de 20 preguntas | Sí |
-| CU3 Registro | MP-19 | `spike_despachador`, comprob. 4 | Sí |
-| CU4 Comunidad | MP-17 | `spike_despachador`, comprob. 6 | Sí |
-| CU5 Ayuda | MP-10, MP-14 | `spike_despachador`, comprob. 2 | Sí |
-| CU6 Onboarding | MP-11, MP-12, MP-13 | — | Sí |
-| CU7 Búsqueda por cultivo | MP-18 | — | Sí |
-| CU8 Mi huerta | MP-14 | `spike_despachador`, comprob. 7 | Sí |
+| CU1 Consentimiento | MP-10 | `spike_despachador`, comprob. 1 y 2 | Sí, 12 participantes |
+| CU2 Orientación | MP-15, MP-16, MP-17, MP-24 | Banco de 20 preguntas | Sí, 7 participantes |
+| CU3 Registro | MP-19 | `spike_despachador`, comprob. 4 | Sí, 6 participantes |
+| CU4 Comunidad | MP-17 | `spike_despachador`, comprob. 6 | **Sin evidencia** (INC-027) |
+| CU5 Ayuda | MP-10, MP-14 | `spike_despachador`, comprob. 2 | Sí, 1 participante |
+| CU6 Onboarding | MP-11, MP-12, MP-13 | — | Sí, 10 de 12 lo completaron |
+| CU7 Búsqueda por cultivo | MP-18 | — | **Sin evidencia** (INC-027) |
+| CU8 Mi huerta | MP-14 | `spike_despachador`, comprob. 7 | **Sin evidencia** (INC-027) |
 
-**Los ocho casos de uso han pasado por aceptación** con usuarias reales
-desde celulares reales entre el 09 y el 23/09/2026, declarado por el autor
-y respaldado por la base: 11 usuarias, 9 huertas, 61 cultivos y 258
-mensajes, de los cuales 135 son respuestas del asistente.
-
-**Lo que falta de ese frente no es ejecutar, es registrar.** La
-conformidad declarada obliga a producir resultados reales (§8.9), el
-resultado de cada caso y la bitácora de ejecución (§8.10), y de esas
-sesiones no existe registro normalizado. Se reconstruye desde la tabla
-`mensaje` con `python -m scripts.revisar_prueba_real` — que además remide
-cada consulta— y es la actividad A-14 del plan. **Su salida no va al
-repositorio, que es público.**
+**Cinco de los ocho casos de uso tienen aceptación con evidencia**, según
+el [registro de aceptación](registro-de-aceptacion.md) (A-14, 25/09/2026), reconstruido desde `mensaje` sin contenido de
+nadie. Hasta ese día este documento decía «los ocho», apoyado en la
+declaración del autor; al reconstruirlo, **ninguna de las doce
+participantes usó nunca el CU4, el CU7 ni el CU8** (INC-027).
 
 Queda además una deuda de *tipo*, no de nivel: la aceptación demuestra que
-los ocho casos de uso **funcionan**, no que el CU2 **acierte**. Eso lo
-mide el banco de 20 preguntas con su rúbrica (A-10), que sigue sin existir.
+los casos de uso **funcionan**, no que el CU2 **acierte**. Eso lo mide el
+[banco de 20 preguntas](banco-de-preguntas.md).
 
 ---
 
@@ -346,7 +340,7 @@ mide el banco de 20 preguntas con su rúbrica (A-10), que sigue sin existir.
 - **Preparación**: PR-03 en verde y migraciones aplicadas. Para repetir el onboarding basta con **borrar la fila de `huerta`** de esa usuaria; borrar `usuario` también sirve, pero se lleva por cascada la conversación, que es el material de la Fase 7.
 - **Ejecución**: saludo, consentimiento, onboarding de tres preguntas, una consulta del CU2, un registro de cultivo, una consulta comunitaria, una nota de voz.
 - **Relación con otros**: el último.
-- **Cierre**: `python -m scripts.revisar_prueba_real` para reconstruir la sesión y remedir cada consulta. **Su salida no va al repositorio, que es público.**
+- **Cierre**: `python -m scripts.registro_aceptacion` produce el resultado por caso de uso y la bitácora, **sin contenido de nadie**, y su salida va al [registro de aceptación](registro-de-aceptacion.md). Para diagnosticar una consulta concreta, `python -m scripts.revisar_prueba_real`, cuya salida lleva la conversación en claro y **no va al repositorio, que es público**.
 
 ## PR-05 — Banco de veinte preguntas
 

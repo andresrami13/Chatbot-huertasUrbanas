@@ -2,10 +2,10 @@
 
 Última actualización: 2026-09-25. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
-pruebas).** Los ocho casos de uso están construidos, desplegados y **los
-ocho tienen aceptación ejecutada con usuarias reales desde celulares
-reales** (CU6 onboarding, CU7 búsqueda por cultivo separado del CU4 el
-08/09/2026, y CU8 consultar mi huerta, añadido el 09/09).
+pruebas).** Los ocho casos de uso están construidos y desplegados. **Cinco
+tienen aceptación con evidencia** de usuarias reales desde celulares —CU1,
+CU2, CU3, CU5 y CU6—; **CU4, CU7 y CU8 no**, porque ninguna participante
+los usó (`docs/pruebas/registro-de-aceptacion.md`, INC-027).
 
 **Y desde el 09/09/2026 el bot está en un número de producción**, sin el
 límite de 5 destinatarios del número de prueba. Al 25/09/2026 en la base
@@ -82,7 +82,7 @@ calling decide qué hacer**: responder con la guía oficial (CU2), contar qué
 siembran otras huertas (CU4), ofrecer guardar lo que le contaron (CU3),
 contarle lo que ella tiene sembrado (CU8) o mostrar la ayuda (CU5).
 Recuerda los últimos diez mensajes. **Los ocho casos de uso están
-construidos, desplegados y probados con usuarias reales.** Lo que queda es
+construidos y desplegados; cinco tienen aceptación con usuarias reales.** Lo que queda es
 lo que dice `docs/pruebas/plan-de-pruebas.md` §7: cerrar la calibración del
 umbral comunitario, la regresión de la ingesta y el registro normalizado
 de la aceptación.
@@ -98,7 +98,7 @@ de la aceptación.
 | Idempotencia con dos estados | `db/004_idempotencia.sql`, `repositorio.py` | En Supabase, probada |
 | Esquema de base de datos | `db/*.sql` | Aplicado en Supabase |
 | Identidad (HMAC) y cifrado (AES-GCM) | `app/core/identidad.py` | Probado. **Identifica por el BSUID de Meta desde el 17/09/2026** (ADR-0023) |
-| Escalera de identidad y re-llaveo | `dispatcher._resolver_identidad`, `repositorio.rellavear_identidad` | Comprobado sin base ni red, con el spike y **en producción**: el envío por `recipient` funcionó en la aceptación de los ocho casos de uso |
+| Escalera de identidad y re-llaveo | `dispatcher._resolver_identidad`, `repositorio.rellavear_identidad` | Comprobado sin base ni red, con el spike y **en producción**: el envío por `recipient` funcionó con las doce participantes de la aceptación |
 | Conexión a PostgreSQL | `app/core/basedatos.py` | Pool con `asyncpg` |
 | Repositorio de datos | `app/services/repositorio.py` | Cubre el esquema entero |
 | Cliente de WhatsApp | `app/services/whatsapp.py` | Texto y botones |
@@ -118,9 +118,9 @@ de la aceptación.
 | Respuesta sin respaldo oficial | `respuesta_general_v1.md`, `CU2_RESPALDO_MODELO` | Activo desde el 15/08; se apaga en Railway sin desplegar |
 | Advertencia de contenido médico | `app/textos.py`, `orientacion.py` | La pone el backend, no el prompt (ADR-0015) |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
-| Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. Migración `009` aplicada. **Probado en la aceptación** |
-| Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Probado en la aceptación** |
-| Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Probado en la aceptación** |
+| Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. Migración `009` aplicada. **Sin evidencia de aceptación** (INC-027) |
+| Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Sin evidencia de aceptación** (INC-027) |
+| Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Sin evidencia de aceptación** (INC-027) |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
 | Agente orquestador | `app/agent/agente.py`, `agente_v2.md` | **Probado en producción desde el celular**; la regla 6 del `v2` (ADR-0024) **sin probar** |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
@@ -188,8 +188,8 @@ desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
 ## Lo que NO funciona todavía (esperado)
 
 - ~~El envío por `recipient` no está probado contra Meta~~ **Ya está**:
-  la migración `010` se desplegó, y la aceptación de los ocho casos de uso
-  se ejecutó desde celulares reales sin que faltara ninguna respuesta.
+  la migración `010` se desplegó, y las doce participantes de la
+  aceptación recibieron respuesta desde sus celulares.
 - **Ocho mensajes se perdieron y no vuelven.** Los del 15/09 en adelante
   que se descartaron por no traer teléfono quedaron marcados
   `procesado`, así que ni un reintento de Meta los recuperaría.
@@ -236,7 +236,7 @@ desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
 ### 0. ~~Desplegar la identidad por BSUID y probarla en vivo~~ Hecho
 
 La `010` se desplegó, `recipient` funciona —comprobado en la aceptación de
-los ocho casos de uso desde celulares reales— y las nueve usuarias de
+las doce participantes desde celulares reales— y las nueve usuarias de
 entonces ya escribieron con la identidad nueva. **Sigue pendiente el
 paso 5**, borrar el re-llaveo transitorio: `dispatcher` y
 `repositorio.rellavear_identidad` siguen con el código marcado como tal.

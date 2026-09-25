@@ -27,8 +27,8 @@ escala no lo justifica.
 **Estado de lo planificado, al cierre del 23/09/2026.** Ejecutados: la
 prueba estática, la de componente (231 casos), la de integración, la de
 sistema (`spike_despachador`), la de instalabilidad (`humo_despliegue`) y
-**la de aceptación, con usuarias reales desde celulares reales en los ocho
-casos de uso**. El **banco de 20 preguntas se ejecutó y calificó el
+**la de aceptación, con usuarias reales desde celulares reales**, que
+según su registro cubre cinco de los ocho casos de uso. El **banco de 20 preguntas se ejecutó y calificó el
 24/09/2026** y **se repitió el 25/09**. INC-020 quedó corregida con el
 ADR-0025; INC-021 se dio por corregida con una sola corrida y **se reabrió**
 al repetir, y la repetición destapó INC-024 —advertencia médica ausente— e
@@ -257,7 +257,7 @@ de sistema —la compuerta de consentimiento—.
 | Informe de estado de prueba | `docs/ESTADO.md` | **Hecho** por la vía de la desviación D-2 |
 | Requisitos de datos y de entorno de prueba | — | **Pendiente.** Es lo que falta por escribir |
 | Informes de preparación de datos y de entorno | — | **Pendiente**, y depende del anterior |
-| Resultados reales, resultado y bitácora de ejecución | — | **Parcial.** Existen los de `spike_despachador`, el banco y el humo; falta el de la **aceptación** (actividad A-14) |
+| Resultados reales, resultado y bitácora de ejecución | `RAC-CHU-001` y las salidas de `spike_despachador`, el banco y el humo | **Hecho** el 25/09/2026 |
 | Informe de cierre | — | **Pendiente** (actividad A-13). Es el último |
 
 **Tres de doce siguen abiertos, y dos son el mismo trabajo.** Los
@@ -374,7 +374,7 @@ Ninguna adicional a las ocho de la política §1.3.
 | A-11 | ~~Probar en celular el envío por `recipient`~~ **Hecha.** Despliegue, migración `010` y aceptación en celulares reales | — | — |
 | A-12 | Remedir el umbral comunitario del CU7, ahora con 9 huertas y 6 fragmentos comunitarios | 0,5 jornada | — |
 | A-13 | Informe de cierre | 1 jornada | Todas |
-| **A-14** | **Reconstruir el registro de la aceptación**: resultados reales, resultado y bitácora de ejecución, desde `mensaje` con `revisar_prueba_real`. La ejecución existe; el registro normalizado que exige la conformidad declarada, no | 1 jornada | — |
+| A-14 | ~~Reconstruir el registro de la aceptación~~ **Hecha el 25/09/2026**, con `scripts/registro_aceptacion.py`. **Destapó que CU4, CU7 y CU8 no tienen evidencia** (INC-027) y el nombre en claro en `mensaje` (INC-026) | — | — |
 | A-15 | Regresión de la tubería de ingesta en las fuentes que faltan. **Aplazada por decisión del autor el 25/09/2026**: no es prioritaria. Van 6 de 9 comprobadas | — | — |
 
 **Total estimado: 12,5 jornadas.** No incluye la Fase 8.
@@ -427,13 +427,12 @@ Fase 8 depende del reclutamiento.
 | H-8 Calidad de respuesta evaluada | A-10 | **Hecho** el 24/09/2026. Tres de los cuatro criterios pasan; falta la pertinencia, por hueco de corpus |
 | H-9 Defectos del banco corregidos | A-16, A-17, A-18 | Las tres hechas. **Pero la repetición abrió INC-021, INC-024 e INC-025**, que siguen sin corregir |
 | H-10 Corrección del CU2 desplegada | — | **Pendiente.** El ADR-0025 está escrito y probado, y **sin desplegar**: producción sigue corriendo `7b136e7`, con el prompt `v1` y la cita del modelo |
-| H-11 Registro de la aceptación | A-14 | Pendiente. La ejecución existe; el registro, no |
+| H-11 Registro de la aceptación | A-14 | **Hecho** el 25/09/2026. **La aceptación no se supera**: 5 de 8 casos de uso con evidencia |
 | H-12 Fase 7 cerrada | A-13 | Al cumplirse los cinco criterios de terminación del §6.6 |
 | H-13 Usabilidad | Fase 8 | Según reclutamiento |
 
-**La aceptación dejó de ser un hito futuro.** Los ocho casos de uso se han
-ejercitado con usuarias reales desde celulares reales entre el 09 y el
-23/09/2026, y la base lo respalda: 11 usuarias, 9 huertas, 61 cultivos y
-258 mensajes. Lo que queda de ese frente no es ejecutar, es **registrar**
-(A-14): la conformidad declarada exige resultados reales, resultado y
-bitácora de ejecución, y eso se reconstruye desde `mensaje`.
+**La aceptación está registrada y no se supera.** El [registro de aceptación](registro-de-aceptacion.md) reconstruye
+doce participantes entre el 09 y el 25/09/2026: CU1, CU2, CU3, CU5 y CU6
+tienen evidencia; **CU4, CU7 y CU8 no**, porque nadie los usó (INC-027).
+Lo que falta no necesita código: tres preguntas desde un celular y
+regenerar el registro.
