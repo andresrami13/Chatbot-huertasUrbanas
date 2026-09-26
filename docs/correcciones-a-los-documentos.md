@@ -8,9 +8,8 @@ Es el consolidado que antes vivía en `docs/adr/README.md`. Se movió aquí para
 que haya un solo sitio que mantener, y porque incorpora además lo que se
 decidió después de escribir aquel listado.
 
-- **Corte:** 2026-09-17
-- **Estado del código:** commit `55e5a4d` más la identidad por BSUID sin
-  commitear
+- **Corte:** 2026-09-26
+- **Estado del código:** `main` al 26/09/2026
 - **Regla:** cuando un ADR corrige un documento de fase, **prevalece el ADR**.
 
 Los valores de la tabla de parámetros se leyeron del código, no de la
@@ -37,6 +36,22 @@ documentación.
 | Troceo / solape | 300–500 / 50 tokens | La Fase 4 §7 no dice cómo se cuentan (ADR-0009) |
 | Corpus oficial | 765 fragmentos, 9 fuentes | La Fase 4 supone una sola entidad; dos no son del Jardín Botánico |
 | Catálogo de barrios | 313 | 312 de Bosa más `otro`. El anteproyecto acotaba a la UPZ 84 (ADR-0016) |
+
+---
+
+## Anteproyecto
+
+### §6.1.7 — el banco de preguntas
+
+- **Dice:** un banco de **20 preguntas** predefinidas, valorado con
+  criterios de precisión, pertinencia y coherencia.
+- **Hace:** **40 preguntas**, calificadas cada una con **sí o no** —responde
+  correctamente o no—, en dos rondas: responde bien el **74 %** (29 y 30
+  de 40). El resultado se da sobre las 40, sin escoger las que mejor salen.
+- **Justifica:** decisión del autor del 26/09/2026. La primera versión, de
+  20 preguntas y tres criterios, se ejecutó y se conserva: de ella salieron
+  INC-020, INC-021 e INC-024. Detalle en
+  [`docs/pruebas/banco-de-preguntas.md`](pruebas/banco-de-preguntas.md) §9.
 
 ---
 

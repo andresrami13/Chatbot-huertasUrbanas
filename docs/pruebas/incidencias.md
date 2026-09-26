@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `INC-CHU-001`, versión 1.6 |
+| **Identificador** | `INC-CHU-001`, versión 1.7 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Abierto, en actualización continua |
@@ -19,6 +19,7 @@
 | 25/09/2026 | 1.4 | **Cerrada INC-004**: corregidas en `docs/ESTADO.md` las tres afirmaciones que desmentía, con el commit y los contadores verificados de nuevo contra el sistema. **Cero incidencias de severidad 1 o 2 abiertas** | A. Ramírez |
 | 25/09/2026 | 1.5 | Repetición con top-k 4 y 5: **se reabre INC-021**, cerrada con una sola corrida, y nacen INC-024 —el romero sin advertencia— e INC-025 —el formulario que el agente no enruta—. Vuelve a haber dos de severidad 2 abiertas | A. Ramírez |
 | 25/09/2026 | 1.6 | INC-026 e INC-027, de reconstruir el registro de aceptación (A-14) | A. Ramírez |
+| 26/09/2026 | 1.7 | INC-026 reclasificada a severidad 3 y aceptada por escrito por el autor. Banco de 40 preguntas en las medidas | A. Ramírez |
 
 ## Introducción
 
@@ -156,10 +157,10 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Origen** | A. Ramírez, autor |
 | **Contexto** | Ítem: `dispatcher.procesar_evento` y `onboarding`. Fase 3 §5, capa 3. ADR-0012 y ADR-0016 |
 | **Descripción** | El despachador guarda cada mensaje de ella **antes** de pasarlo al onboarding (`recordar_usuaria`). Su respuesta a «¿cómo se llama usted?» queda así en `mensaje.contenido` **en claro**, mientras en `usuario.nombre_usuario_cifrado` va cifrada con AES-GCM. El agente la lee de la ventana de memoria y la repite en respuestas que también se guardan: se observó al menos una |
-| **Severidad** | **2** |
-| **Prioridad** | 2 |
+| **Severidad** | 3 —era 2 hasta el 26/09/2026— |
+| **Prioridad** | 4 |
 | **Riesgo** | Anula la capa 3 del modelo de seguridad para el nombre: quien lea la base lo tiene, cifrado o no. No se expone a otras usuarias —`mensaje` se filtra por `usuario_id` y el CU4 no lo lee—, pero **el ADR-0016 dejó el saludo personalizado fuera de la memoria justo para que el nombre no estuviera en `mensaje`**, y la premisa no se cumple. El ADR-0012 dice que la minimización gobierna lo que el sistema pide; aquí **el sistema lo pide** |
-| **Estado** | **Abierta.** Corregirlo es decisión del autor: no recordar la respuesta al paso del nombre, o recordarla sustituida. Toca el ADR-0012 y el ADR-0016, y queda pendiente qué hacer con los nombres ya guardados |
+| **Estado** | **Abierta y aceptada por escrito por el autor el 26/09/2026**, que la reclasifica de severidad 2 a 3. Motivo: las usuarias autorizaron el tratamiento de su nombre al dar el consentimiento (Ley 1581 de 2012), así que conocerlo y guardarlo tiene base legal, y no se expone a otras usuarias. **Riesgo que se asume**: el cifrado del nombre en `usuario` no lo protege frente a quien lea la base, y el documento de grado no puede presentar la capa 3 como si lo hiciera. La corrección —no recordar la respuesta del paso del nombre— queda para después |
 
 ## INC-027 — CU4, CU7 y CU8 no tienen evidencia de aceptación
 
@@ -361,7 +362,7 @@ el estado en el que quedan los defectos que no se buscaron.
 |---|---|
 | Incidencias registradas | 25 |
 | Abiertas | 8 |
-| **Abiertas de severidad 1 o 2** | **4** (INC-021, INC-024, INC-026, INC-027) |
+| **Abiertas de severidad 1 o 2** | **3** (INC-021, INC-024, INC-027) |
 | Cerradas | 17 |
 | Contra el producto | 17 |
 | Contra los casos de prueba | 4 (INC-001 a INC-003, INC-022) |
@@ -371,7 +372,7 @@ el estado en el que quedan los defectos que no se buscaron.
 | Comprobaciones de instalabilidad | 4 de 4 |
 | Casos de uso con aceptación con evidencia | **5 de 8** —declarados 8 por el autor— (INC-027) |
 | Casos de uso con aceptación **registrada** conforme a §8.9 y §8.10 | **8 de 8** registrados, 5 con resultado «pasa» ([registro](registro-de-aceptacion.md)) |
-| Banco de 20 preguntas | Tras el ADR-0025 y **repitiendo el 25/09**: coherencia 20/20 pasa; precisión (INC-021), advertencia médica (INC-024) y pertinencia 13/20 **no** |
+| Banco de preguntas | **40 preguntas, dos rondas: 29 y 30 de 40, el 74 %**. Estable en 37 de 40 |
 | Fuentes del corpus con regresión comprobada | **6 de 9**: `jbb_practicas_2022` el 23/09 y las cinco tocadas por la limpieza el 24/09, todas con su recuento de origen |
 | **Defectos de severidad 1 encontrados por una prueba** | **0** |
 | **Defectos de severidad 1 encontrados por el uso** | **3** (INC-005, INC-013, INC-015) |

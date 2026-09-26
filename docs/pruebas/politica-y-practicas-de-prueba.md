@@ -334,18 +334,19 @@ justificación y su fecha. Las nueve decisiones no negociables de
    **no se hizo**. El documento de grado debe decir «se mantuvo el valor
    medido el 19/08/2026 y se comprobó contra 19 consultas reales», nunca
    «se calibró el umbral».
-5. El banco de 20 preguntas ejecutado y calificado con su rúbrica.
+5. El banco de preguntas ejecutado y calificado.
 
-   **Ejecutado el 24/09/2026 tres veces y repetido el 25/09.** Tras
-   corregir INC-020 con el ADR-0025, solo la coherencia (**20/20**) cumple
-   de forma estable. La precisión falla por INC-021 —D-06 funde cifras en 5
-   de 6 repeticiones—, la advertencia médica por INC-024 —un falso
-   negativo— y la pertinencia queda en **13/20** contra un umbral de 16.
+   **Cumplido el 26/09/2026.** Por decisión del autor el banco son **40
+   preguntas calificadas con sí o no** —responde correctamente o no—, en
+   dos rondas: **29 y 30 de 40, el 74 % de 80 respuestas**, con 37 de las
+   40 calificadas igual en las dos. El resultado se da sobre las 40, no
+   sobre las que mejor salen.
 
-   El criterio queda **incumplido por la pertinencia, y por una causa que
-   ningún cambio de código arregla**: cinco de las diez preguntas reales
-   piden algo que el corpus no cubre. Es un hueco de corpus, no un defecto
-   del sistema, y así hay que declararlo en el documento de grado.
+   Es un cambio frente a lo que el anteproyecto §6.1.7 y la primera versión
+   de este criterio preveían —20 preguntas y tres criterios, precisión,
+   pertinencia y coherencia, con umbral cada uno—, y así se declara. Los
+   defectos que esa rúbrica destapó siguen registrados como incidencias:
+   INC-021 en la precisión e INC-024 en la advertencia médica.
 
 Obsérvese que **no hay objetivo de cobertura de código**, y es deliberado:
 la norma exige criterios de terminación, no un porcentaje de líneas.

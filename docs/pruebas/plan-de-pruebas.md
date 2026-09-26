@@ -253,7 +253,7 @@ de sistema —la compuerta de consentimiento—.
 | Especificación de casos de prueba | `ESP-CHU-001`, matriz | **Hecho**: 231 casos, en `tests/` |
 | Especificación de procedimientos de prueba | `ESP-CHU-001` §PR | **Hecho**: PR-01 a PR-05 |
 | Registro de incidencias | `INC-CHU-001` | **Hecho**: 21 incidencias |
-| Banco de 20 preguntas y su rúbrica | `BPA-CHU-001` | **Hecho**, ejecutado y calificado |
+| Banco de preguntas | `BPA-CHU-001` | **Hecho**: 40 preguntas, dos rondas, 74 % |
 | Informe de estado de prueba | `docs/ESTADO.md` | **Hecho** por la vía de la desviación D-2 |
 | Requisitos de datos y de entorno de prueba | — | **Pendiente.** Es lo que falta por escribir |
 | Informes de preparación de datos y de entorno | — | **Pendiente**, y depende del anterior |
@@ -283,8 +283,11 @@ Los de la política §4.1.
 
 ## 6.6 Criterios de terminación
 
-Los de la política §4.2. El **quinto** es el banco de 20 preguntas, cuya
-rúbrica fija el autor (§4 del [banco](banco-de-preguntas.md)):
+Los de la política §4.2. El **quinto** es el banco de preguntas. Desde el
+26/09/2026 son **40, calificadas con sí o no, y responde bien el 74 %** (§9
+del [banco](banco-de-preguntas.md)). Lo que sigue es la calificación de la
+primera versión, de 20 preguntas y tres criterios, que se conserva porque
+de ella salieron INC-020, INC-021 e INC-024:
 
 | Criterio | Umbral | Antes del ADR-0025 | Después | |
 |---|---|---|---|---|
@@ -424,7 +427,7 @@ Fase 8 depende del reclutamiento.
 | H-5 Regresión de la ingesta | A-15 | **Aplazado** por decisión del autor. 6 de 9 fuentes comprobadas |
 | H-6 Umbrales decididos | — | **Cerrado el 24/09/2026 por decisión del autor**: se mantienen 0.66 y 0.65, sostenidos por la medición de 19 consultas reales y **declarados como no recalibrados** |
 | H-7 Umbral comunitario remedido | A-12 | Pendiente |
-| H-8 Calidad de respuesta evaluada | A-10 | **Hecho** el 24/09/2026. Tres de los cuatro criterios pasan; falta la pertinencia, por hueco de corpus |
+| H-8 Calidad de respuesta evaluada | A-10 | **Hecho** el 26/09/2026: el banco de 40 responde bien el 74 %, estable en dos rondas |
 | H-9 Defectos del banco corregidos | A-16, A-17, A-18 | Las tres hechas. **Pero la repetición abrió INC-021, INC-024 e INC-025**, que siguen sin corregir |
 | H-10 Corrección del CU2 desplegada | — | **Pendiente.** El ADR-0025 está escrito y probado, y **sin desplegar**: producción sigue corriendo `7b136e7`, con el prompt `v1` y la cita del modelo |
 | H-11 Registro de la aceptación | A-14 | **Hecho** el 25/09/2026. **La aceptación no se supera**: 5 de 8 casos de uso con evidencia |

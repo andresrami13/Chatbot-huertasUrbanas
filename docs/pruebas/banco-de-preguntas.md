@@ -1,12 +1,12 @@
-# Banco de veinte preguntas agroecológicas
+# Banco de preguntas agroecológicas
 
 | | |
 |---|---|
-| **Identificador** | `BPA-CHU-001`, versión 3.1 |
+| **Identificador** | `BPA-CHU-001`, versión 4.0 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
-| **Estado** | **Ejecutado el 24/09/2026, tres veces.** Tras el ADR-0025 pasan tres de los cuatro criterios; falta la pertinencia. Ver el §7 |
-| **Fecha** | 24/09/2026 |
+| **Estado** | **Vigente. El banco de referencia son 40 preguntas (§9): responde bien el 74 %.** Los §1 a §8 son la primera versión, de 20 |
+| **Fecha** | 26/09/2026 |
 
 ## Historial de cambios
 
@@ -17,10 +17,16 @@
 | 24/09/2026 | 2.1 | Segunda ejecución tras limpiar el corpus (INC-019) y comparación de las dos (§6) | A. Ramírez |
 | 24/09/2026 | 3.0 | Tercera ejecución, tras corregir INC-020 e INC-021 con el ADR-0025. Nueva calificación (§7) | A. Ramírez |
 | 25/09/2026 | 3.1 | Repetición con top-k 4 y 5 (§8). **Corrige el §7**: INC-021 no está resuelta y la advertencia médica tiene un falso negativo | A. Ramírez |
+| 26/09/2026 | 4.0 | **El banco pasa a 40 preguntas, calificadas con sí o no, en dos rondas (§9)**. Decisión del autor | A. Ramírez |
 
 ## Introducción
 
-Es el **banco de veinte preguntas predefinidas sobre temáticas
+> **Desde el 26/09/2026 el banco de referencia es el de 40 preguntas del
+> §9**, calificadas con sí o no. Lo que sigue hasta el §8 es la primera
+> versión, de 20, con la rúbrica de tres criterios; se conserva porque de
+> ella salieron INC-020, INC-021 e INC-024.
+
+Es el **banco de preguntas predefinidas sobre temáticas
 agroecológicas** que el anteproyecto compromete en su §6.1.7 y en la
 descripción de la Fase 7, valorando «criterios de precisión, pertinencia y
 coherencia». Es el **criterio de terminación 5** del
@@ -517,3 +523,116 @@ enrutamiento, INC-025.
 **Tampoco se encontró daño**: el «declina y cita» sigue en 0 de 20 con 5.
 El autor decidió dejar 5 (ADR-0026), y se declara como decisión, no como
 calibración.
+
+---
+
+# 9. El banco de 40 preguntas, el de referencia desde el 26/09/2026
+
+**Decisión del autor, 26/09/2026.** El banco pasa de 20 a **40 preguntas**,
+se califica cada respuesta con **sí o no** —responde correctamente lo que
+se preguntó— y el resultado se da **sobre las 40**. Se consideró quedarse
+con las 20 que mejor salían y se descartó: un banco elegido por su
+resultado sale cerca de 20 de 20 por construcción y no mide nada.
+
+Las 40 son preguntas generales de agricultura urbana **escritas por el
+autor**, no de usuarias. Están en `scripts/ejecutar_banco.py` como el
+conjunto `B`:
+
+    python -m scripts.ejecutar_banco --solo B
+
+Criterio de calificación: **sí**, si responde lo que se preguntó y lo que
+dice es correcto; **no**, si no lo responde, lo responde a medias
+admitiendo que le falta lo principal, o dice algo equivocado. Las cifras y
+afirmaciones dudosas se comprobaron contra el corpus. Se corrió **dos
+veces**, el mismo día, con `RAG_TOP_K` 5 y el ADR-0025 desplegado.
+
+## 9.1 Resultado
+
+| Ronda | Responde bien |
+|---|---|
+| 1.ª | **29 de 40** (72,5 %) |
+| 2.ª | **30 de 40** (75 %) |
+| Las dos juntas | **59 de 80 (74 %)** |
+
+**Se sostiene**: 37 de las 40 preguntas reciben la misma calificación
+en las dos rondas. Las tres que cambian están en negrita en la tabla. La
+similitud de la pregunta con el corpus es idéntica en las dos rondas —los
+embeddings son deterministas—; lo que varía es cómo el agente reformula la
+consulta y cómo redacta el modelo, que corren a 0.7 y 0.4.
+
+| # | Tema | 1.ª | 2.ª | Observación |
+|---|---|---|---|---|
+| B-01 | Cultivos para el clima de Bogotá | Sí | Sí | Quinua, amaranto, maíz, lechuga y chocho; al chocho lo nombra solo como *L. mutabilis* |
+| B-02 | pH del suelo y cómo medirlo | No | No | Declina sin citar. El corpus solo trae el pH de especies sueltas |
+| B-03 | Abono orgánico, compost y humus | Sí | Sí |  |
+| B-04 | Cómo preparar el compostaje | Sí | Sí |  |
+| B-05 | Qué no echar a la compostera | Sí | Sí | En la 1.ª, advertencia médica sobrante |
+| B-06 | Cada cuánto y cuánto regar | **No** | **Sí** | La 1.ª admitió no tener el dato; la 2.ª explicó que depende de la planta, la matera y el clima, con la regla de la humedad |
+| B-07 | Saber si una planta necesita agua | Sí | Sí |  |
+| B-08 | Qué es la rotación de cultivos | No | No | Explica por qué importa y dice no tener la definición |
+| B-09 | Asociación de cultivos | Sí | Sí |  |
+| B-10 | Principales plagas | Sí | Sí |  |
+| B-11 | Control de plagas sin químicos | Sí | Sí |  |
+| B-12 | Insecto plaga frente a benéfico | Sí | Sí |  |
+| B-13 | Condiciones para la fotosíntesis | Sí | Sí |  |
+| B-14 | Horas de luz de las hortalizas | No | No | No da el número; el corpus no lo tiene |
+| B-15 | Cultivos para poca luz | **Sí** | **No** | La 1.ª nombró aromáticas, capuchina y mizuna; la 2.ª admitió no saber qué hortalizas |
+| B-16 | Sustrato para materas | Sí | Sí |  |
+| B-17 | Tamaño del recipiente según el cultivo | Sí | Sí |  |
+| B-18 | Riesgos de contaminación en la ciudad | No | No | Entiende la pregunta al revés, y lleva advertencia médica sobrante en las dos |
+| B-19 | Agua de riego sin contaminar | Sí | Sí |  |
+| B-20 | Entidades y programas del Distrito | **No** | **Sí** | La 1.ª omitió al Jardín Botánico; la 2.ª lo incluyó |
+| B-21 | Siembra directa y trasplante | Sí | Sí |  |
+| B-22 | Germinación y sus factores | Sí | Sí |  |
+| B-23 | Semilla, plántula y planta adulta | No | No | Le falta la planta adulta |
+| B-24 | Cómo hacer un semillero | Sí | Sí |  |
+| B-25 | Qué es el raleo | Sí | Sí | Sin respaldo: responde el modelo |
+| B-26 | Qué es el aporque | No | No | Dice en qué cultivos sirve y no qué es |
+| B-27 | Nitrógeno, fósforo y potasio | Sí | Sí |  |
+| B-28 | Deficiencia de nitrógeno | Sí | Sí |  |
+| B-29 | Función de las lombrices | Sí | Sí |  |
+| B-30 | Organismos benéficos del suelo | Sí | Sí |  |
+| B-31 | Cobertura o mulch | Sí | Sí |  |
+| B-32 | Por qué importa la biodiversidad | Sí | Sí |  |
+| B-33 | Aromáticas para polinizadores | No | No | Solo el tomillo |
+| B-34 | Función de los polinizadores | Sí | Sí |  |
+| B-35 | Control biológico | No | No | Sin la definición; en la 1.ª mezcló preparados de tabaco |
+| B-36 | Prevenir hongos sin fungicidas | Sí | Sí |  |
+| B-37 | Anuales, bienales y perennes | Sí | Sí | Sin respaldo: responde el modelo |
+| B-38 | Cuándo cosechar | Sí | Sí |  |
+| B-39 | Higiene en la cosecha | No | No | Le falta el lavado de manos y de alimentos |
+| B-40 | Huerta, educación ambiental y residuos | Sí | Sí |  |
+
+## 9.2 Por qué fallan las que fallan
+
+Nueve preguntas fallan en las dos rondas, y no por la misma razón:
+
+- **Al corpus le falta el dato** (B-02 pH, B-14 horas de luz, B-39
+  higiene en la manipulación, y en parte B-18 riesgos urbanos). Se arregla
+  con corpus.
+- **El corpus usa la palabra y no la define** (B-08 rotación, B-26
+  aporque, B-35 control biológico, B-23 planta adulta). Es la
+  consecuencia directa de la regla 1 del `redaccion_rag_v2.md` —«use solo
+  lo que dice el contexto»—: el fragmento habla de la rotación sin decir
+  qué es, y al modelo se le prohíbe completarlo. **Las dos preguntas que no
+  superan el umbral, B-25 raleo y B-37 anuales y perennes, van por el
+  camino sin respaldo y salen bien**: es el mismo hallazgo de R-09 en el
+  §4.5, ahora con cuatro casos más.
+- **Parcial**: B-33, solo nombra el tomillo.
+- **Entiende la pregunta al revés**: B-18 responde cómo contamina el
+  cultivo, no qué contamina los alimentos en la ciudad.
+
+## 9.3 Lo demás que se vio
+
+- **El «declina y cita» (INC-020) no aparece en ninguna de las 80
+  respuestas.** Las que dicen no saber algo y citan son parciales que
+  responden otra parte con la guía.
+- **Advertencia médica sobrante en 3 de 80** —B-18 en las dos rondas, B-05
+  en una—. Ninguna de las 40 es de salud, así que ninguna la necesitaba.
+  Es INC-018, y la frase «lo que dice la guía **sobre la planta**» suena
+  rara en una respuesta sobre compost.
+- **Dos respuestas por el camino sin respaldo** (B-25 y B-37), correctas y
+  sin cita, que es lo que el diseño pide.
+- Lo que este banco **no** mide: la advertencia médica cuando sí hace
+  falta (eso lo prueban D-03 y D-08, e INC-024), y cómo pregunta de verdad
+  la gente —el conjunto `R`, con sus muletillas, dio otro resultado—.
