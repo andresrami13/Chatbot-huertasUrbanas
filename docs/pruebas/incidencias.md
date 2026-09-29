@@ -358,13 +358,13 @@ el estado en el que quedan los defectos que no se buscaron.
 
 # 4. Medidas
 
-| Métrica | Valor al 25/09/2026 |
+| Métrica | Valor al 26/09/2026 |
 |---|---|
-| Incidencias registradas | 25 |
+| Incidencias registradas | 26 —de INC-001 a INC-027; la INC-011 se retiró porque no era una incidencia— |
 | Abiertas | 8 |
 | **Abiertas de severidad 1 o 2** | **3** (INC-021, INC-024, INC-027) |
-| Cerradas | 17 |
-| Contra el producto | 17 |
+| Cerradas | 18 |
+| Contra el producto | 18 |
 | Contra los casos de prueba | 4 (INC-001 a INC-003, INC-022) |
 | **Contra la base de prueba** | **3** (INC-004, INC-012, INC-027) |
 | Contra el entorno de prueba | 1 (INC-023) |

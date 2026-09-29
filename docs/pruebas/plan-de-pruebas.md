@@ -355,7 +355,7 @@ primer caso, se **repite la prueba de instalabilidad completa**.
 
 ## 6.14 Desviaciones respecto de las prácticas organizacionales
 
-Ninguna adicional a las ocho de la política §1.3.
+Ninguna adicional a las nueve de la política §1.3.
 
 ---
 
@@ -429,7 +429,7 @@ Fase 8 depende del reclutamiento.
 | H-7 Umbral comunitario remedido | A-12 | Pendiente |
 | H-8 Calidad de respuesta evaluada | A-10 | **Hecho** el 26/09/2026: el banco de 40 responde bien el 74 %, estable en dos rondas |
 | H-9 Defectos del banco corregidos | A-16, A-17, A-18 | Las tres hechas. **Pero la repetición abrió INC-021, INC-024 e INC-025**, que siguen sin corregir |
-| H-10 Corrección del CU2 desplegada | — | **Pendiente.** El ADR-0025 está escrito y probado, y **sin desplegar**: producción sigue corriendo `7b136e7`, con el prompt `v1` y la cita del modelo |
+| H-10 Corrección del CU2 desplegada | — | **Hecho** el 25/09/2026: `/health` confirmó `e7a5ec9` en producción, con el ADR-0025 |
 | H-11 Registro de la aceptación | A-14 | **Hecho** el 25/09/2026. **La aceptación no se supera**: 5 de 8 casos de uso con evidencia |
 | H-12 Fase 7 cerrada | A-13 | Al cumplirse los cinco criterios de terminación del §6.6 |
 | H-13 Usabilidad | Fase 8 | Según reclutamiento |

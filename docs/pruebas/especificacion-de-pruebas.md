@@ -180,7 +180,7 @@ del §6.4 de ese mismo plan.
 
 - **Objetivo**: que una llave literal no rompa la carga con `KeyError` a mitad del turno.
 - **Prioridad**: 2 (riesgo P-09).
-- **Estrategia**: **inventario exhaustivo**, no muestreo: los seis vigentes y los cuatro históricos, uno por uno.
+- **Estrategia**: **inventario exhaustivo**, no muestreo: los seis vigentes y los cinco históricos, uno por uno.
 - **Modelo**: cada prompt vigente carga y su texto es analizable por `str.format`; el del agente **no lleva huecos**, a propósito; los cuatro históricos siguen en el repositorio como evidencia citable; un prompt inexistente falla de forma explícita y no como cadena vacía.
 - **Traza**: CLAUDE.md §11 · `plantillas.cargar_prompt` · riesgo P-09.
 
