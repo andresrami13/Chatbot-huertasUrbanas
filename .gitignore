@@ -40,3 +40,12 @@ docs/Proyecto de grado*.docx
 # dentro el nombre de quien tiene el documento abierto y no son el
 # documento: uno se coló al repositorio y se sacó el 19/09/2026.
 ~$*
+
+# Salidas de la evaluación formativa que llevan texto literal de la
+# conversación o el `identidad_hash` de las usuarias. Ellas autorizaron el
+# tratamiento de sus datos, no su publicación, y este repositorio es
+# público. El informe, el embudo y las consultas SQL sí se versionan: solo
+# llevan conteos y seudónimos, igual que scripts/registro_aceptacion.py.
+analisis/salidas/*.csv
+# El embudo es la excepción: solo lleva conteos y porcentajes.
+!analisis/salidas/embudo_onboarding.csv

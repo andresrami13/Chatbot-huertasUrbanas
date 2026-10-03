@@ -1,0 +1,20 @@
+{
+  "FECHA_EXTRACCION": "2026-09-29T02:27:05.404605+00:00",
+  "FECHA_EXTRACCION_BOGOTA": "2026-09-28T21:27:05.404605-05:00",
+  "ZONA_HORARIA": "America/Bogota",
+  "HASHES_EXCLUIDOS": [
+    "4bff4ec10f940bf91a32e2b2cb2a1b2590d03d3fd990fa67f48ceb737c9c7b76"
+  ],
+  "N_ESPERADO": 16,
+  "UMBRAL_PAUSA_MIN": 10,
+  "REPETICION_MIN": 2,
+  "notas": {
+    "FECHA_EXTRACCION": "Instante del reloj de la base (select now()) al abrir la Fase 1 el 28/09/2026. Congela los datos: no filtra usuarias. Se reutiliza en toda ejecucion posterior.",
+    "HASHES_EXCLUIDOS": "identidad_hash de la cuenta del autor, que el autor calcula con su propia clave y entrega. La exclusion se aplica ANTES de cualquier medida, y los seudonimos NO se reasignan: la excluida deja un hueco en la numeracion para que sigan coincidiendo con el registro de aceptacion.",
+    "N_ESPERADO": "16 = las 17 filas de usuario menos la cuenta del autor. El autor entrega su identidad_hash; el script no calcula ningun HMAC ni lee la clave.",
+    "UMBRAL_PAUSA_MIN": "Pausa entre mensajes consecutivos del intento que lo marca interrumpido.",
+    "REPETICION_MIN": "Ventana en minutos para contar un mensaje repetido textualmente como error (Ef-3-G).",
+    "CLASIFICACION_VALIDADA": "true desde el 02/10/2026. Procedencia exacta: la propuso la IA sobre las 50 filas; el autor reviso y aprobo las cinco que la IA marco como dudosas (P-02-003, P-07-003, P-09-002, P-10-009, P-10-010) y acepto las 45 restantes sin objecion. Asi se declara en el informe, sin presentarla como una clasificacion hecha desde cero por una persona."
+  },
+  "CLASIFICACION_VALIDADA": true
+}

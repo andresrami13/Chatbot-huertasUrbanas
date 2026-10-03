@@ -1,0 +1,26 @@
+{
+  "_nota": "Calificación de las 20 consultas agroecológicas, dada por el autor el 02/10/2026 leyendo cada pregunta con su respuesta. Siembra las casillas vacías de rubrica_T3.csv; si el autor escribe algo en el CSV, manda el CSV. No contiene texto de nadie, solo identificadores y sí/no, por eso se versiona.",
+  "_criterio": "contesto_lo_que_pregunto = atendió lo que se le preguntó. lo_que_dice_es_cierto = lo que afirma es correcto agronómicamente. Una consulta cuenta como completada solo si las dos son sí.",
+  "respuestas": {
+    "P-02-002": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-02-005": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-03-006": {"contesto_lo_que_pregunto": "no", "lo_que_dice_es_cierto": "sí"},
+    "P-07-003": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-07-004": {"contesto_lo_que_pregunto": "no", "lo_que_dice_es_cierto": "sí"},
+    "P-07-005": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-08-002": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-08-003": {"contesto_lo_que_pregunto": "no", "lo_que_dice_es_cierto": "sí"},
+    "P-09-002": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-09-003": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-09-004": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-09-005": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-10-002": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-10-003": {"contesto_lo_que_pregunto": "no", "lo_que_dice_es_cierto": "sí"},
+    "P-10-004": {"contesto_lo_que_pregunto": "no", "lo_que_dice_es_cierto": "sí"},
+    "P-10-006": {"contesto_lo_que_pregunto": "no", "lo_que_dice_es_cierto": "sí"},
+    "P-10-007": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-10-009": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-14-002": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"},
+    "P-15-003": {"contesto_lo_que_pregunto": "sí", "lo_que_dice_es_cierto": "sí"}
+  }
+}

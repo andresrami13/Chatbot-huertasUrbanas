@@ -8,21 +8,30 @@ huertas en la localidad.
 Trabajo de grado — Especialización en Ingeniería de Software,
 Universidad Distrital Francisco José de Caldas.
 
-**Las usuarias son líderes y propietarias de huerta, mayoritariamente
-adultas mayores y de mediana edad, con apropiación tecnológica limitada al
-uso básico del celular.** Ese perfil condiciona todas las decisiones de
-diseño: WhatsApp como único canal, lenguaje natural en lugar de menús, y
-botones solo en los dos momentos binarios del flujo. El criterio de éxito
-es una puntuación SUS igual o superior a 68 en la evaluación con 5 a 7
-usuarias de la comunidad.
+**Las personas que lo usan son líderes y propietarias de huerta,
+mayoritariamente adultas mayores y de mediana edad, con apropiación
+tecnológica limitada al uso básico del celular.** Ese perfil condiciona
+todas las decisiones de diseño: WhatsApp como único canal, lenguaje natural
+en lugar de menús, y botones solo en los dos momentos binarios del flujo.
+
+El criterio de éxito es que las participantes **completen sin asistencia al
+menos el 80 % de las tareas** de onboarding, registro de cultivos y consulta
+agroecológica, medido con la ISO/IEC 25022. El SUS sigue dentro de la
+evaluación como medida de satisfacción, pero el ≥68 dejó de ser el criterio
+y hay **una sola ronda, formativa** (28/09/2026).
 
 ## Estado
 
 **Fase 7 — calibración y pruebas.** Los ocho casos de uso están
-construidos y desplegados. El bot está en un **número de producción**
-desde el 09/09/2026 —ya no hay límite de destinatarios— y cuatro personas
-distintas se registraron por su cuenta desde sus celulares. Lo que queda
-es medir y calibrar.
+construidos y desplegados. El bot está en un **número de producción** desde
+el 09/09/2026 —ya no hay límite de destinatarios— y **diecisiete personas
+distintas se registraron por su cuenta** desde sus celulares.
+
+**La evaluación formativa de usabilidad está medida y cerrada**
+(02/10/2026): sobre 16 participantes —se excluye la cuenta del autor—, la
+completitud sin asistencia da **40/50 = 0,80**, justo en el umbral de la
+hipótesis. El informe, con sus medidas, sus límites y sus hallazgos, es
+[`docs/prueba_formativa.md`](docs/prueba_formativa.md).
 
 Lo que **no** está cerrado, y conviene saberlo antes de leer cualquier
 número de este repositorio:
@@ -35,7 +44,14 @@ número de este repositorio:
   83. Mientras siga así, toda calibración hereda esa debilidad.
 - **El CU4, el CU7 y el CU8 se desplegaron el 08 y el 09/09/2026 y todavía
   no han pasado por un celular real.** Están probados contra la base real
-  y con `spike_despachador`, no desde un teléfono.
+  y con `spike_despachador`, no desde un teléfono. La evaluación formativa
+  lo confirma: **ninguna de las 16 participantes los usó nunca**.
+- **El 0,80 de la evaluación formativa no tiene margen.** Está exactamente
+  en el umbral, y tres decisiones de medición lo mueven; las tres están
+  fechadas y declaradas en el informe.
+- **Seis de las dieciséis se registraron y nunca usaron la herramienta.**
+  El 0,80 dice que quien lo intenta lo logra; esto dice que más de un tercio
+  no llega a intentarlo. Los dos datos van juntos o ninguno.
 
 El detalle, con las mediciones que respaldan cada decisión, está en
 [`docs/ESTADO.md`](docs/ESTADO.md).
@@ -326,6 +342,8 @@ Todos se ejecutan con `python -m scripts.<nombre>` desde la raíz.
 | `calibrar_enrutamiento` | A qué herramienta enruta el agente. Repite porque a 0.7 no es determinista; no ejecuta ninguna herramienta |
 | `revisar_prueba_real` | Reconstruye una sesión hecha desde el celular y remide cada consulta. Solo lee |
 | `spike_despachador` | La rama completa, entrando por `procesar_evento`. El único que queda de la Fase 5, y el más útil para comprobar que nada se rompió |
+| `evaluacion_formativa` | **La evaluación formativa de usabilidad** (ISO/IEC 25022): regenera todas las salidas de `analisis/`. Solo lee |
+| `registro_aceptacion` | Reconstruye el registro de la prueba de aceptación desde `mensaje`. No imprime una sola palabra de lo que escribió nadie |
 
 **El 08/09/2026 se borraron nueve scripts** —los siete spikes sueltos de
 la Fase 5 y las dos calibraciones con consultas imaginadas por el
@@ -375,6 +393,8 @@ producción.
 | Documento | Contenido |
 |---|---|
 | [`docs/ESTADO.md`](docs/ESTADO.md) | Dónde está el trabajo, qué falta y las mediciones que respaldan cada paso |
+| [`docs/prueba_formativa.md`](docs/prueba_formativa.md) | **La evaluación formativa de usabilidad**, conforme a ISO/IEC 25022. Es lo que contrasta la hipótesis |
+| [`docs/pruebas/`](docs/pruebas/) | El proceso de prueba conforme a ISO/IEC/IEEE 29119: política, plan, especificación, incidencias, banco de preguntas y aceptación |
 | [`docs/adr/`](docs/adr/) | Veinticuatro decisiones tomadas durante la implementación. Prevalecen sobre los `.docx` |
 | [`docs/correcciones-a-los-documentos.md`](docs/correcciones-a-los-documentos.md) | Qué dice cada documento de fase y qué hace el sistema, por fase y sección |
 | [`CLAUDE.md`](CLAUDE.md) | Instrucciones de trabajo y decisiones no negociables |
@@ -392,5 +412,11 @@ riesgo: deja fuera el `.env`, los PDF de las fuentes oficiales —son
 publicaciones de terceros y se descargan de la URL registrada en `fuente`—
 y el borrador del documento de grado. Las conversaciones de las pruebas y
 los mensajes que nombran un barrio tampoco se versionan.
+
+**Las salidas de `analisis/` están partidas en dos por lo mismo.** Lo que
+solo lleva conteos, fechas y seudónimos se versiona; lo que lleva texto
+literal de las conversaciones, no. Las participantes autorizaron el
+tratamiento de sus datos, **no su publicación**, y el texto de autorización
+que vieron está transcrito en el anexo 12.3 del informe formativo.
 
 No lleva archivo de licencia. Es material de un trabajo de grado en curso.

@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-09-25. **La Fase 6 se cerró el 15/08/2026 con la
+Última actualización: 2026-10-02. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
 pruebas).** Los ocho casos de uso están construidos y desplegados. **Cinco
 tienen aceptación con evidencia** de usuarias reales desde celulares —CU1,
@@ -8,9 +8,30 @@ CU2, CU3, CU5 y CU6—; **CU4, CU7 y CU8 no**, porque ninguna participante
 los usó (`docs/pruebas/registro-de-aceptacion.md`, INC-027).
 
 **Y desde el 09/09/2026 el bot está en un número de producción**, sin el
-límite de 5 destinatarios del número de prueba. Al 25/09/2026 en la base
-hay **12 usuarias, 10 huertas, 61 cultivos y 273 mensajes**, todo
+límite de 5 destinatarios del número de prueba. Al 28/09/2026 en la base
+hay **17 personas usuarias, 15 huertas, 77 cultivos y 356 mensajes**, todo
 registrado por ellas mismas desde sus celulares.
+
+**Y desde el 02/10/2026 la evaluación formativa de usabilidad está medida y
+cerrada** (`EVF-CHU-001`, [`docs/prueba_formativa.md`](prueba_formativa.md)).
+Sobre **16 participantes** —se excluye la cuenta del autor, que es P-12— y
+conforme a la ISO/IEC 25022, la completitud sin asistencia da **40/50 =
+0,80**, exactamente el umbral de la hipótesis. Lo regenera entero
+`python -m scripts.evaluacion_formativa`, que solo lee la base.
+
+Cuatro cosas de ese informe que conviene no volver a descubrir:
+
+- **La hipótesis cambió el 28/09/2026** y ya no es el SUS ≥ 68: pide
+  completar sin asistencia el 80 % de las tareas. El SUS sigue dentro de la
+  evaluación como satisfacción, y **hay una sola ronda, formativa**.
+- **El registro se mide por intento y la consulta por consulta**, nunca por
+  participante. Medirlas por participante las vuelve circulares y daban
+  10/10 y 9/9, que no significaban nada. Es la corrección C-4 del informe.
+- **El enrutamiento del agente no falló ni una vez** en los 36 mensajes que
+  pedían algo. La v1.0 del informe dijo lo contrario leyendo como consultas
+  unos agradecimientos; lo corrigió la clasificación humana.
+- **6 de 16 se registraron y nunca usaron la herramienta**, y solo 2
+  volvieron otro día. Es el hallazgo más duro y va siempre junto al 0,80.
 
 De la Fase 7 van hechas doce cosas, las dos primeras nacidas de esa prueba:
 
@@ -322,9 +343,22 @@ remide cada consulta. Hace falta porque la bitácora dice `fragmentos=0`
 pero no a qué pregunta (CLAUDE.md §11). **Su salida no va al repositorio,
 que es público.**
 
-### 3. La evaluación con usuarias, en discusión el 11/09/2026
+### 3. La evaluación con usuarias — ~~en discusión~~ **decidida y ejecutada**
 
-El anteproyecto especifica **dos rondas de SUS**, formativa y sumativa,
+**Resuelto el 28/09 y el 02/10/2026.** Se adoptó lo que esta sección
+proponía: **una sola ronda formativa**, con análisis de los registros del
+sistema en lugar de la guía de observación, y el SUS dentro de ella como
+medida de satisfacción. La hipótesis y el cuarto objetivo específico ya
+están cambiados en el documento de grado. El resultado, sus límites y sus
+hallazgos están en [`docs/prueba_formativa.md`](prueba_formativa.md).
+
+**Lo que queda de esta sección es el pendiente:** aplicar el SUS por llamada
+a las **7 participantes** que completaron las tres tareas, y conseguir un
+segundo evaluador para la rúbrica de las 20 consultas, que hoy tiene uno
+solo. El texto de abajo se conserva porque es el razonamiento que llevó a la
+decisión, y el documento de grado lo cita.
+
+El anteproyecto especificaba **dos rondas de SUS**, formativa y sumativa,
 con cuestionario SUS y guía de observación en las dos. Al mirarlo con
 detalle antes de aplicarlo aparecieron tres problemas, y ninguno se
 resuelve simplificando el instrumento.
@@ -423,6 +457,7 @@ filas reales no se tocan.
 | Script | Qué hace |
 |---|---|
 | `spike_despachador` | La rama completa, entrando por `procesar_evento`. **El más útil para comprobar que nada se rompió**, y la única prueba de regresión de extremo a extremo que hay |
+| `evaluacion_formativa` | **La evaluación formativa de usabilidad** (ISO/IEC 25022). Regenera todas las salidas de `analisis/`. Solo lee |
 | `calibrar_umbral_real` | **La revalidación de la Fase 7**, con las consultas de la prueba real |
 | `calibrar_enrutamiento` | **A qué herramienta enruta el agente**, repitiendo porque a 0.7 no es determinista. No ejecuta ninguna. `--grupo`, `--modelos`, `--repeticiones` |
 | `revisar_prueba_real` | Reconstruye una sesión hecha desde el celular y remide cada consulta. Solo lee |

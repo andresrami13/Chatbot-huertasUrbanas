@@ -15,13 +15,29 @@ Es el trabajo de grado de la Especialización en Ingeniería de Software de la
 del Plan de Desarrollo Local de Bosa 2024-2028, que fija la meta de 500 huertas
 urbanas en la localidad.
 
-**Usuarias reales:** líderes y propietarias de huerta, mayoritariamente adultas
-mayores y de mediana edad, con apropiación tecnológica limitada al uso básico
-del celular. Este perfil condiciona **todas** las decisiones de diseño. No es un
-detalle de contexto: es la restricción principal.
+**Personas usuarias reales:** líderes y propietarias de huerta,
+mayoritariamente adultas mayores y de mediana edad, con apropiación
+tecnológica limitada al uso básico del celular. Este perfil condiciona
+**todas** las decisiones de diseño. No es un detalle de contexto: es la
+restricción principal.
 
-**Criterio de éxito:** puntuación SUS igual o superior a 68 en la evaluación
-sumativa con 5 a 7 usuarias de la comunidad.
+**No son todas mujeres, y este archivo lo dio por supuesto hasta el
+02/10/2026.** La evaluación formativa encontró al menos un hombre entre las
+dieciséis participantes. «Usuarias» y «ella» como genérico son un error de
+hecho, no de estilo: la base no guarda el género y nadie lo preguntó. En
+texto nuevo va **«participante»** o **«persona usuaria»**. Lo viejo se
+corrige cuando se toque, sin una pasada masiva que ensucie el historial.
+
+**Criterio de éxito — cambió el 28/09/2026, y el anterior ya no rige.** La
+hipótesis del documento de grado pide ahora que las participantes
+**completen sin asistencia al menos el 80 % de las tareas** de onboarding,
+registro de cultivos y consulta agroecológica, medido con Ef-1-G de la
+ISO/IEC 25022. El SUS sigue dentro de la evaluación como medida de
+**satisfacción**, pero el ≥68 dejó de ser el criterio de éxito y **ya no hay
+dos rondas: hay una sola, formativa**.
+
+**Medido el 02/10/2026: 40/50 = 0,80**, justo en el umbral. El informe es
+[`docs/prueba_formativa.md`](docs/prueba_formativa.md) (`EVF-CHU-001`).
 
 ---
 
@@ -38,6 +54,8 @@ dicen, no lo implementes: dilo y espera decisión.
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
 | `docs/adr/` | Veinticuatro decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 | `docs/correcciones-a-los-documentos.md` | **Qué dice cada `.docx` y qué hace el sistema**, por fase y sección. Consolidado de las desviaciones |
+| `docs/pruebas/` | El proceso de prueba conforme a ISO/IEC/IEEE 29119: política, plan, especificación, incidencias, banco de preguntas y registro de aceptación |
+| `docs/prueba_formativa.md` | **La evaluación formativa de usabilidad** (`EVF-CHU-001`), conforme a ISO/IEC 25022. Es lo que contrasta la hipótesis |
 
 **Fase actual: 7 (calibración y pruebas).** La Fase 6 se cerró el
 15/08/2026 con la prueba en un celular real. De la 7 van hechas siete
@@ -59,6 +77,35 @@ cosas:
    retiró el mismo día.
 7. La **fecha de siembra salió del CU3 entero** por ser un dato de solo
    escritura (ADR-0018).
+8. **La evaluación formativa de usabilidad está medida y cerrada**
+   (02/10/2026, `EVF-CHU-001`), sobre 16 participantes reales y conforme a
+   la ISO/IEC 25022. Ver abajo.
+
+### La evaluación formativa, en cuatro líneas que conviene no reinventar
+
+**Ef-1-G global = 40/50 = 0,80**, justo en el umbral de la hipótesis. Por
+tarea: onboarding 14/16 participantes, registro 12/14 intentos, consulta
+agroecológica 14/20 consultas. Lo regenera entero
+`python -m scripts.evaluacion_formativa`, que **solo lee** la base.
+
+**Las unidades no son negociables y costaron una versión del informe.** El
+registro se mide **por intento** y la consulta **por consulta**, nunca por
+participante: medirlas por participante las vuelve circulares —el intento se
+detecta con la misma evidencia que el éxito— y daban 10/10 y 9/9, que no
+significaban nada.
+
+**Dos juicios de esa medición no salen de la base y están declarados**: qué
+quería la persona en cada mensaje libre (lo propuso la IA, lo validó el
+autor) y si recibió asistencia (lo declaró el autor). Con el resultado
+pegado al umbral, cualquiera de los dos lo mueve, así que **van siempre con
+su fecha y su procedencia**.
+
+**Lo que midió, además del 0,80:** el enrutamiento no falló ni una vez en 36
+mensajes con petición; 20 de 20 respuestas del CU2 son agronómicamente
+ciertas y 14 de 20 contestaron lo que se preguntó —las otras seis son huecos
+de corpus—; cero fallos del sistema; y **6 de 16 personas se registraron y
+nunca usaron la herramienta**, que es el hallazgo más duro y no se puede
+presentar sin él al lado del 0,80.
 
 **El umbral se mantiene por decisión del autor (24/09/2026)** y queda
 declarado como **no recalibrado**, no como calibrado: lo sostiene la
@@ -521,9 +568,18 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - **Los scripts de `scripts/` que escriben en la base crean datos
   temporales y los borran en un `finally`**, con identidades que llevan
   `57000000` dentro —con forma de BSUID desde el ADR-0023, como
-  `CO.570000000601`—. Al 17/09/2026 hay **nueve filas reales** en
-  `usuario`, siete de ellas con huerta, y son el material de la Fase 7: no
-  las toques.
+  `CO.570000000601`—. Al 28/09/2026 hay **diecisiete filas reales** en
+  `usuario`, quince de ellas con huerta, y son el material de la Fase 7 y de
+  la evaluación formativa: no las toques.
+- **`analisis/` es la evaluación formativa, y su carpeta de salidas está
+  partida en dos a propósito.** Lo que solo lleva conteos, fechas,
+  seudónimos `P-01…` e identificadores se versiona —el mapeo, los
+  parámetros, el embudo y los dos JSON de trazabilidad—; lo que lleva texto
+  literal de la conversación **no**, y el `.gitignore` lo deja fuera por
+  extensión. Las participantes autorizaron el tratamiento de sus datos, **no
+  su publicación**, y este repositorio es público. Es el mismo criterio que
+  separa `registro_aceptacion.py` de `revisar_prueba_real.py`.
+  Antes de añadir una salida nueva, decide en cuál de los dos lados cae.
 - **Ninguna fuente oficial se ingiere a mano.** Se declara en
   `scripts/catalogo_fuentes.py` y se ingiere con
   `python -m scripts.ingesta_fuente --fuente <clave>` (ADR-0014). Los PDF
@@ -597,6 +653,16 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
   CU3 y CU4, **que nunca llegan al CU2**; consultas reales del CU2 con el
   índice como mejor fragmento había **dos**. Antes de dar un porcentaje,
   comprueba que el denominador sea lo que le importa a la usuaria.
+  **Van tres, y la tercera llegó a escribirse en un informe entregado:** la
+  v1.0 de la evaluación formativa daba 9/9 en consultas y 10/10 en
+  registros, y los dos eran **circulares** —el intento se detectaba con la
+  misma evidencia que el éxito, así que no podían bajar del 100 %—. Medidos
+  bien quedaron en 14/20 y 12/14. Ese mismo informe leyó 11 mensajes que el
+  modelo contestó sin pasar por ningún caso de uso como «consultas sin RAG
+  ni cita»; al clasificarlos, **ninguno era una consulta**: eran
+  agradecimientos. **Una proporción que no puede dar menos del 100 % no es
+  un resultado, es una tautología**; mira de dónde sale cada lado de la
+  fracción antes de escribirla.
 - **Para buscar defectos en un texto extraído, inventaría; no busques
   sospechosos.** En el Protocolo de espacio público, buscar caracteres
   raros encontró tres de ocho. Arreglados esos tres el texto ya *parecía*
