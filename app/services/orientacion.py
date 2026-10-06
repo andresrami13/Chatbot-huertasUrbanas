@@ -206,19 +206,51 @@ def _con_cita(texto: str, entidad: str) -> str:
 #
 # El vocabulario tira a ancho a propósito. Advertir de más cuesta dos
 # renglones; advertir de menos falla justo en el mensaje en que importaba.
+#
+# ## Todo va en raíz, y eso es lo que corrigió INC-024
+#
+# El 25/09/2026 «¿Para qué sirve el romero?» respondió usos medicinales
+# sin advertencia en 1 de 7 corridas. No enganchó ni una alternativa: el
+# modelo escribió «dolores de» y aquí decía `dolor de`, «cicatrizar» y
+# aquí decía `cicatrizante`, «en la salud» y aquí decía `para la salud`.
+# La lista mira cadenas y el modelo conjuga.
+#
+# La mayoría del vocabulario ya estaba en raíz —`curativ` cubre curativa,
+# curativo y curativas— y solo unas pocas entradas se habían escrito
+# cerradas. Ahora **ninguna lleva terminación ni preposición**: si hay que
+# añadir algo, se añade la raíz más corta que siga siendo inequívoca.
+#
+# Dos excepciones, y las dos son deliberadas. `\btos\b` y `\basma\b` van
+# acotadas porque como raíz se comen «todos», «tostado» y «plasma». Y
+# `salud` lleva una exclusión para los sentidos agronómicos —la salud del
+# suelo, de la planta, del cultivo— que son frases corrientes en el
+# corpus y no hablan de la salud de nadie.
+#
+# `cicatri[zc]` lleva las dos letras porque el español alterna la z por c
+# delante de e: «cicatriza» pero «que cicatrice». Escribirla solo con z
+# —que es lo primero que se intentó— deja fuera el subjuntivo, y es el
+# mismo hueco de INC-024 en otra letra.
+#
+# Lo que esto cuesta está medido y aceptado: cubre «cicatrizar heridas»,
+# que es lo que hay que advertir, y de paso «deje que cicatrice el corte
+# de la poda», que no. Es un falso positivo conocido y cae del lado que
+# manda el ADR-0015. Vive en INC-018.
 _HABLA_DE_SALUD = re.compile(
     r"medicinal|medicina|remedio|curativ|terapéutic|terapeutic"
     r"|anticonceptiv|abortiv|emenagog|afrodisíac|afrodisiac"
     r"|antiinflamatori|antibiótic|antibiotic|antiséptic|antiseptic"
     r"|analgésic|analgesic|expectorante|diurétic|diuretic|laxante"
-    r"|digestiv|estomáquic|estomaquic|carminativ|antiulceros|antiespasmódic"
-    r"|sedante|calmante|cicatrizante|desinflamat|purgante|vermífug"
+    r"|digestiv|estomáquic|estomaquic|carminativ|antiulceros"
+    r"|antiespasmódic|antiespasmodic"
+    r"|sedante|calmante|cicatri[zc]|desinflamat|purgante|vermífug|vermifug"
     r"|t[óo]xic|venenos|intoxicaci[óo]n|contraindicaci"
-    r"|\btos\b|\bfiebre\b|\bgripa\b|\bgripe\b|dolor de|dolencia|malestar"
-    r"|infusi[óo]n|aromática para|agua de panela para"
+    r"|\btos\b|\bfiebre\b|\bgripa\b|\bgripe\b|dolor|dolencia|malestar"
+    r"|alivi|m[úu]scul|est[óo]mag|respirator|\basma\b|bronqui"
+    r"|infusi[óo]n|arom[áa]ticas? para|agua de panela para"
     r"|embarazo|lactancia|diabetes|hipertensi[óo]n|presi[óo]n alta"
     r"|colesterol|gastritis|[úu]lcera|insomnio|ansiedad"
-    r"|para (la|el) salud|propiedades? (medicinal|curativ|terap)",
+    r"|\bsalud\b(?!\s+(?:del suelo|de la planta|de las plantas"
+    r"|del cultivo|de los cultivos|vegetal|ambiental))",
     re.IGNORECASE,
 )
 

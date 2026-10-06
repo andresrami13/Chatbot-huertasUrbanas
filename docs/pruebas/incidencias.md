@@ -134,7 +134,7 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Severidad** | **2** |
 | **Prioridad** | 1 |
 | **Riesgo** | Viola una decisión no negociable, el `CLAUDE.md` §4.6: toda respuesta del CU2 que hable de salud lleva advertencia. Y la viola justo en la pregunta elegida para comprobarla. El vocabulario se amplió «a lo ancho» a propósito (ADR-0015) y aun así tiene huecos: la lista mira palabras, y el modelo conjuga |
-| **Estado** | **Abierta.** Corregirlo es ampliar el vocabulario —formas conjugadas y dolencias respiratorias—, con el coste conocido de INC-018: más falsos positivos |
+| **Estado** | **Corregida en el código el 05/10/2026**: todo el vocabulario de `_HABLA_DE_SALUD` pasa a raíces —`dolor`, `cicatri[zc]`, `alivi`, `m[úu]scul`, `respirator`, `bronqui`, `asma`, `salud`— con una exclusión para la salud del suelo y de la planta. Once casos nuevos en MP-16, entre ellos la frase exacta que falló. **Falta comprobarlo en producción** repitiendo D-03 tras el despliegue. El coste es el previsto: un falso positivo aceptado —«que cicatrice el corte de la poda»—, que vive en INC-018 |
 
 ## INC-025 — El agente contesta sin consultar la guía una pregunta que la guía responde
 

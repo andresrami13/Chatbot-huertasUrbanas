@@ -168,6 +168,68 @@ def test_mp16_lo_que_no_habla_de_salud_no_la_lleva(respuesta):
     assert _con_advertencia_medica(respuesta) == respuesta
 
 
+# Las seis formas con las que el modelo dijo lo mismo que la lista buscaba
+# y no enganchó ninguna (INC-024, 25/09/2026). La respuesta entera salió
+# sin advertencia en 1 de 7 corridas de la misma pregunta: el fallo no
+# depende de la pregunta, depende de cómo redacte el modelo esa vez.
+#
+# Cada caso lleva al lado la entrada de la lista que debería haberlo
+# cubierto y no lo hizo, porque estaba escrita como cadena cerrada en vez
+# de como raíz —que es el estilo del resto del vocabulario—.
+@pytest.mark.parametrize(
+    "respuesta",
+    [
+        # la frase entera que falló, tal como la recibió la usuaria
+        "En la salud, sus aceites relajan los músculos y alivian dolores de"
+        " cabeza, dolores articulares, y sirven para cicatrizar heridas,"
+        " tratar problemas del estómago y aliviar males respiratorios como"
+        " asma, bronquitis.",
+        "Alivia los dolores de cabeza.",  # la lista tenía `dolor de`
+        "Ayuda a cicatrizar heridas.",  # la lista tenía `cicatrizante`
+        "En la salud, sus aceites son muy apreciados.",  # tenía `para la salud`
+        "Sirve para tratar problemas del estómago.",  # tenía `estomáquic`
+        "Alivia males respiratorios como el asma o la bronquitis.",  # no estaba
+        "Sus aceites relajan los músculos.",  # no estaba
+    ],
+)
+def test_mp16_las_formas_conjugadas_del_romero_llevan_advertencia(respuesta):
+    """INC-024. La lista mira palabras y el modelo conjuga."""
+    assert textos.ADVERTENCIA_MEDICA in _con_advertencia_medica(respuesta)
+
+
+# El vocabulario tira a ancho a propósito (ADR-0015), pero ancho no es
+# indiscriminado: estas frases son agronomía corriente y comparten raíz
+# con el vocabulario de salud. Si alguna empieza a llevar advertencia, lo
+# que subió no es la cobertura sino INC-018.
+@pytest.mark.parametrize(
+    "respuesta",
+    [
+        "La salud del suelo mejora con el compost.",
+        "Abonar bien cuida la salud de la planta.",
+        "Un suelo vivo sostiene la salud de los cultivos.",
+    ],
+)
+def test_mp16_la_agronomia_que_comparte_raiz_no_lleva_advertencia(respuesta):
+    """El coste de ensanchar el vocabulario, acotado donde se puede."""
+    assert _con_advertencia_medica(respuesta) == respuesta
+
+
+def test_mp16_la_poda_es_un_falso_positivo_aceptado():
+    """Lo contrario del anterior, y está escrito a propósito.
+
+    `cicatriz` cubre «cicatrizar heridas», que es lo que INC-024 dejó
+    pasar, y de paso la poda, que no habla de la salud de nadie. No se
+    acota porque el ADR-0015 ya decidió de qué lado caer: advertir de más
+    cuesta dos renglones, advertir de menos falla donde importaba.
+
+    Si alguien viene a «arreglarlo», que sepa que lo que rompe es la
+    cobertura de INC-024. El falso positivo vive en INC-018.
+    """
+    respuesta = "Deje que cicatrice el corte de la poda antes de regar."
+
+    assert textos.ADVERTENCIA_MEDICA in _con_advertencia_medica(respuesta)
+
+
 def test_mp16_la_advertencia_va_al_final():
     """Después de la línea de la fuente, para no romper la atribución."""
     respuesta = "Es medicinal.\n\nFuente: Jardín Botánico de Bogotá"
