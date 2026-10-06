@@ -143,7 +143,7 @@ de la aceptación.
 | Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Sin evidencia de aceptación** (INC-027) |
 | Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Sin evidencia de aceptación** (INC-027) |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
-| Agente orquestador | `app/agent/agente.py`, `agente_v2.md` | **Probado en producción desde el celular**; la regla 6 del `v2` (ADR-0024) **sin probar** |
+| Agente orquestador | `app/agent/agente.py`, `agente_v2.md` | **Probado en producción desde el celular**. La regla 6 del `v2` (ADR-0024), no prometer trámites que no hace, **comprobada el 05/10/2026**: 12 de 12 respuestas correctas ante cuatro peticiones de reportar, guardar o avisar al programador, tres veces cada una. Las dos únicas promesas reales de la base son del 18/09, anteriores a la regla |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
 | Acuse de la nota de voz | `app/services/espera.py` | Se manda al recibir el audio, sin umbral (ADR-0017, revisado) |
 | Indicador de «escribiendo» | `whatsapp.marcar_escribiendo` | Los tres puntitos nativos de WhatsApp, en todos los mensajes (ADR-0017, 2.ª revisión). **Sin probar desde el celular** |
