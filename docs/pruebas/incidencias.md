@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `INC-CHU-001`, versión 1.7 |
+| **Identificador** | `INC-CHU-001`, versión 1.9 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Abierto, en actualización continua |
@@ -20,6 +20,8 @@
 | 25/09/2026 | 1.5 | Repetición con top-k 4 y 5: **se reabre INC-021**, cerrada con una sola corrida, y nacen INC-024 —el romero sin advertencia— e INC-025 —el formulario que el agente no enruta—. Vuelve a haber dos de severidad 2 abiertas | A. Ramírez |
 | 25/09/2026 | 1.6 | INC-026 e INC-027, de reconstruir el registro de aceptación (A-14) | A. Ramírez |
 | 26/09/2026 | 1.7 | INC-026 reclasificada a severidad 3 y aceptada por escrito por el autor. Banco de 40 preguntas en las medidas | A. Ramírez |
+| 10/10/2026 | 1.8 | INC-028, INC-029 e INC-030, de la depuración de los casos de componente (de 271 a 198) | A. Ramírez |
+| 12/10/2026 | 1.9 | **Cierre de la Fase 7.** INC-024 e INC-027 cerradas con evidencia de producción. INC-021 aceptada por escrito y reclasificada a severidad 3. INC-010, INC-018, INC-025 e INC-030 aceptadas por escrito. Quedan siete abiertas, todas de severidad 3 o 4 y aceptadas | A. Ramírez |
 
 ## Introducción
 
@@ -67,22 +69,27 @@ Cuatro niveles cada una, 1 el más grave.
 
 # 1. Incidencias abiertas
 
-Son ocho. Las de severidad 1 y 2 tienen que quedar resueltas o aceptadas
-por escrito antes de dar la Fase 7 por cerrada (criterio de terminación 2
-del [plan](plan-de-pruebas.md) §6.6).
+Son siete, **todas de severidad 3 o 4 y aceptadas por escrito** por el
+autor el 12/10/2026, que es lo que pide el criterio de terminación 2 de la
+[política](politica-y-practicas-de-prueba.md) §4.2: cero de severidad 1 o 2
+abiertas, y las demás listadas y aceptadas.
 
 ## INC-010 — Dos defectos de extracción en *Sembrando Biodiversidad*
 
 | Campo | Contenido |
 |---|---|
-| **Detectada** | 15/08/2026 |
+| **Detectada** | 15/08/2026. **Los rótulos, cerrados el 05/10/2026** |
 | **Origen** | A. Ramírez, autor |
 | **Contexto** | Ítem: el corpus oficial. Fuente `jbb_sembrando_2023`. Prueba estática de inventario |
-| **Descripción** | Los **rótulos al margen se cuelan dentro de la frase** en unas 17 páginas, y **cinco páginas con texto rotado** que `pypdf` no extrae. Documentado en el ADR-0014, sección «Lo que este ADR no resuelve» |
+| **Descripción** | **1. Rótulos al margen dentro de la frase.** El registro decía «unas 17 páginas»; medido el 05/10/2026 son **28 de los 220 fragmentos y 106 rótulos**, más de lo anotado. Eran `HOJAS`, `TALLO`, `SEMILLAS`, `FLORES`, `RAÍZ`, `FRUTO` y sus formas rotas: `TALL` es `TALLO` cortado, `TALL O` es `TALLO` partido en dos, `RAÍCESTALL` y `FLORESTALL` son un rótulo pegado a otro. Ejemplo: «el tallo presenta un diámetro de entre 13 mm y **TALLOTALL** 13,95 mm». **2. Texto rotado** que `pypdf` no extrae, que el ADR-0014 cifra en cinco páginas |
 | **Severidad** | 3 |
 | **Prioridad** | 3 |
-| **Riesgo** | Un fragmento con el rótulo incrustado puede recuperarse y llegar a la usuaria con una frase rota. Las cinco páginas perdidas son corpus que no está |
-| **Estado** | **Abierta.** Aceptada conscientemente al ingerir |
+| **Riesgo** | Un fragmento con el rótulo incrustado puede recuperarse y llegar a la usuaria con una frase rota o con una cifra cortada. Las páginas de texto rotado son corpus que no está |
+| **Estado** | **Rótulos: cerrados el 05/10/2026.** Se declaran por fuente en el catálogo (`rotulos_del_margen`) y se quitan en `limpiar_fragmento` después del troceo, así que el recuento de la fuente no cambia: 220. 28 fragmentos reparados y revectorizados con `limpiar_corpus.py`. Medido contra las 64 preguntas de los bancos antes y después: **la mejor similitud cambió en una sola, R-09, de 0,6682 a 0,6708; ninguna cruzó el umbral.** 28 casos de prueba nuevos (MP-25). **Texto rotado: abierto y sin verificar.** Buscando texto vertical en el PDF solo aparecen dos páginas con texto extraído (la 42 y la 165), no cinco: no se pudo reproducir la cifra del ADR-0014. **Aceptada por escrito por el autor el 12/10/2026**: el texto rotado es corpus que falta, no un dato falso, y el CU2 responde sin citar cuando no lo encuentra |
+
+**Lo que la limpieza no repara.** Quitar el rótulo no devuelve lo que ocultaba. Cuando el rótulo **partía una palabra** —«en el HOJAS as y verde claro en el envés»— queda «en el as y verde claro»: se retira el ruido, pero la frase sigue rota. Y cuando el rótulo hacía de sujeto —«Descripción botánica RAÍZ presenta una raíz principal»— queda «presenta una raíz principal», sin el sujeto que el PDF solo ponía en el margen. Es mejor que antes, no es el texto original.
+
+**La regla es angosta a propósito.** Un rótulo se quita solo si está suelto —sin letra ni número pegados—, solo en la fuente que lo declara y no si lo sigue otra palabra en mayúscula que no sea un rótulo: así `SEMILLAS FERCON`, el nombre de una empresa que aparece dos veces en el mismo libro, se conserva. Fuera de *Sembrando biodiversidad* esas palabras aparecen cuatro veces y ninguna es un rótulo.
 
 ## INC-017 — Un mensaje que mezcla consulta y dato ofrece guardar lo consultado
 
@@ -108,7 +115,7 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Severidad** | 4 |
 | **Prioridad** | 4 |
 | **Riesgo** | Advertir de más cuesta dos renglones y cansa; advertir de menos falla justo en el mensaje en que importaba. **Puede ser el comportamiento buscado o puede ser demasiado ancho: hace falta medirlo, no decidirlo de memoria.** Es una de las salidas del banco de 20 preguntas |
-| **Estado** | **Abierta** |
+| **Estado** | **Abierta y aceptada por escrito por el autor el 12/10/2026.** Advertir de más es el lado que eligió el ADR-0015, y el falso positivo de la poda se quedó a propósito para no perder la cobertura de INC-024. Lo que se acepta es el cansancio de la advertencia repetida |
 
 ## INC-021 — Una cifra agronómica que no está en ninguna fuente
 
@@ -118,23 +125,10 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Origen** | A. Ramírez, autor |
 | **Contexto** | Ítem: redacción del CU2 con respaldo. Criterio de **precisión** |
 | **Descripción** | La respuesta sobre cuándo trasplantar dice «de **2 a 4** hojas verdaderas». El fragmento del que sale dice «de **3 a 4**»; otros dicen «de **3 a 5**» y «**dos o tres**»; **el «2 a 4» no está en ninguna**. Todo lo demás de esa respuesta sí se comprobó textual, incluidas las horas y el «5 a 20 cm en un plazo de 4 a 5 semanas» |
-| **Severidad** | **2** |
+| **Severidad** | 3 —era 2 hasta el 12/10/2026— |
 | **Prioridad** | 2 |
 | **Riesgo** | Es el fallo más difícil de ver: la respuesta es correcta en lo demás, va citada y suena bien. Una cifra inventada **bajo una cita oficial** es exactamente lo que la jerarquía de fuentes promete que no pasa. Una sola en veinte, y el umbral de precisión se fijó en 20 de 20 justo por esto |
-| **Estado** | **Reabierta el 25/09/2026.** Se había cerrado el 24/09 con la regla 9 del `redaccion_rag_v2.md` —no fundir cifras de fragmentos distintos— **y una sola corrida**, la afortunada. Repitiendo tres veces con top-k 4 y tres con 5, D-06 vuelve a decir «2 a 4» en **5 de 6**. La regla de prompt no basta |
-
-## INC-024 — El romero respondió usos medicinales sin advertencia médica
-
-| Campo | Contenido |
-|---|---|
-| **Detectada** | 25/09/2026, en el banco completo con top-k 5 |
-| **Origen** | A. Ramírez, autor |
-| **Contexto** | Ítem: `orientacion._HABLA_DE_SALUD`. Modelo MP-16. Riesgo P-01 |
-| **Descripción** | D-03, «¿Para qué sirve el romero?», respondió *«En la salud, sus aceites relajan los músculos y alivian dolores de cabeza, dolores articulares […] cicatrizar heridas, tratar problemas del estómago y aliviar males respiratorios como asma, bronquitis»* **sin la advertencia**. El vocabulario busca `dolor de` y no `dolores de`, `cicatrizante` y no `cicatrizar`, `para la salud` y no `en la salud`, y no tiene `asma`, `bronquitis` ni `respiratori`. La misma pregunta llevó advertencia en las otras 6 corridas: depende de cómo redacte el modelo |
-| **Severidad** | **2** |
-| **Prioridad** | 1 |
-| **Riesgo** | Viola una decisión no negociable, el `CLAUDE.md` §4.6: toda respuesta del CU2 que hable de salud lleva advertencia. Y la viola justo en la pregunta elegida para comprobarla. El vocabulario se amplió «a lo ancho» a propósito (ADR-0015) y aun así tiene huecos: la lista mira palabras, y el modelo conjuga |
-| **Estado** | **Corregida en el código el 05/10/2026**: todo el vocabulario de `_HABLA_DE_SALUD` pasa a raíces —`dolor`, `cicatri[zc]`, `alivi`, `m[úu]scul`, `respirator`, `bronqui`, `asma`, `salud`— con una exclusión para la salud del suelo y de la planta. Once casos nuevos en MP-16, entre ellos la frase exacta que falló. **Falta comprobarlo en producción** repitiendo D-03 tras el despliegue. El coste es el previsto: un falso positivo aceptado —«que cicatrice el corte de la poda»—, que vive en INC-018 |
+| **Estado** | **Reabierta el 25/09/2026.** Se había cerrado el 24/09 con la regla 9 del `redaccion_rag_v2.md` —no fundir cifras de fragmentos distintos— **y una sola corrida**, la afortunada. Repitiendo tres veces con top-k 4 y tres con 5, D-06 vuelve a decir «2 a 4» en **5 de 6**. La regla de prompt no basta. **Aceptada por escrito por el autor el 12/10/2026**, que la reclasifica de severidad 2 a 3. Motivo: el asistente se presenta como un sistema en pruebas que puede equivocarse en los tres puntos por los que entra una persona —la ayuda, la solicitud previa al onboarding y el saludo de quien ya está registrada (ADR-0024)—, comprobado en el commit desplegado `0e2e73f`. **Riesgo que se asume**: el aviso es general y la cita oficial pesa más que él, así que una cifra inventada bajo la cita puede creerse igual. La corrección —comparar las cifras de la respuesta con las de los fragmentos— queda como trabajo futuro |
 
 ## INC-025 — El agente contesta sin consultar la guía una pregunta que la guía responde
 
@@ -143,11 +137,11 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Detectada** | 25/09/2026, al medir el top-k (ADR-0026) |
 | **Origen** | A. Ramírez, autor |
 | **Contexto** | Ítem: enrutamiento del agente, `agente_v2.md` (ADR-0013) |
-| **Descripción** | La consulta real «Cual es la dirección de enlace al JBB para obtener el formulario» tiene respuesta en el corpus —los enlaces del Protocolo de espacio público—, y el agente **no llama al CU2**: contesta por su cuenta «No tengo el enlace ni los formularios del Jardín Botánico». Comprobado envolviendo `agente.consultar_orientacion`, que no se invoca en ninguna de las corridas |
+| **Descripción** | La consulta real «Cual es la dirección de enlace al JBB para obtener el formulario» tiene respuesta en el corpus —los enlaces del Protocolo de espacio público—, y el agente **no llama al CU2**: contesta por su cuenta «No tengo el enlace ni los formularios del Jardín Botánico». Comprobado envolviendo `agente.consultar_orientacion`, que no se invoca en ninguna de las corridas. **Ampliada el 06/10/2026: es una clase, no una pregunta.** Con `calibrar_enrutamiento --grupo tramites`, cinco repeticiones: las preguntas que piden un **dato concreto** —el enlace, el correo de renovación, el correo de la localidad— van a la guía 1, 0 y 0 de 5 veces; las que piden un **procedimiento** —dónde se consigue el formulario, cómo se pide el permiso—, 5 de 5. **Corrección a lo que este registro daba por sentado:** la conversación guardada muestra que el 18/09, cuando la persona hizo la pregunta, el asistente **sí** consultó la guía. El `agente_v2` entró al día siguiente; es compatible con que lo causara, pero no se midió el `v1` |
 | **Severidad** | 3 |
 | **Prioridad** | 3 |
-| **Riesgo** | Ella se queda sin un dato que el sistema tiene. Y **nada lo delata**: la respuesta es plausible y educada. Además invalida una forma de medir: el fragmento se había medido en el puesto 5 con la consulta suelta, fuera del agente, y de ahí salió la idea de subir el top-k |
-| **Estado** | **Abierta** |
+| **Riesgo** | La persona se queda sin un dato que el sistema tiene. Y **nada lo delata**: la respuesta es plausible y educada. Además invalida una forma de medir: el fragmento se había medido en el puesto 5 con la consulta suelta, fuera del agente, y de ahí salió la idea de subir el top-k |
+| **Estado** | **Corregida el 06/10/2026 con `agente_v3.md` (ADR-0027); falta desplegarla.** El grupo de trámites pasa de 26/40 a **40/40**, sin que los tres controles de la regla de no prometer se muevan. De punta a punta, las respuestas dan el enlace del formulario de Bosa y los correos, y los dos datos están literalmente en el Protocolo. Sin regresión en los otros cuatro grupos de enrutamiento: 140/140 con el `v2` y 140/140 con el `v3`. **Aceptada por escrito por el autor el 12/10/2026** mientras se despliega: la corrección está hecha y medida, y se cierra cuando `/health` informe el commit que la lleve |
 
 ## INC-026 — El nombre de pila queda en claro en `mensaje`
 
@@ -162,6 +156,40 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Riesgo** | Anula la capa 3 del modelo de seguridad para el nombre: quien lea la base lo tiene, cifrado o no. No se expone a otras usuarias —`mensaje` se filtra por `usuario_id` y el CU4 no lo lee—, pero **el ADR-0016 dejó el saludo personalizado fuera de la memoria justo para que el nombre no estuviera en `mensaje`**, y la premisa no se cumple. El ADR-0012 dice que la minimización gobierna lo que el sistema pide; aquí **el sistema lo pide** |
 | **Estado** | **Abierta y aceptada por escrito por el autor el 26/09/2026**, que la reclasifica de severidad 2 a 3. Motivo: las usuarias autorizaron el tratamiento de su nombre al dar el consentimiento (Ley 1581 de 2012), así que conocerlo y guardarlo tiene base legal, y no se expone a otras usuarias. **Riesgo que se asume**: el cifrado del nombre en `usuario` no lo protege frente a quien lea la base, y el documento de grado no puede presentar la capa 3 como si lo hiciera. La corrección —no recordar la respuesta del paso del nombre— queda para después |
 
+## INC-030 — El tope de cuatro palabras del saludo no tiene efecto
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 10/10/2026, al intentar rehacer el caso de valor límite de MP-10 como cuatro palabras frente a cinco |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: `consentimiento.es_saludo_o_ayuda`. ADR-0006 |
+| **Descripción** | La función descarta los mensajes de más de cuatro palabras y luego exige que el mensaje **sea exactamente** uno de los del conjunto cerrado. La frase más larga del conjunto mide tres palabras, así que **ninguna entrada de cuatro puede dar verdadero** y el tope no cambia nunca el resultado. Lo que de verdad separa «hola» de «hola, mi tomate tiene bichos» es la pertenencia exacta. El caso de prueba que decía probar el límite comparaba una palabra con cinco: pasaba con el tope y sin él |
+| **Severidad** | 4 |
+| **Prioridad** | 4 |
+| **Riesgo** | Ninguno para la usuaria. Es código que no sirve para nada (CLAUDE.md §12), y un comentario que atribuye al tope una protección que da otra línea |
+| **Estado** | **Abierta y aceptada por escrito por el autor el 12/10/2026**: no afecta a ninguna persona usuaria. Se cierra quitando el tope o declarándolo como defensa por si el conjunto crece. El caso de prueba ya se retiró |
+
+---
+
+# 2. Incidencias cerradas
+
+## Del cierre de la Fase 7, 12/10/2026
+
+Las dos de severidad 2 que quedaban por evidencia, no por código. Se cerraron con preguntas desde un celular real y leyendo la base.
+
+## INC-024 — El romero respondió usos medicinales sin advertencia médica
+
+| Campo | Contenido |
+|---|---|
+| **Detectada** | 25/09/2026, en el banco completo con top-k 5 |
+| **Origen** | A. Ramírez, autor |
+| **Contexto** | Ítem: `orientacion._HABLA_DE_SALUD`. Modelo MP-16. Riesgo P-01 |
+| **Descripción** | D-03, «¿Para qué sirve el romero?», respondió *«En la salud, sus aceites relajan los músculos y alivian dolores de cabeza, dolores articulares […] cicatrizar heridas, tratar problemas del estómago y aliviar males respiratorios como asma, bronquitis»* **sin la advertencia**. El vocabulario busca `dolor de` y no `dolores de`, `cicatrizante` y no `cicatrizar`, `para la salud` y no `en la salud`, y no tiene `asma`, `bronquitis` ni `respiratori`. La misma pregunta llevó advertencia en las otras 6 corridas: depende de cómo redacte el modelo |
+| **Severidad** | 2 |
+| **Prioridad** | 1 |
+| **Riesgo** | Viola una decisión no negociable, el `CLAUDE.md` §4.6: toda respuesta del CU2 que hable de salud lleva advertencia. Y la viola justo en la pregunta elegida para comprobarla. El vocabulario se amplió «a lo ancho» a propósito (ADR-0015) y aun así tiene huecos: la lista mira palabras, y el modelo conjuga |
+| **Estado** | **Cerrada el 12/10/2026, comprobada en producción.** Con `0e2e73f` desplegado —que incluye la corrección, `1582073`—, cinco preguntas desde un celular real: D-03 tal cual, dos variantes del romero, D-08 y la caléndula. **Las cinco llevan la advertencia**, entre ellas una redacción casi idéntica a la que falló —«En la salud… cicatrizar heridas… asma, bronquitis»—. Se usaron variantes en lugar de repetir la misma pregunta, porque con la conversación en memoria el agente puede contestar sin volver a consultar la guía. Comprobado leyendo `mensaje` |
+
 ## INC-027 — CU4, CU7 y CU8 no tienen evidencia de aceptación
 
 | Campo | Contenido |
@@ -170,14 +198,12 @@ del [plan](plan-de-pruebas.md) §6.6).
 | **Origen** | A. Ramírez, autor |
 | **Contexto** | Ítem: **la base de prueba**. La especificación, el plan y `ESTADO.md` afirmaban «los ocho casos de uso han pasado por aceptación» |
 | **Descripción** | En `mensaje` —273 mensajes de 12 participantes, del 09 al 25/09— no hay ninguna respuesta del listado del CU4, de la búsqueda del CU7 ni de «mi huerta» del CU8, **ni ninguna pregunta de ellas con esa intención**. La afirmación se apoyaba en la declaración del autor, no en la base. Si se probaron desde una fila después borrada, la evidencia se perdió por cascada |
-| **Severidad** | **2** |
+| **Severidad** | 2 |
 | **Prioridad** | 2 |
 | **Riesgo** | Invalida una medición del trabajo de grado: la cobertura de la aceptación. Y el CU7 queda sin prueba de punta a punta de ninguna clase: solo tiene casos de componente |
-| **Estado** | **Abierta.** Se cierra con tres preguntas desde un celular real y regenerando el registro |
+| **Estado** | **Cerrada el 12/10/2026.** El autor ejerció los tres desde su celular contra producción (P-17 en el registro): el listado del CU4 con su segunda tanda, el CU8 con su huerta y sus tres cultivos, y el CU7 con las cuatro huertas que tienen tomate. Registro de aceptación regenerado: **8 de 8 casos de uso con evidencia**. La del CU7 se comprobó leyendo `mensaje`, porque su respuesta positiva la redacta el modelo y no lleva una marca que el registro pueda contar. La evidencia es mínima —una persona por caso de uso— y así se declara |
 
----
-
-# 2. Incidencias cerradas
+## Del 25/09/2026
 
 ## INC-004 — `docs/ESTADO.md` describe un estado de despliegue que no es el real
 
@@ -197,6 +223,18 @@ de planificar sobre el estado del despliegue hay que **consultarlo**, no
 leerlo. Para eso está `python -m scripts.humo_despliegue`, que responde en
 dos segundos y sin gastar un mensaje de WhatsApp. El propio `ESTADO.md`
 ahora se lo recuerda a quien vuelva a editarlo a mano.
+
+## Del trabajo del 10/10/2026
+
+Las dos salieron de revisar los 271 casos uno por uno, y **las dos son del
+caso de prueba, no del producto**: pasaban en verde sin comprobar lo que
+decían. Se rehicieron y se comprobaron con una mutación —introducir a mano
+el defecto que dicen atrapar y ver que ahora fallan—.
+
+| ID | Contexto | Descripción | Sev | Pri | Riesgo | Estado |
+|---|---|---|---|---|---|---|
+| **INC-028** | Caso de prueba. `tests/test_agente_y_respuesta.py`, MP-15 | El caso «ningún prompt tiene una llave suelta» solo pasaba el texto por `string.Formatter().parse`, que **acepta** `{"especie": "tomate"}` como un hueco más. Solo detectaba llaves sin cerrar: el `KeyError` de CLAUDE.md §11, que es lo que decía prevenir, pasaba sin aviso | 3 | 2 | Riesgo P-09: un prompt que no carga a mitad del turno, con la prueba en verde | **Cerrada el 10/10/2026.** El caso compara ahora los huecos de cada prompt con los que le rellena su `.format()`. Mutación: con un ejemplo JSON en `extraccion_v3.md`, falla |
+| **INC-029** | Caso de prueba. `tests/test_webhook.py`, MP-23 | El caso «el 200 no espera al procesamiento» comprobaba que la excepción del despachador **salía**, y saldría igual procesando en línea. No distinguía los dos montajes, que es justo lo que decía probar | 3 | 2 | Corrección §9.2: volver a procesar dentro de la petición traería respuestas y registros duplicados, con la prueba en verde | **Cerrada el 10/10/2026.** El cliente corre con `raise_server_exceptions=False` y el caso exige el 200. Mutación: con `await procesar_evento(payload)` en lugar de la tarea en segundo plano, falla |
 
 ## Del trabajo del 24/09/2026
 
@@ -358,20 +396,20 @@ el estado en el que quedan los defectos que no se buscaron.
 
 # 4. Medidas
 
-| Métrica | Valor al 26/09/2026 |
+| Métrica | Valor al 12/10/2026 |
 |---|---|
-| Incidencias registradas | 26 —de INC-001 a INC-027; la INC-011 se retiró porque no era una incidencia— |
-| Abiertas | 8 |
-| **Abiertas de severidad 1 o 2** | **3** (INC-021, INC-024, INC-027) |
-| Cerradas | 18 |
-| Contra el producto | 18 |
-| Contra los casos de prueba | 4 (INC-001 a INC-003, INC-022) |
+| Incidencias registradas | 29 —de INC-001 a INC-030; la INC-011 se retiró porque no era una incidencia— (10/10/2026) |
+| Abiertas | 7, todas aceptadas por escrito |
+| **Abiertas de severidad 1 o 2** | **0** |
+| Cerradas | 22 |
+| Contra el producto | 19 (10/10/2026) |
+| Contra los casos de prueba | 6 (INC-001 a INC-003, INC-022, INC-028, INC-029) |
 | **Contra la base de prueba** | **3** (INC-004, INC-012, INC-027) |
 | Contra el entorno de prueba | 1 (INC-023) |
-| Casos de componente e integración ejecutados | **231 de 231**, todos en verde |
+| Casos de componente e integración ejecutados | **231 de 231**, todos en verde: la depuración del 10/10/2026 dejó 198, y MP-26 a MP-28 añadieron 33 para los requisitos sin cobertura |
 | Comprobaciones de instalabilidad | 4 de 4 |
-| Casos de uso con aceptación con evidencia | **5 de 8** —declarados 8 por el autor— (INC-027) |
-| Casos de uso con aceptación **registrada** conforme a §8.9 y §8.10 | **8 de 8** registrados, 5 con resultado «pasa» ([registro](registro-de-aceptacion.md)) |
+| Casos de uso con aceptación con evidencia | **8 de 8**; CU4, CU7 y CU8 desde el 12/10/2026 (INC-027) |
+| Casos de uso con aceptación **registrada** conforme a §8.9 y §8.10 | **8 de 8**, los ocho con resultado «pasa» ([registro](registro-de-aceptacion.md)) |
 | Banco de preguntas | **40 preguntas, dos rondas: 29 y 30 de 40, el 74 %**. Estable en 37 de 40 |
 | Fuentes del corpus con regresión comprobada | **6 de 9**: `jbb_practicas_2022` el 23/09 y las cinco tocadas por la limpieza el 24/09, todas con su recuento de origen |
 | **Defectos de severidad 1 encontrados por una prueba** | **0** |
@@ -386,7 +424,7 @@ teléfono dentro lo destapó una inspección casual; que el modelo dejara de
 llamar a las herramientas se supo al medir el enrutamiento por otra razón;
 y los ocho mensajes perdidos los descubrió el silencio de ocho personas.
 
-Que los 231 casos escritos hoy pasen todos **no significa que el producto
+Que los 231 casos pasen todos **no significa que el producto
 esté bien**: significa que cubren código que ya llevaba meses
 ejercitándose con nueve usuarias reales. La red de seguridad sirve para lo
 que venga, no para validar lo que ya pasó, y así conviene presentarla en

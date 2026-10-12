@@ -52,7 +52,7 @@ dicen, no lo implementes: dilo y espera decisión.
 | Anteproyecto | Problema, objetivos, metodología, alcance, marco legal |
 | Fases de diseño | Fase 2 (funcional), Fase 3 (técnico), Fase 4 (IA) |
 | `docs/ESTADO.md` | **Léelo al empezar.** Dónde está el trabajo y por dónde seguir |
-| `docs/adr/` | Veinticuatro decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
+| `docs/adr/` | Veintisiete decisiones tomadas al implementar. Prevalecen sobre los `.docx` |
 | `docs/correcciones-a-los-documentos.md` | **Qué dice cada `.docx` y qué hace el sistema**, por fase y sección. Consolidado de las desviaciones |
 | `docs/pruebas/` | El proceso de prueba conforme a ISO/IEC/IEEE 29119: política, plan, especificación, incidencias, banco de preguntas y registro de aceptación |
 | `docs/prueba_formativa.md` | **La evaluación formativa de usabilidad** (`EVF-CHU-001`), conforme a ISO/IEC 25022. Es lo que contrasta la hipótesis |
@@ -80,6 +80,35 @@ cosas:
 8. **La evaluación formativa de usabilidad está medida y cerrada**
    (02/10/2026, `EVF-CHU-001`), sobre 16 participantes reales y conforme a
    la ISO/IEC 25022. Ver abajo.
+
+### El proceso de prueba (ISO/IEC/IEEE 29119), cerrado el 12/10/2026
+
+**El capítulo de pruebas está cerrado.** Cumplen los criterios de
+terminación 1, 2, 4 y 5; el 3 —regresión de la ingesta, 6 de 9 fuentes—
+queda aplazado por decisión del autor. **Cero incidencias de severidad 1 o
+2 abiertas**: las siete que quedan (INC-010, 017, 018, 021, 025, 026 y
+030) son de severidad 3 o 4 y están aceptadas por escrito. INC-021 —una
+cifra inventada bajo una cita oficial— **se reclasificó de 2 a 3** al
+aceptarla, igual que INC-026: no cambies una severidad sin decisión del
+autor.
+
+**231 casos en 27 modelos vigentes** (MP-01 a MP-28; MP-21 retirado), con
+`pytest` desde `.venv`, sin red ni base. El 10/10/2026 se depuraron de 271
+a 198 y se añadieron MP-26 a MP-28 para los requisitos que no tenían
+cobertura. **Un caso nuevo tiene que poder decir qué partición, límite o
+regla de su modelo cubre que no cubra ya otro**; si no puede, no entra.
+Cada modelo se traza a los RF/RNF del documento de grado
+(`docs/pruebas/especificacion-de-pruebas.md`, «Trazabilidad hacia los
+requisitos»): 17 cubiertos, 6 parciales y 1 por inspección.
+
+**Si añades o renombras una función pública en
+`app/services/repositorio.py`, clasifícala en
+`tests/test_capa_de_datos.py`.** El inventario de MP-26 falla a propósito
+si no: es lo que garantiza que toda consulta sobre datos de una persona
+vaya acotada por su `usuario_id` (RNF-07).
+
+Lo que queda abierto, en orden, está en `docs/ESTADO.md`, «Por dónde
+seguir», bajo «Después del cierre de las pruebas».
 
 ### La evaluación formativa, en cuatro líneas que conviene no reinventar
 
@@ -543,9 +572,9 @@ Los `.docx` de `docs/` tienen puntos superados. **Prevalece lo que sigue.**
 - Secretos solo por variables de entorno. `.env` nunca se versiona.
 - Los prompts viven en `app/agent/prompts/` como archivos versionados,
   conforme a la práctica de versionamiento declarada en la metodología.
-  **Los seis vigentes son** `agente_v2.md`, `extraccion_v3.md`,
+  **Los seis vigentes son** `agente_v3.md`, `extraccion_v3.md`,
   `barrio_v1.md`, `redaccion_rag_v2.md`, `redaccion_comunidad_v2.md` y
-  `respuesta_general_v1.md`. `agente_v1.md`, `extraccion_v1.md`,
+  `respuesta_general_v1.md`. `agente_v1.md`, `agente_v2.md`, `extraccion_v1.md`,
   `extraccion_v2.md`, `redaccion_comunidad_v1.md` y `redaccion_rag_v1.md`
   siguen en el repositorio a propósito, como historial citable, pero **no
   los carga nadie**: no los edites creyendo que están en uso.

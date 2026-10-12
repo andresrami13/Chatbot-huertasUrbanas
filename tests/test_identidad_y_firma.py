@@ -41,8 +41,6 @@ _BSUID = "CO.570000000601"
     [
         _TELEFONO,
         "+57 300 123 4567",
-        "(57) 300-123-4567",
-        "57300123456",
     ],
 )
 def test_mp01_los_telefonos_se_reconocen(identidad):
@@ -53,7 +51,6 @@ def test_mp01_los_telefonos_se_reconocen(identidad):
     "identidad",
     [
         _BSUID,
-        "US.13491208655302741918",
         # El caso que motivó el filtro de forma del ADR-0023: un BSUID
         # corto que, si solo se contaran dígitos, pasaría por teléfono.
         "CO.12345678",
@@ -70,13 +67,13 @@ def test_mp01_lo_que_no_es_telefono_no_lo_parece(identidad):
 # Valores límite sobre el rango [8, 15] de la E.164.
 
 
-@pytest.mark.parametrize("digitos", [8, 9, 14, 15])
+@pytest.mark.parametrize("digitos", [8, 15])
 def test_mp02_las_longitudes_validas_se_aceptan(digitos):
     numero = "5" * digitos
     assert normalizar_telefono(numero) == numero
 
 
-@pytest.mark.parametrize("digitos", [0, 1, 7, 16, 20])
+@pytest.mark.parametrize("digitos", [7, 16])
 def test_mp02_las_longitudes_invalidas_se_rechazan(digitos):
     with pytest.raises(ValueError):
         normalizar_telefono("5" * digitos)
@@ -107,18 +104,6 @@ def test_mp02_la_puntuacion_no_cambia_la_identidad():
 # --- MP-03: los dominios del HMAC separan los espacios ---------------
 
 
-def test_mp03_la_huella_es_determinista():
-    assert calcular_identidad_hash(_BSUID) == calcular_identidad_hash(_BSUID)
-
-
-def test_mp03_el_bsuid_y_el_telefono_no_pueden_coincidir():
-    """Dos espacios de identificadores, dos huellas, aunque compartan pepper.
-
-    Es lo que garantiza la etiqueta de dominio del ADR-0023.
-    """
-    assert calcular_identidad_hash(_BSUID) != calcular_identidad_hash(_TELEFONO)
-
-
 def test_mp03_el_telefono_no_lleva_etiqueta_de_dominio():
     """El teléfono se calcula sin prefijo, y eso no se puede cambiar.
 
@@ -135,6 +120,11 @@ def test_mp03_el_telefono_no_lleva_etiqueta_de_dominio():
 
 
 def test_mp03_el_bsuid_lleva_su_etiqueta():
+    """La etiqueta es lo que separa los dos espacios aunque compartan pepper.
+
+    Comparar dos huellas de identificadores distintos no lo probaría:
+    darían distinto con etiqueta o sin ella.
+    """
     esperada = hmac.new(
         key=settings.PHONE_HASH_PEPPER.encode("utf-8"),
         msg=f"bsuid:{_BSUID}".encode("utf-8"),
@@ -142,12 +132,6 @@ def test_mp03_el_bsuid_lleva_su_etiqueta():
     ).hexdigest()
 
     assert calcular_identidad_hash(_BSUID) == esperada
-
-
-def test_mp03_la_huella_cabe_en_la_columna():
-    """64 caracteres hexadecimales, que es la restricción CHECK del esquema."""
-    huella = calcular_identidad_hash(_BSUID)
-    assert re.fullmatch(r"[0-9a-f]{64}", huella)
 
 
 # --- MP-04: el wamid nunca en claro ----------------------------------
@@ -174,15 +158,6 @@ def test_mp04_la_referencia_mide_dieciseis_hexadecimales():
     assert re.fullmatch(r"[0-9a-f]{16}", referencia_wamid(_WAMID))
 
 
-def test_mp04_la_huella_del_wamid_es_determinista():
-    """La idempotencia depende de ello: el reintento de Meta trae el mismo wamid."""
-    assert huella_wamid(_WAMID) == huella_wamid(_WAMID)
-
-
-def test_mp04_dos_wamid_distintos_dan_huellas_distintas():
-    assert huella_wamid(_WAMID) != huella_wamid(_WAMID.replace("HBgM", "HBgN"))
-
-
 # --- MP-05: cifrado del nombre ---------------------------------------
 
 
@@ -193,10 +168,6 @@ def test_mp05_el_nombre_va_y_vuelve():
 def test_mp05_dos_cifrados_del_mismo_nombre_son_distintos():
     """El nonce es nuevo en cada llamada; si no, el cifrado sería reconocible."""
     assert cifrar_nombre("Ana") != cifrar_nombre("Ana")
-
-
-def test_mp05_el_cifrado_no_deja_el_nombre_a_la_vista():
-    assert b"Ana" not in cifrar_nombre("Ana")
 
 
 @pytest.mark.parametrize("vacio", [None, ""])

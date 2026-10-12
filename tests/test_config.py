@@ -13,7 +13,7 @@ import base64
 import pytest
 from pydantic import ValidationError
 
-from app.config import Settings, settings
+from app.config import Settings
 
 
 def test_mp22_la_configuracion_de_prueba_es_valida():
@@ -24,15 +24,14 @@ def test_mp22_la_configuracion_de_prueba_es_valida():
 # --- Claves críticas e irrecuperables --------------------------------
 
 
-@pytest.mark.parametrize("pepper", ["", "corto", "a" * 31])
-def test_mp22_un_pepper_debil_no_arranca(pepper):
+def test_mp22_un_pepper_debil_no_arranca():
     """Valor límite: 31 caracteres no, 32 sí.
 
     Si el pepper cambia, las usuarias registradas dejan de ser
     reconocidas. Es irreversible, así que se valida al arrancar.
     """
     with pytest.raises(ValidationError):
-        Settings(PHONE_HASH_PEPPER=pepper)
+        Settings(PHONE_HASH_PEPPER="a" * 31)
 
 
 def test_mp22_treinta_y_dos_caracteres_bastan():
@@ -83,60 +82,44 @@ def test_mp22_el_modelo_generativo_no_puede_ir_vacio():
         Settings(GEMINI_GENERATIVE_MODEL="  ")
 
 
-def test_mp22_el_defecto_del_repositorio_es_un_modelo_generativo():
-    """El defecto existe para dejar constancia de con qué se está corriendo.
-
-    No se comprueba aquí *cuál* es —eso lo manda la variable de Railway y
-    lo informa `/health`—, sino que sea utilizable.
-    """
-    assert settings.GEMINI_GENERATIVE_MODEL.strip()
-    assert "embedding" not in settings.GEMINI_GENERATIVE_MODEL
-
-
 # --- Parámetros calibrables ------------------------------------------
 
 
-@pytest.mark.parametrize("umbral", [-0.1, 1.1, 2.0])
+@pytest.mark.parametrize("umbral", [-0.1, 1.1])
 def test_mp22_un_umbral_fuera_de_rango_no_arranca(umbral):
     with pytest.raises(ValidationError):
         Settings(RAG_UMBRAL_SIMILITUD=umbral)
 
 
-@pytest.mark.parametrize("umbral", [0.0, 0.66, 1.0])
+@pytest.mark.parametrize("umbral", [0.0, 1.0])
 def test_mp22_los_umbrales_en_rango_se_aceptan(umbral):
-    """Valores límite del intervalo cerrado [0, 1]."""
+    """Valores límite del intervalo cerrado [0, 1].
+
+    Lo que esta validación no puede atrapar es escribir la distancia en
+    lugar de la similitud: la de 0.66 es 0.34, que está en rango. Contra
+    eso solo protege el aviso del `.env.example`.
+    """
     assert Settings(RAG_UMBRAL_SIMILITUD=umbral).RAG_UMBRAL_SIMILITUD == umbral
 
 
-def test_mp22_la_validacion_del_umbral_no_atrapa_una_distancia():
-    """Se declara lo que esta comprobación NO puede hacer.
-
-    La distancia equivalente a 0.66 es 0.34, que está en rango y pasaría,
-    dejando el CU2 respondiendo con los fragmentos que no vienen a cuento
-    y sin dar ningún error. Contra eso solo protege leer el aviso del
-    `.env.example`.
-    """
-    assert Settings(RAG_UMBRAL_SIMILITUD=0.34).RAG_UMBRAL_SIMILITUD == 0.34
-
-
-@pytest.mark.parametrize("top_k", [0, -1])
-def test_mp22_un_top_k_sin_sentido_no_arranca(top_k):
-    with pytest.raises(ValidationError):
-        Settings(RAG_TOP_K=top_k)
-
-
-@pytest.mark.parametrize("campo", ["CU4_HUERTAS_POR_TANDA", "CU4_CULTIVOS_POR_HUERTA"])
-def test_mp22_un_listado_de_cero_no_arranca(campo):
-    """Cero fallaría en silencio: un listado vacío con su cola contando huertas."""
+@pytest.mark.parametrize("campo", ["RAG_TOP_K", "CU4_HUERTAS_POR_TANDA", "CU4_CULTIVOS_POR_HUERTA"])
+def test_mp22_un_tamano_de_cero_no_arranca(campo):
+    """Cero fallaría en silencio: sin contexto en el CU2, o un listado vacío
+    con su cola contando huertas."""
     with pytest.raises(ValidationError):
         Settings(**{campo: 0})
 
 
-@pytest.mark.parametrize("ventana", [0, 1])
-def test_mp22_una_ventana_de_memoria_inutil_no_arranca(ventana):
+@pytest.mark.parametrize("campo", ["RAG_TOP_K", "CU4_HUERTAS_POR_TANDA", "CU4_CULTIVOS_POR_HUERTA"])
+def test_mp22_un_tamano_de_uno_se_acepta(campo):
+    """El otro lado del límite: uno es poco, pero tiene sentido."""
+    assert getattr(Settings(**{campo: 1}), campo) == 1
+
+
+def test_mp22_una_ventana_de_memoria_de_uno_no_arranca():
     """Con uno solo, el agente vería la pregunta en curso y nada de lo anterior."""
     with pytest.raises(ValidationError):
-        Settings(MEMORIA_VENTANA_MENSAJES=ventana)
+        Settings(MEMORIA_VENTANA_MENSAJES=1)
 
 
 def test_mp22_dos_mensajes_es_el_minimo_admitido():

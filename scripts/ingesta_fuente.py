@@ -52,6 +52,7 @@ plantilla no es un adorno: es lo que le impide contaminar el corpus.
 
 import argparse
 import asyncio
+import functools
 import re
 import statistics
 import sys
@@ -246,7 +247,54 @@ def _normalizar_texto(texto: str) -> str:
     return unicodedata.normalize("NFKC", texto)
 
 
-def limpiar_fragmento(texto: str) -> str:
+@functools.lru_cache(maxsize=None)
+def _regex_rotulos(rotulos: tuple[str, ...]) -> re.Pattern[str]:
+    """La expresión que encuentra los rótulos del margen de una fuente.
+
+    Un rótulo se quita cuando está **suelto**: sin letra ni número pegados
+    por ningún lado. Es lo que lo separa de una palabra que lo contiene:
+    `HOJAS` suelta es el rótulo, y `HOJASO`, `RAÍCESTALL` o `SEMILLAS` en
+    «obtenidas de la casa comercial SEMILLAS FERCON» son otra cosa.
+
+    **El nombre de una empresa en mayúscula no se toca.** Si detrás del
+    rótulo viene otra palabra en mayúscula que no es un rótulo, es un
+    nombre propio y se deja. Si es un rótulo —«TALL TALLOO»— se quitan los
+    dos, que son dos rótulos seguidos.
+    """
+    alternativas = "|".join(re.escape(r) for r in rotulos)
+    letra = "A-Za-zÁÉÍÓÚÑáéíóúñ0-9"
+    mayuscula = "A-ZÁÉÍÓÚÑ"
+    return re.compile(
+        rf"(?<![{letra}])(?:{alternativas})(?![{letra}])"
+        rf"(?!\s+(?!(?:{alternativas})(?![{letra}]))[{mayuscula}]{{3,}}(?![a-záéíóúñ]))"
+    )
+
+
+def _quitar_rotulos(texto: str, rotulos: tuple[str, ...]) -> str:
+    """Quita los rótulos y deja un solo espacio donde había uno."""
+    patron = _regex_rotulos(rotulos)
+
+    def sustituir(m: re.Match[str]) -> str:
+        # Con espacio por delante, el de detrás sobra; pegado a un signo
+        # —«Pollard &TALL Cockerell»— hay que dejarlo o las palabras se
+        # juntan.
+        antes = m.string[m.start() - 1] if m.start() else " "
+        return "" if antes.isspace() else " "
+
+    original = texto
+    previo = None
+    while previo != texto:        # `TALL TALLOO`: el segundo aparece al quitar el primero
+        previo = texto
+        texto = patron.sub(sustituir, texto)
+
+    # Si no había nada que quitar, el fragmento se devuelve tal cual: los
+    # espacios de un fragmento limpio no se tocan.
+    if texto == original:
+        return original
+    return re.sub(r"[ \t]{2,}", " ", texto).strip()
+
+
+def limpiar_fragmento(texto: str, rotulos_del_margen: tuple[str, ...] = ()) -> str:
     """Quita los restos de extracción que ninguna normalización arregla.
 
     Se aplica a cada fragmento **ya troceado**, y no al texto de la página,
@@ -266,7 +314,12 @@ def limpiar_fragmento(texto: str) -> str:
     for basura, limpio in _BASURA_DE_EXTRACCION:
         texto = texto.replace(basura, limpio)
 
-    return _ACENTO_HUERFANO.sub("", texto)
+    texto = _ACENTO_HUERFANO.sub("", texto)
+
+    if rotulos_del_margen:
+        texto = _quitar_rotulos(texto, rotulos_del_margen)
+
+    return texto
 
 
 def _quitar_numero_pagina(texto: str, folio: int, variable: bool = False) -> str:
@@ -1368,7 +1421,10 @@ async def main() -> None:
         )
         print(f"Fichas detectadas, y por las que se corta fragmento: {len(inicios)}")
 
-    fragmentos = [limpiar_fragmento(t) for t in _trocear(parrafos, ratio, inicios)]
+    fragmentos = [
+        limpiar_fragmento(t, fuente.rotulos_del_margen)
+        for t in _trocear(parrafos, ratio, inicios)
+    ]
     _informar(fragmentos, argumentos.muestra, ratio)
 
     if argumentos.medir_tokens:

@@ -4,6 +4,7 @@
     python -m scripts.calibrar_enrutamiento --repeticiones 6
     python -m scripts.calibrar_enrutamiento --modelos gemini-3.6-flash,gemini-3.5-flash-lite
     python -m scripts.calibrar_enrutamiento --grupo comunidad
+    python -m scripts.calibrar_enrutamiento --prompt agente_v2.md,agente_v3.md
 
 **No escribe nada, no manda WhatsApp y no llama a ninguna herramienta.**
 Monta la misma llamada que hace `agente.atender` —mismo prompt de sistema,
@@ -25,14 +26,18 @@ tres hizo falta medirlo:
 - **09/09/2026, el CU8.** El riesgo de añadir `consultar_mi_huerta` era
   confundir «qué tengo sembrado» con «tengo cilantro sembrado». Medido con
   catorce frases sin signos de interrogación: 56/56 (ADR-0022).
+- **06/10/2026, los trámites (INC-025).** Una pregunta por el formulario
+  del Jardín Botánico, que la guía responde, no llegaba a la guía: el
+  agente contestaba por su cuenta que no tenía el enlace. Para comparar
+  dos versiones del prompt en las mismas condiciones existe `--prompt`.
 
 ## Tres cosas que una prueba suelta no da
 
 1. **Repite.** A temperatura 0.7 el enrutamiento **no es determinista**
    (CLAUDE.md §12), así que un acierto suelto no es una medida. Por eso la
    salida dice «CU4×2, (sin herramienta)×2» y no un sí o un no.
-2. **Compara modelos.** Es lo que destapó que el problema del CU4 no
-   estaba en el prompt.
+2. **Compara modelos y prompts.** Comparar modelos es lo que destapó que
+   el problema del CU4 no estaba en el prompt.
 3. **Lleva controles.** Frases que **no** deben ir a donde se está
    calibrando, para que subir el acierto de una intención no se pague
    bajando el de otra.
@@ -130,6 +135,22 @@ _GRUPOS: dict[str, list[tuple[str, list, str]]] = {
         ("cada cuánto hay que regar la huerta", _TRAS_REGISTRAR, "consultar_orientacion"),
         ("cómo hago compost en la casa", _TRAS_REGISTRAR, "consultar_orientacion"),
     ],
+    # Trámites que la guía sí responde: el Protocolo de espacio público
+    # trae el formulario con su enlace, el correo de renovación, los
+    # correos por localidad y los pasos de la solicitud (INC-025). La
+    # primera es el mensaje real, literal y con su punto.
+    "tramites": [
+        ("Cual es la dirección de enlace al JBB para obtener el formulario.", [], "consultar_orientacion"),
+        ("¿A qué correo debo escribir para renovar la autorización del espacio público?", [], "consultar_orientacion"),
+        ("donde consigo el formulario para hacer una huerta en un parque", [], "consultar_orientacion"),
+        ("como pido permiso para sembrar en un espacio publico", [], "consultar_orientacion"),
+        ("a que correo del jardin botanico le escribo desde bosa", [], "consultar_orientacion"),
+        # Lo que la regla 6 prohíbe prometer no es una consulta: no debe
+        # ir a la guía, sino contestarse con franqueza.
+        ("reporte esta pregunta para que el programador la revise", [], "(sin herramienta)"),
+        ("guarde mi pregunta y me responde mañana", [], "(sin herramienta)"),
+        ("muchas gracias", [], "(sin herramienta)"),
+    ],
     # Controles. No calibran nada: comprueban que lo que ya funcionaba
     # sigue funcionando.
     "controles": [
@@ -160,7 +181,7 @@ def _contenidos(historial: list, mensaje: str) -> list[types.Content]:
     return partes
 
 
-async def _enrutar(modelo: str, historial: list, mensaje: str) -> str:
+async def _enrutar(modelo: str, prompt: str, historial: list, mensaje: str) -> str:
     """Qué herramienta pediría el modelo. Nunca lanza."""
     for intento in range(len(_ESPERAS) + 1):
         try:
@@ -169,7 +190,7 @@ async def _enrutar(modelo: str, historial: list, mensaje: str) -> str:
                 contents=_contenidos(historial, mensaje),
                 config=types.GenerateContentConfig(
                     temperature=_TEMPERATURA,
-                    system_instruction=cargar_prompt(_PROMPT),
+                    system_instruction=cargar_prompt(prompt),
                     tools=[_HERRAMIENTAS],
                     automatic_function_calling=(
                         types.AutomaticFunctionCallingConfig(disable=True)
@@ -198,9 +219,11 @@ async def _enrutar(modelo: str, historial: list, mensaje: str) -> str:
     return "+".join(nombres)
 
 
-async def _medir(modelo: str, casos: list, repeticiones: int) -> tuple[int, int]:
+async def _medir(
+    modelo: str, prompt: str, casos: list, repeticiones: int
+) -> tuple[int, int]:
     print("\n" + "=" * 78)
-    print(f"MODELO: {modelo}   ({repeticiones} repeticiones por mensaje)")
+    print(f"MODELO: {modelo}   PROMPT: {prompt}   ({repeticiones} repeticiones por mensaje)")
     print("=" * 78)
 
     aciertos = 0
@@ -208,7 +231,8 @@ async def _medir(modelo: str, casos: list, repeticiones: int) -> tuple[int, int]
         # En serie y no en paralelo: cuatro llamadas simultáneas disparan el
         # 503 de la familia flash con mucha más frecuencia.
         resultados = [
-            await _enrutar(modelo, historial, mensaje) for _ in range(repeticiones)
+            await _enrutar(modelo, prompt, historial, mensaje)
+            for _ in range(repeticiones)
         ]
         vistos = Counter(resultados)
         bien = vistos.get(esperado, 0)
@@ -226,20 +250,25 @@ async def _medir(modelo: str, casos: list, repeticiones: int) -> tuple[int, int]
     return aciertos, total
 
 
-async def principal(modelos: list[str], grupos: list[str], repeticiones: int) -> None:
+async def principal(
+    modelos: list[str], prompts: list[str], grupos: list[str], repeticiones: int
+) -> None:
     casos = [caso for grupo in grupos for caso in _GRUPOS[grupo]]
     print(f"Grupos: {', '.join(grupos)} | {len(casos)} mensajes")
 
     resumen = []
     for modelo in modelos:
-        resumen.append((modelo, *await _medir(modelo, casos, repeticiones)))
+        for prompt in prompts:
+            resumen.append(
+                (f"{modelo} / {prompt}", *await _medir(modelo, prompt, casos, repeticiones))
+            )
 
     if len(resumen) > 1:
         print("\n" + "=" * 78)
         print("RESUMEN")
         print("=" * 78)
-        for modelo, aciertos, total in resumen:
-            print(f"  {modelo:28} {aciertos:3d}/{total:3d}  "
+        for nombre, aciertos, total in resumen:
+            print(f"  {nombre:44} {aciertos:3d}/{total:3d}  "
                   f"({100 * aciertos / total:3.0f} %)")
 
 
@@ -249,6 +278,11 @@ def main() -> None:
         "--modelos",
         default=settings.GEMINI_GENERATIVE_MODEL,
         help="Separados por coma. Por defecto, el desplegado.",
+    )
+    analizador.add_argument(
+        "--prompt",
+        default=_PROMPT,
+        help="Separados por coma. Por defecto, el que carga el agente.",
     )
     analizador.add_argument(
         "--grupo",
@@ -265,6 +299,7 @@ def main() -> None:
     asyncio.run(
         principal(
             [m.strip() for m in argumentos.modelos.split(",") if m.strip()],
+            [p.strip() for p in argumentos.prompt.split(",") if p.strip()],
             argumentos.grupo or sorted(_GRUPOS),
             argumentos.repeticiones,
         )

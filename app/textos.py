@@ -532,8 +532,8 @@ No se guardó nada. ¿Lo intentamos de nuevo en un ratico?"""
 # `mostrar_ayuda` se saltara el saludo, que es código y no texto.
 #
 # Y no diga nunca «todavía estoy aprendiendo»: suena mejor y es falso —el
-# sistema no aprende nada de lo que ella cuenta—, justo lo que la regla 6
-# de `agente_v2.md` le prohíbe al modelo.
+# sistema no aprende nada de lo que ella cuenta—, justo lo que la regla 7
+# de `agente_v3.md` le prohíbe al modelo.
 SALUDO_PERSONALIZADO = "Hola, {nombre}. Sigo en pruebas, así que puedo equivocarme."
 
 

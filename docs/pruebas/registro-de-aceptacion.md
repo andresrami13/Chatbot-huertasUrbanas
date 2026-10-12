@@ -2,17 +2,18 @@
 
 | | |
 |---|---|
-| **Identificador** | `RAC-CHU-001`, versión 1.0 |
+| **Identificador** | `RAC-CHU-001`, versión 1.1 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Vigente. Se regenera al cerrar la Fase 8 |
-| **Fecha** | 25/09/2026 |
+| **Fecha** | 25/09/2026, regenerado el 12/10/2026 |
 
 ## Historial de cambios
 
 | Fecha | Versión | Cambio | Autor |
 |---|---|---|---|
 | 25/09/2026 | 1.0 | Reconstrucción desde `mensaje`, actividad A-14 | A. Ramírez |
+| 12/10/2026 | 1.1 | Regenerado hasta el 12/10/2026: 17 participantes. CU4, CU7 y CU8 ejercidos desde un celular real; **los ocho casos de uso pasan** y se cierra INC-027 | A. Ramírez |
 
 ## Introducción
 
@@ -23,8 +24,8 @@ ejecución** de la prueba de aceptación, que ISO/IEC/IEEE 29119-3 pide en sus
 al procedimiento PR-04 de la [especificación](especificacion-de-pruebas.md).
 
 La aceptación no se planificó como sesión: la ejecutaron **personas reales
-escribiéndole al número de producción desde sus celulares**, entre el 09 y
-el 25/09/2026. Lo único que queda de ella es la conversación guardada en la
+escribiéndole al número de producción desde sus celulares**, entre el
+09/09 y el 12/10/2026. Lo único que queda de ella es la conversación guardada en la
 tabla `mensaje`, y este documento la reconstruye.
 
 ## Alcance
@@ -56,16 +57,21 @@ la fila de `usuario`, que **es** el consentimiento. El CU6 se da por
 completado cuando existe la fila de `huerta`.
 
 **Lo que este registro no puede distinguir**: si alguna de las filas es del
-propio autor probando. No hay marca que lo diga. P-12, que consintió el
-25/09, coincide con la verificación del ADR-0025 que se le propuso al
-autor ese mismo día.
+propio autor probando. No hay marca que lo diga, salvo cuando el autor lo
+declara: **P-17 es el autor**, que el 12/10/2026 ejerció el CU4, el CU7 y
+el CU8 y repitió las preguntas de INC-024.
+
+**Los seudónimos no son estables entre regeneraciones.** Se asignan por
+orden de consentimiento, así que una fila borrada corre a todas las de
+después. La P-12 de la versión 1.0, que consintió el 25/09, ya no está en
+la base; la P-12 de esta versión es otra persona.
 
 ---
 
 # 1. Bitácora por participante
 
-Del 09 al 25/09/2026. 12 participantes, 273 mensajes: 130 de ellas y 143
-del asistente.
+Del 09/09 al 12/10/2026. 17 participantes, 392 mensajes: 187 de ellas y
+205 del asistente.
 
 | Participante | Consintió | Onboarding | Días con actividad | Mensajes de ella | De ellos, voz | CU2 con cita | CU2 sin respaldo | CU3 guardados | Cultivos | Sin respuesta registrada |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -80,10 +86,15 @@ del asistente.
 | P-09 | 17/09 | completo | 1 | 11 | 0 | 2 | 2 | 1 | 1 | 0 |
 | P-10 | 18/09 | completo | 1 | 17 | 0 | 6 | 1 | 1 | 4 | 0 |
 | P-11 | 23/09 | completo | 1 | 6 | 0 | 0 | 0 | 0 | 0 | 0 |
-| P-12 | 25/09 | completo | 1 | 7 | 0 | 0 | 1 | 0 | 0 | 0 |
+| P-12 | 27/09 | completo | 1 | 7 | 0 | 0 | 0 | 1 | 6 | 0 |
+| P-13 | 27/09 | completo | 1 | 9 | 0 | 1 | 0 | 1 | 2 | 0 |
+| P-14 | 27/09 | completo | 2 | 12 | 0 | 1 | 1 | 1 | 3 | 0 |
+| P-15 | 27/09 | completo | 1 | 8 | 0 | 0 | 0 | 1 | 5 | 0 |
+| P-16 | 27/09 | completo | 2 | 5 | 0 | 0 | 0 | 0 | 0 | 0 |
+| P-17 | 09/10 | completo | 2 | 23 | 0 | 6 | 2 | 1 | 3 | 0 |
 
-**Once de doce volvieron un solo día.** Solo P-02 escribió en tres días
-distintos. Es el dato que el ESTADO §3 señalaba como más revelador que el
+**Trece de diecisiete volvieron un solo día**, y de las cuatro que
+volvieron, una es el autor. Solo P-02 escribió en tres días distintos. Es el dato que el ESTADO §3 señalaba como más revelador que el
 SUS para medir adopción, y aquí dice que **la adopción sostenida no está
 demostrada**: la gente probó, no se quedó.
 
@@ -93,19 +104,26 @@ demostrada**: la gente probó, no se quedó.
 
 | CU | Evidencia en la base | Participantes | Respuestas | Periodo | Resultado |
 |---|---|---|---|---|---|
-| CU1 Consentimiento | Filas de `usuario` | 12 | — | 09/09 a 25/09 | **Pasa** |
-| CU2 Orientación | «Fuente:» o texto del camino sin respaldo | 7 | 21 | 09/09 a 25/09 | **Pasa**, con los defectos de calidad del banco |
-| CU3 Registro | Propuesta y «ya quedó guardado» | 6 | 19 | 09/09 a 18/09 | **Pasa**: 61 cultivos persistidos, todos confirmados |
-| CU4 Comunidad | Listado del código | **0** | 0 | — | **Sin evidencia** |
+| CU1 Consentimiento | Filas de `usuario` | 17 | — | 09/09 a 09/10 | **Pasa** |
+| CU2 Orientación | «Fuente:» o texto del camino sin respaldo | 9 | 31 | 09/09 a 12/10 | **Pasa**, con los defectos de calidad del banco |
+| CU3 Registro | Propuesta y «ya quedó guardado» | 11 | 30 | 09/09 a 09/10 | **Pasa**: 80 cultivos persistidos, todos confirmados |
+| CU4 Comunidad | Listado del código | 1 | 2 | 12/10 | **Pasa**, con evidencia mínima |
 | CU5 Ayuda | Texto de bienvenida | 1 | 2 | 10/09 a 15/09 | **Pasa**, con evidencia mínima |
-| CU6 Onboarding | Filas de `huerta` | 10 de 12 | — | — | **Pasa**; 2 lo abandonaron |
-| CU7 Búsqueda por cultivo | «ninguna tiene…» o redacción comunitaria | **0** | 0 | — | **Sin evidencia** |
-| CU8 Mi huerta | Texto compuesto de «su huerta» | **0** | 0 | — | **Sin evidencia** |
+| CU6 Onboarding | Filas de `huerta` | 15 de 17 | — | — | **Pasa**; 2 lo abandonaron |
+| CU7 Búsqueda por cultivo | Respuesta con las huertas que tienen el cultivo, **comprobada leyendo la base** | 1 | 1 | 12/10 | **Pasa**, con evidencia mínima |
+| CU8 Mi huerta | Texto compuesto de «su huerta» | 1 | 1 | 12/10 | **Pasa**, con evidencia mínima |
 
-## 2.1 Tres casos de uso sin aceptación en la base
+**El CU7 sale con 0 en el script, y pasa.** El script reconoce cada caso
+de uso por una marca del texto que compone el código. El CU7 solo tiene
+marca en la respuesta negativa —«ninguna tiene … anotado»—; la positiva la
+redacta el modelo. La del 12/10 —cuatro huertas con el cultivo
+preguntado, cada una con su barrio— se comprobó leyendo `mensaje`, y se
+declara así, con fecha y procedencia.
 
-**Ninguna de las doce participantes preguntó nunca por otras huertas ni por
-la suya.** Se buscaron también sus mensajes con esa intención —«otras
+## 2.1 Tres casos de uso que nadie usaba
+
+**Hasta el 12/10/2026, ninguna participante preguntó por otras huertas ni
+por la suya.** Se buscaron también sus mensajes con esa intención —«otras
 huertas», «qué siembran», «qué tengo sembrado», «mi huerta»— y no hay
 ninguno. No es que el CU4, el CU7 y el CU8 fallaran: **nadie los usó**.
 
@@ -116,13 +134,17 @@ borró para repetir el onboarding —borrar `usuario` se lleva la
 conversación por cascada—; si es así, **la evidencia se perdió**, y este
 registro no puede darla por buena.
 
-Lo único que los ejerce de punta a punta es `spike_despachador` —CU4 en la
-comprobación 6, CU8 en la 7—, que es sistema y no aceptación. **El CU7 no
-lo ejerce ni eso**: solo tiene casos de componente (MP-18).
+**Se cerró el 12/10/2026 (INC-027).** El autor —P-17— le preguntó desde
+su celular al número de producción qué tenían sembrado las otras huertas,
+y pidió la segunda tanda (CU4); qué tenía sembrado él (CU8), y si alguna
+huerta tenía un cultivo concreto (CU7). Respondieron los tres. **Es evidencia mínima**:
+una persona, y que conoce el sistema. Prueba que los tres funcionan en
+producción, no que una participante los encuentre por su cuenta; eso sigue
+sin ocurrir.
 
 ## 2.2 La voz
 
-9 de los 130 mensajes de ellas fueron **notas de voz**, de 2 participantes
+9 de los 187 mensajes de ellas fueron **notas de voz**, de 2 participantes
 —P-03 y P-07—. Ninguna quedó sin transcribir: el texto de «no logré
 entender la nota de voz» no se recuerda, pero tampoco hay un mensaje de voz
 suelto sin respuesta.
@@ -135,7 +157,7 @@ Contrastadas con el [registro de incidencias](incidencias.md).
 
 | Observación | Cantidad | Lectura |
 |---|---|---|
-| Reintentos del onboarding —barrio no encontrado o número no entendido— | 9 | Fricción conocida: el catálogo de barrios está incompleto (ADR-0024) |
+| Reintentos del onboarding —barrio no encontrado o número no entendido— | 10 | Fricción conocida: el catálogo de barrios está incompleto (ADR-0024) |
 | Onboarding descartado y vuelto a empezar | 1 | Ella pulsó «No» en el resumen y lo repitió |
 | Onboarding sin completar | 2 (P-05, P-06) | P-06 coincide **en fecha** con la usuaria que, según el ADR-0024, abandonó el 15/09 porque su barrio no estaba en la lista. No se comprobó que sea ella |
 | Registro del CU3 descartado | 1 | Funcionamiento correcto: confirmar antes de guardar (`CLAUDE.md` §4.7) |
@@ -171,13 +193,11 @@ estaba en `mensaje` por la respuesta de ella. Queda registrado como
 El criterio de salida de la aceptación (política §4.1) es «la conversación
 completa desde un celular real, sin incidencia de severidad 1 o 2».
 
-- **Cinco de los ocho casos de uso** tienen aceptación con evidencia:
-  CU1, CU2, CU3, CU5 y CU6.
-- **Tres no la tienen**: CU4, CU7 y CU8 (INC-027).
-- Hay **incidencias de severidad 2 abiertas** que tocan la aceptación:
-  INC-021 y INC-024 en el CU2, e INC-026 en los datos personales.
+- **Los ocho casos de uso** tienen aceptación con evidencia; CU4, CU7 y
+  CU8 desde el 12/10/2026, con evidencia mínima.
+- **No queda ninguna incidencia de severidad 1 o 2 abierta.** INC-024 se
+  cerró el 12/10 con cinco preguntas en producción, todas con advertencia
+  médica; INC-021 se aceptó por escrito como severidad 3, e INC-026 ya lo
+  estaba desde el 26/09.
 
-**La aceptación no se supera.** Lo que falta es barato de conseguir y no
-necesita código: que alguien le pregunte al bot qué siembran las otras
-huertas, si alguien más tiene un cultivo concreto, y qué tiene sembrado
-ella. Tres mensajes, y regenerar este registro.
+**La aceptación se supera el 12/10/2026.**

@@ -276,6 +276,12 @@ cortos se comportan distinto en similitud.
 
 ## Lo que este ADR no resuelve
 
+> **Corrección del 05/10/2026.** Los rótulos al margen ya no son un límite
+> de este ADR: se midieron —**28 fragmentos y 106 rótulos**, no «unas 17
+> páginas»— y se quitan por fuente con `rotulos_del_margen` en el catálogo
+> (incidencia INC-010). Lo que sigue sin resolver es el texto rotado, y ni
+> siquiera su cifra se pudo reproducir: ver el registro de incidencias.
+
 - **Los rótulos al margen de *Sembrando Biodiversidad*.** En las páginas de
   descripción botánica, las etiquetas del margen izquierdo se siguen
   inyectando dentro de la frase: «el tallo presenta un diámetro de entre 13

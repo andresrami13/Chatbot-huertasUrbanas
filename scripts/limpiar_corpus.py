@@ -3,10 +3,15 @@
     python -m scripts.limpiar_corpus --simular   # dice qué cambiaría
     python -m scripts.limpiar_corpus
 
-Corrige la incidencia INC-019: viñetas de fuente simbólica que `pypdf`
-devolvió sin traducir, un marcador de objeto incrustado, un acento
-combinante huérfano y un rótulo con basura pegada. Al 24/09/2026 son **36
-fragmentos de 765**, repartidos en cinco de las nueve fuentes.
+Corrige dos incidencias:
+
+- **INC-019**: viñetas de fuente simbólica que `pypdf` devolvió sin
+  traducir, un marcador de objeto incrustado, un acento combinante
+  huérfano y un rótulo con basura pegada. Al 24/09/2026 fueron **36
+  fragmentos de 765**, en cinco de las nueve fuentes.
+- **INC-010**: los rótulos del margen de *Sembrando biodiversidad*
+  —`HOJAS`, `TALLO`, `SEMILLAS`…— metidos dentro de la frase. Esos se
+  declaran **por fuente** en el catálogo, no para todo el corpus.
 
 ## Por qué esto existe y no se reingiere
 
@@ -38,6 +43,7 @@ import asyncio
 
 from app.core.basedatos import abrir_pool, cerrar_pool, obtener_pool
 from app.services.embeddings import vectorizar_documentos
+from scripts.catalogo_fuentes import CATALOGO
 from scripts.ingesta_fuente import limpiar_fragmento
 
 # Cuántos fragmentos se vectorizan por llamada. La ingesta usa el mismo
@@ -80,7 +86,7 @@ async def main() -> None:
         pool = obtener_pool()
         filas = await pool.fetch(
             """
-            select f.id, f.orden, f.contenido, fu.titulo
+            select f.id, f.orden, f.contenido, fu.titulo, fu.url
               from fragmento_oficial f
               join fuente fu on fu.id = f.fuente_id
              order by fu.titulo, f.orden
@@ -88,9 +94,13 @@ async def main() -> None:
         )
         print(f"Fragmentos en la base: {len(filas)}")
 
+        # Los rótulos del margen son de cada fuente: se buscan por la URL
+        # con que se registró, que es la misma que declara el catálogo.
+        rotulos = {f.url: f.rotulos_del_margen for f in CATALOGO.values()}
+
         cambios = []
         for fila in filas:
-            limpio = limpiar_fragmento(fila["contenido"])
+            limpio = limpiar_fragmento(fila["contenido"], rotulos.get(fila["url"], ()))
             if limpio != fila["contenido"]:
                 cambios.append((fila["id"], fila["titulo"], fila["contenido"], limpio))
 

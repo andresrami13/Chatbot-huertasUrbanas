@@ -1,11 +1,14 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-02. **La Fase 6 se cerró el 15/08/2026 con la
+Última actualización: 2026-10-12. **La Fase 6 se cerró el 15/08/2026 con la
 prueba en un celular real, y el trabajo está en la Fase 7 (calibración y
-pruebas).** Los ocho casos de uso están construidos y desplegados. **Cinco
-tienen aceptación con evidencia** de usuarias reales desde celulares —CU1,
-CU2, CU3, CU5 y CU6—; **CU4, CU7 y CU8 no**, porque ninguna participante
-los usó (`docs/pruebas/registro-de-aceptacion.md`, INC-027).
+pruebas).** Los ocho casos de uso están construidos y desplegados, y **los
+ocho tienen aceptación con evidencia** desde celulares reales. CU4, CU7 y
+CU8 la tienen desde el 12/10/2026, cuando el autor los ejerció en
+producción (`docs/pruebas/registro-de-aceptacion.md`, INC-027): ninguna
+participante los había usado. **El proceso de prueba de la Fase 7 se
+cerró el 12/10/2026**: cero incidencias de severidad 1 o 2 abiertas, y las
+siete que quedan, aceptadas por escrito (`docs/pruebas/incidencias.md`).
 
 **Y desde el 09/09/2026 el bot está en un número de producción**, sin el
 límite de 5 destinatarios del número de prueba. Al 28/09/2026 en la base
@@ -68,7 +71,10 @@ De la Fase 7 van hechas doce cosas, las dos primeras nacidas de esa prueba:
   mandar el número de quien activa su nombre de usuario de WhatsApp. Eran
   8 de unos 69 mensajes.
 - **Hay un proceso de prueba formal** (23/09/2026): 231 casos de
-  componente e integración en `pytest`, humo de despliegue contra
+  componente e integración en `pytest` —eran 271 hasta la depuración del
+  10/10/2026, que retiró los que repetían a otros o no podían fallar, y
+  ese mismo día se añadieron los de los tres requisitos sin cobertura—,
+  humo de despliegue contra
   `/health`, integración continua sin secretos, y cinco documentos
   conforme a ISO/IEC/IEEE 29119 en `docs/pruebas/`.
 - **El corpus se limpió de basura de extracción y el CU2 dejó de citar
@@ -103,10 +109,9 @@ calling decide qué hacer**: responder con la guía oficial (CU2), contar qué
 siembran otras huertas (CU4), ofrecer guardar lo que le contaron (CU3),
 contarle lo que ella tiene sembrado (CU8) o mostrar la ayuda (CU5).
 Recuerda los últimos diez mensajes. **Los ocho casos de uso están
-construidos y desplegados; cinco tienen aceptación con usuarias reales.** Lo que queda es
-lo que dice `docs/pruebas/plan-de-pruebas.md` §7: cerrar la calibración del
-umbral comunitario, la regresión de la ingesta y el registro normalizado
-de la aceptación.
+construidos, desplegados y con aceptación en producción.** El proceso de
+prueba se cerró el 12/10/2026; lo que queda está en «Por dónde seguir»,
+bajo «Después del cierre de las pruebas».
 
 ---
 
@@ -131,7 +136,7 @@ de la aceptación.
 | Transcripción | `app/services/normalizacion.py` | Probado en producción |
 | Extracción de entidades | `app/services/extraccion.py` | Conectada al flujo |
 | Registro de la huerta (CU3) | `app/services/registro.py`, `db/005_*.sql` | Probado de punta a punta |
-| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v2`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v2`, `redaccion_comunidad_v2`, `respuesta_general_v1` |
+| Prompts versionados | `app/agent/prompts/`, `plantillas.py` | Seis: `agente_v3`, `extraccion_v3`, `barrio_v1`, `redaccion_rag_v2`, `redaccion_comunidad_v2`, `respuesta_general_v1` |
 | Catálogo de fuentes oficiales | `scripts/catalogo_fuentes.py` | Nueve fuentes declaradas, con sus parámetros medidos (ADR-0014) |
 | Ingesta de fuentes oficiales | `scripts/ingesta_fuente.py` | **765 fragmentos de nueve fuentes en Supabase**; descarta los renglones de índice |
 | Recuperación por similitud | `app/services/recuperacion.py` | Probada contra el corpus real |
@@ -139,11 +144,11 @@ de la aceptación.
 | Respuesta sin respaldo oficial | `respuesta_general_v1.md`, `CU2_RESPALDO_MODELO` | Activo desde el 15/08; se apaga en Railway sin desplegar |
 | Advertencia de contenido médico | `app/textos.py`, `orientacion.py` | La pone el backend, no el prompt (ADR-0015) |
 | Fragmento comunitario | `app/services/fragmento_comunitario.py` | Se genera al confirmar el CU3 |
-| Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. Migración `009` aplicada. **Sin evidencia de aceptación** (INC-027) |
-| Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). **Sin evidencia de aceptación** (INC-027) |
-| Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. **Sin evidencia de aceptación** (INC-027) |
+| Qué siembran otras huertas (CU4) | `app/services/comunidad.py`, `db/009_*.sql` | Listado compuesto por el código, de tres en tres. Migración `009` aplicada. Aceptación con evidencia mínima el 12/10/2026 (INC-027) |
+| Buscar un cultivo en otras huertas (CU7) | `app/services/comunidad.py`, `redaccion_comunidad_v2.md` | Separado del CU4 el 08/09/2026 (ADR-0021). Aceptación con evidencia mínima el 12/10/2026 (INC-027) |
+| Consultar mi propia huerta (CU8) | `app/services/mi_huerta.py` | Añadido el 09/09/2026 (ADR-0022). Texto compuesto por el código. Aceptación con evidencia mínima el 12/10/2026 (INC-027) |
 | Memoria de conversación | `app/services/memoria.py`, `db/006_*.sql` | **Probada en producción**; es de donde sale el material de la Fase 7 |
-| Agente orquestador | `app/agent/agente.py`, `agente_v2.md` | **Probado en producción desde el celular**. La regla 6 del `v2` (ADR-0024), no prometer trámites que no hace, **comprobada el 05/10/2026**: 12 de 12 respuestas correctas ante cuatro peticiones de reportar, guardar o avisar al programador, tres veces cada una. Las dos únicas promesas reales de la base son del 18/09, anteriores a la regla |
+| Agente orquestador | `app/agent/agente.py`, `agente_v3.md` | **Probado en producción desde el celular**. La regla 6 del `v2` (ADR-0024), no prometer trámites que no hace, **comprobada el 05/10/2026**: 12 de 12 respuestas correctas ante cuatro peticiones de reportar, guardar o avisar al programador, tres veces cada una. Las dos únicas promesas reales de la base son del 18/09, anteriores a la regla |
 | Onboarding de tres preguntas | `app/services/onboarding.py`, `db/007_*.sql`, `barrio_v1.md` | **Probado desde un celular real el 17/08/2026** (ADR-0016) |
 | Acuse de la nota de voz | `app/services/espera.py` | Se manda al recibir el audio, sin umbral (ADR-0017, revisado) |
 | Indicador de «escribiendo» | `whatsapp.marcar_escribiendo` | Los tres puntitos nativos de WhatsApp, en todos los mensajes (ADR-0017, 2.ª revisión). **Sin probar desde el celular** |
@@ -253,6 +258,49 @@ desde el ADR-0023, y hoy guarda la del BSUID—. Lo que la prueba completa del
 ---
 
 ## Por dónde seguir
+
+### Después del cierre de las pruebas (12/10/2026) — empieza aquí
+
+El proceso de prueba se cerró el 12/10/2026: `docs/pruebas/incidencias.md`
+v1.9, el registro de aceptación v1.1 y el capítulo 4. Lo que sigue, en
+orden:
+
+1. **Desplegar `agente_v3.md` (ADR-0027) y cerrar INC-025.** Entró en el
+   commit del 12/10, pero el despliegue lo dispara el `push` a `main`.
+   Comprobar con `python -m scripts.humo_despliegue` que `/health` informa
+   ese commit, y pasar INC-025 a cerradas en el registro, el capítulo 4 y
+   el documento de grado.
+2. **INC-030**: quitar el tope de cuatro palabras de
+   `consentimiento.es_saludo_o_ayuda`, o declararlo como defensa. No tiene
+   efecto: la frase más larga del conjunto mide tres palabras.
+3. **INC-021, trabajo futuro**: comparar las cifras de la respuesta del CU2
+   con las de los fragmentos recuperados y no citar —o redactar de nuevo—
+   si aparece una que no está. Ojo con las fuentes que escriben las cifras
+   en letras («dos o tres»). Lleva ADR, casos y volver a medir el banco.
+4. **Criterio 3, la regresión de la ingesta**: faltan 3 de las 9 fuentes,
+   con `--simular --comprobar-duplicados` y en el orden del catálogo.
+5. **El SUS**: el protocolo está en `docs/pruebas/protocolo-sus.md`; falta
+   aplicarlo e integrarlo al informe de la evaluación formativa.
+6. **MP-26 en sistema**: comprobar contra la base real que una persona no
+   ve la huerta de otra. Hoy MP-26 comprueba el SQL que se manda, no lo que
+   la base hace con él.
+7. **`scripts/registro_aceptacion.py` no cuenta el CU7 positivo**: esa
+   respuesta la redacta el modelo y no lleva marca. La evidencia del
+   12/10 se declaró leyendo `mensaje`.
+
+**Tres cosas prácticas de este equipo de desarrollo:**
+
+- **El DNS local rechaza los hosts de Supabase y de Railway** (12/10/2026,
+  de forma sostenida). `Resolve-DnsName <host> -Server 8.8.8.8` sí los
+  resuelve, y un script de solo lectura puede sustituir
+  `socket.getaddrinfo` para ese host. No toques la configuración de red
+  del equipo.
+- **No hay pandoc ni LibreOffice.** Los `.docx` de `docs/` se editan sobre
+  `word/document.xml` —descomprimir, reemplazar dentro del run exacto,
+  reempaquetar— y se validan contra el esquema. No se pueden ver
+  renderizados: el autor actualiza índices y referencias en Word.
+- **`docs/Proyecto de grado*.docx` no se versiona** (`.gitignore`), así que
+  git no guarda su historial. Haz una copia antes de editarlo.
 
 ### 0. ~~Desplegar la identidad por BSUID y probarla en vivo~~ Hecho
 
@@ -436,7 +484,8 @@ credibilidad al repartir el enlace.
   índices y umbral, CU4/CU7, CU8, identidad por BSUID), del 08 al
   17/09/2026.
 - **Revisar el DNS del equipo.** El resolutor configurado rechaza el host de
-  Supabase de forma intermitente (ver más abajo). No rompe nada en
+  Supabase de forma intermitente (ver más abajo), y desde el 12/10/2026
+  también el de Railway. No rompe nada en
   producción, pero cuesta tiempo en cada sesión de desarrollo.
 - **Decidir el diseño de la evaluación con usuarias** (ver la subsección
   siguiente): si la ronda formativa se hace por análisis de registros y

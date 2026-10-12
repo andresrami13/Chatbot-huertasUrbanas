@@ -43,7 +43,8 @@ def cliente():
 # --- GET: el reto de verificación ------------------------------------
 
 
-def test_mp23_el_reto_se_devuelve_con_el_token_correcto(cliente):
+def test_mp23_el_reto_se_devuelve_en_texto_plano(cliente):
+    """Con el token correcto. Envuelto en JSON, Meta rechaza la verificación."""
     respuesta = cliente.get(
         "/webhook",
         params={
@@ -55,19 +56,6 @@ def test_mp23_el_reto_se_devuelve_con_el_token_correcto(cliente):
 
     assert respuesta.status_code == 200
     assert respuesta.text == "1158201444"
-
-
-def test_mp23_el_reto_va_en_texto_plano(cliente):
-    """Envuelto en JSON, Meta rechaza la verificación."""
-    respuesta = cliente.get(
-        "/webhook",
-        params={
-            "hub.mode": "subscribe",
-            "hub.verify_token": settings.META_VERIFY_TOKEN,
-            "hub.challenge": "1158201444",
-        },
-    )
-
     assert respuesta.headers["content-type"].startswith("text/plain")
 
 
@@ -155,24 +143,31 @@ def test_mp23_un_cuerpo_no_json_se_responde_con_doscientos(cliente, procesados, 
     assert procesados == []
 
 
-def test_mp23_el_doscientos_no_espera_al_procesamiento(cliente, monkeypatch, firmar):
+def test_mp23_el_doscientos_no_espera_al_procesamiento(monkeypatch, firmar):
     """Meta reintenta si el webhook tarda, y el pipeline completo excede ese margen.
 
     Sin esta separación habría respuestas y registros duplicados. Se
-    comprueba haciendo que el despachador falle: la respuesta tiene que
-    ser 200 igualmente, porque ya se había devuelto.
+    comprueba haciendo que el despachador falle: si se esperara dentro de
+    la petición, el fallo saldría como un 500; en segundo plano, el 200 ya
+    se había devuelto. Por eso el cliente no relanza las excepciones del
+    servidor: con ellas, los dos montajes darían el mismo error y la
+    prueba no distinguiría uno de otro.
     """
     async def _revienta(payload: dict) -> None:
         raise RuntimeError("el despachador falló")
 
     monkeypatch.setattr(webhook, "procesar_evento", _revienta)
+    aplicacion = FastAPI()
+    aplicacion.include_router(webhook.router)
+    cliente = TestClient(aplicacion, raise_server_exceptions=False)
 
-    with pytest.raises(RuntimeError):
-        cliente.post(
-            "/webhook",
-            content=_CUERPO,
-            headers={
-                "X-Hub-Signature-256": firmar(_CUERPO),
-                "Content-Type": "application/json",
-            },
-        )
+    respuesta = cliente.post(
+        "/webhook",
+        content=_CUERPO,
+        headers={
+            "X-Hub-Signature-256": firmar(_CUERPO),
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert respuesta.status_code == 200

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Identificador** | `PLP-CHU-001`, versión 1.0 |
+| **Identificador** | `PLP-CHU-001`, versión 1.3 |
 | **Emite** | Andrés Ramírez — autor del trabajo de grado |
 | **Aprueba** | A. Ramírez — autor. **Única autoridad de aprobación** (desviación D-9) |
 | **Estado** | Borrador para revisión |
@@ -13,6 +13,9 @@
 | Fecha | Versión | Cambio | Autor |
 |---|---|---|---|
 | 23/09/2026 | 1.0 | Versión inicial | A. Ramírez |
+| 10/10/2026 | 1.1 | Casos de componente depurados de 271 a 198, y MP-21 retirado (`ESP-CHU-001` v1.4) | A. Ramírez |
+| 10/10/2026 | 1.2 | MP-26 a MP-28 para los requisitos sin cobertura: 231 casos (`ESP-CHU-001` v1.6). La mitigación de P-08 que se declaraba ya existe | A. Ramírez |
+| 12/10/2026 | 1.3 | **Fase 7 cerrada.** INC-024 e INC-027 cerradas en producción, INC-021 aceptada; aceptación de 8 de 8 casos de uso | A. Ramírez |
 
 ## Introducción
 
@@ -25,7 +28,7 @@ prueba del prototipo. No se producen planes separados por nivel, porque la
 escala no lo justifica.
 
 **Estado de lo planificado, al cierre del 23/09/2026.** Ejecutados: la
-prueba estática, la de componente (231 casos), la de integración, la de
+prueba estática, la de componente (231 casos al 10/10/2026, tras la depuración y los modelos de los requisitos sin cobertura), la de integración, la de
 sistema (`spike_despachador`), la de instalabilidad (`humo_despliegue`) y
 **la de aceptación, con usuarias reales desde celulares reales**, que
 según su registro cubre cinco de los ocho casos de uso. El **banco de 20 preguntas se ejecutó y calificó el
@@ -182,7 +185,7 @@ las filas de mayor exposición se prueban primero y con más profundidad.
 | **P-02** | La usuaria escribe y **no recibe nada** por identidad o destino mal resueltos | 1 | 5 | **5** | **Reevaluado el 23/09/2026.** Ocurrió el 15/09 —8 mensajes de unos 70—, y desde entonces: corrección desplegada (`7b136e7`), migración `010` corrida, 11 casos de componente sobre `_campo_destino` y `_resolver_identidad`, y **aceptación ejecutada en celulares reales con usuarias reales**. La base registra 135 respuestas del asistente y actividad hasta hoy |
 | **P-03** | El CU2 **cita una fuente que no sustenta** lo que dice, o calla la cita cuando debía darla | 2 | 4 | **8** | **Materializado, medido y corregido el 24/09/2026.** Ocurría en 6 de 20 (INC-020); con el ADR-0025 la cita la pone el backend y ocurre en 0 de 20. Baja a probabilidad 2 y no a 1: queda el caso contrario —que el modelo declare no haber podido cuando el contexto sí le servía—, que **no lo detecta nada** |
 | **P-12** | El **modelo generativo desalineado** entre Railway, `config.py` y los documentos invalida una medición | 3 | 4 | **12** | Instalabilidad: `/health` informa el modelo. Ya ocurrió el 08/09/2026 con tres valores distintos |
-| **P-14** | **Texto defectuoso extraído del PDF** llega a la usuaria | 2 | 3 | **6** | **Reevaluado el 24/09/2026.** El inventario exhaustivo se hizo y la limpieza también: 36 fragmentos corregidos, cero apariciones después, y la regla vive en `ingesta_fuente.limpiar_fragmento`, así que una reingesta no la deshace. Queda INC-010, de otra clase: rótulos incrustados y cinco páginas rotadas que `pypdf` no extrae |
+| **P-14** | **Texto defectuoso extraído del PDF** llega a la usuaria | 2 | 3 | **6** | **Reevaluado el 05/10/2026.** El inventario exhaustivo se hizo y la limpieza también: 36 fragmentos corregidos el 24/09 y 28 más el 05/10 —los rótulos del margen de INC-010—, cero apariciones después, y las reglas viven en `ingesta_fuente.limpiar_fragmento` con 28 casos (MP-25), así que una reingesta no las deshace. Queda lo no verificado de INC-010: las páginas con texto rotado |
 | **P-01** | Una respuesta del CU2 que habla de **salud sale sin advertencia médica** | 3 | 5 | **15** | **Materializado el 25/09/2026 (INC-024)**: el romero, 1 de 7 corridas. Sube de probabilidad 2 a 3 |
 | **P-05** | El agente **no llama a ninguna herramienta** y responde de memoria, saltándose el CU2: sin RAG, sin cita y sin advertencia | 2 | 5 | **10** | `calibrar_enrutamiento` con repeticiones. Con `gemini-2.5-flash` fallaba 26 de 76; con el modelo actual, 0 de 76 |
 | **P-07** | Un **dato personal** aparece en la bitácora o en la base en claro | 2 | 5 | **10** | Componente sobre `referencia_wamid`, `huella_wamid` y el cifrado del nombre; revisión estática de los registros. Ya ocurrió el 30/07/2026 |
@@ -194,7 +197,7 @@ las filas de mayor exposición se prueban primero y con más profundidad.
 | **P-15** | Un mensaje que **mezcla consulta y dato** ofrece guardar el cultivo por el que se preguntó | 4 | 2 | **8** | Sistema y aceptación. La confirmación previa a guardar lo contiene |
 | **P-10** | **Respuesta o registro duplicados** por un reintento de Meta | 2 | 3 | **6** | Sistema: idempotencia por huella del `wamid` |
 | **P-06** | Se **persiste un dato antes del consentimiento** | 1 | 5 | **5** | Componente y sistema: el spike comprueba que no queda **ni una fila** de quien no autorizó |
-| **P-08** | El CU4 o el CU7 **exponen un dato personal** de otra usuaria | 1 | 5 | **5** | Componente sobre las columnas compartibles; sistema |
+| **P-08** | El CU4 o el CU7 **exponen un dato personal** de otra usuaria | 1 | 5 | **5** | Componente sobre las columnas compartibles y el filtrado por usuario (MP-26 y MP-27); sistema. **El caso de componente se declaraba aquí y no existió hasta el 10/10/2026** |
 | **P-18** | La **advertencia médica se dispara donde no toca** y termina cansando | 4 | 1 | **4** | **Medido el 24/09/2026**: 1 de 20 respuestas sin tema de salud la lleva, y no faltó en ninguna de las 2 que sí. Es ancha, como se diseñó |
 
 ## 5.2 Riesgos de proyecto
@@ -249,7 +252,7 @@ de sistema —la compuerta de consentimiento—.
 |---|---|---|
 | Política de prueba y prácticas organizacionales | `PPP-CHU-001` | **Hecho** |
 | Plan de pruebas | `PLP-CHU-001` | **Hecho** |
-| Especificación de modelos de prueba | `ESP-CHU-001` §MP | **Hecho**: 24 modelos |
+| Especificación de modelos de prueba | `ESP-CHU-001` §MP | **Hecho**: 27 modelos vigentes; MP-21 retirado el 10/10/2026 |
 | Especificación de casos de prueba | `ESP-CHU-001`, matriz | **Hecho**: 231 casos, en `tests/` |
 | Especificación de procedimientos de prueba | `ESP-CHU-001` §PR | **Hecho**: PR-01 a PR-05 |
 | Registro de incidencias | `INC-CHU-001` | **Hecho**: 21 incidencias |
@@ -294,7 +297,7 @@ de ella salieron INC-020, INC-021 e INC-024:
 | Precisión: ninguna afirmación agronómica falsa | **20 de 20** | 19 de 20 | 20 en una corrida; D-06 falla 5 de 6 al repetir (INC-021) | **No pasa** |
 | Pertinencia: la respuesta atiende lo que se preguntó | **≥ 16 de 20** | 14 de 20 | 13 de 20 | **No pasa** |
 | Coherencia: sin contradicción interna ni cita rota | **≥ 18 de 20** | 14 de 20 | **20 de 20** | **Pasa** |
-| Advertencia médica presente cuando corresponde | **100 %** | 100 % | un falso negativo al repetir (INC-024) | **No pasa** |
+| Advertencia médica presente cuando corresponde | **100 %** | 100 % | un falso negativo al repetir (INC-024); **5 de 5 en producción el 12/10/2026** | **Pasa** desde el 12/10 |
 
 **Falta la pertinencia, y no por un defecto del sistema.** Las cinco
 preguntas reales que fallan piden algo que el corpus no cubre —cómo hacer
@@ -421,21 +424,22 @@ Fase 8 depende del reclutamiento.
 | Hito | Actividades | Momento |
 |---|---|---|
 | H-1 Proceso de prueba declarado | A-1 | **Hecho** el 23/09/2026 |
-| H-2 Red de seguridad automatizada | A-2 a A-6 | **Hecho** el 23/09/2026: 231 casos tras el ADR-0025, humo de despliegue e integración continua |
+| H-2 Red de seguridad automatizada | A-2 a A-6 | **Hecho** el 23/09/2026 y ampliado hasta 271 casos al 05/10/2026, con humo de despliegue e integración continua. **Depurado a 198 el 10/10/2026**, y 231 con los modelos de los requisitos sin cobertura |
 | H-3 Historia de prueba recuperada | A-7 | **Hecho** el 23/09/2026: 18 incidencias y nueve pruebas estáticas registradas |
 | H-4 Identidad por BSUID comprobada en vivo | A-11 | **Hecho** |
 | H-5 Regresión de la ingesta | A-15 | **Aplazado** por decisión del autor. 6 de 9 fuentes comprobadas |
 | H-6 Umbrales decididos | — | **Cerrado el 24/09/2026 por decisión del autor**: se mantienen 0.66 y 0.65, sostenidos por la medición de 19 consultas reales y **declarados como no recalibrados** |
 | H-7 Umbral comunitario remedido | A-12 | Pendiente |
 | H-8 Calidad de respuesta evaluada | A-10 | **Hecho** el 26/09/2026: el banco de 40 responde bien el 74 %, estable en dos rondas |
-| H-9 Defectos del banco corregidos | A-16, A-17, A-18 | Las tres hechas. **Pero la repetición abrió INC-021, INC-024 e INC-025**, que siguen sin corregir |
+| H-9 Defectos del banco corregidos | A-16, A-17, A-18 | Las tres hechas. La repetición abrió INC-021, INC-024 e INC-025: **al 12/10/2026, INC-024 cerrada en producción, INC-025 corregida y pendiente de despliegue, e INC-021 aceptada** |
 | H-10 Corrección del CU2 desplegada | — | **Hecho** el 25/09/2026: `/health` confirmó `e7a5ec9` en producción, con el ADR-0025 |
-| H-11 Registro de la aceptación | A-14 | **Hecho** el 25/09/2026. **La aceptación no se supera**: 5 de 8 casos de uso con evidencia |
-| H-12 Fase 7 cerrada | A-13 | Al cumplirse los cinco criterios de terminación del §6.6 |
+| H-11 Registro de la aceptación | A-14 | **Hecho** el 25/09/2026 y regenerado el 12/10/2026. **La aceptación se supera**: 8 de 8 casos de uso con evidencia |
+| H-12 Fase 7 cerrada | A-13 | **Hecho el 12/10/2026.** Criterios 1, 2, 4 y 5 cumplidos; el 3 —regresión de la ingesta— aplazado por decisión del autor |
 | H-13 Usabilidad | Fase 8 | Según reclutamiento |
 
-**La aceptación está registrada y no se supera.** El [registro de aceptación](registro-de-aceptacion.md) reconstruye
-doce participantes entre el 09 y el 25/09/2026: CU1, CU2, CU3, CU5 y CU6
-tienen evidencia; **CU4, CU7 y CU8 no**, porque nadie los usó (INC-027).
-Lo que falta no necesita código: tres preguntas desde un celular y
-regenerar el registro.
+**La aceptación está registrada y se supera.** El [registro de aceptación](registro-de-aceptacion.md) reconstruye
+diecisiete participantes entre el 09/09 y el 12/10/2026, y los ocho casos
+de uso tienen evidencia. CU4, CU7 y CU8 la tienen desde el 12/10, cuando
+el autor los ejerció desde su celular (INC-027): evidencia mínima, que
+prueba que funcionan en producción y no que alguien los encuentre por su
+cuenta.

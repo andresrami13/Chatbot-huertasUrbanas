@@ -107,6 +107,18 @@ class FuenteDocumento:
     # forma excelente de estropear un texto que estaba bien.
     sustituciones: tuple[tuple[str, str], ...] = ()
 
+    # Rótulos del margen que la extracción deja **metidos dentro de la
+    # frase**, escritos como en el texto: en mayúscula y, a veces, cortados
+    # o pegados a otro. Se quitan de cada fragmento ya troceado
+    # (`ingesta_fuente.limpiar_fragmento`).
+    #
+    # Es por documento y no una limpieza general por la misma razón que
+    # `sustituciones`: `HOJAS` o `SEMILLAS` en mayúscula son basura en una
+    # ficha de especie y un encabezado legítimo en otro libro. Se midió el
+    # 05/10/2026: fuera de *Sembrando biodiversidad* aparecen cuatro veces
+    # y ninguna es un rótulo del margen.
+    rotulos_del_margen: tuple[str, ...] = ()
+
     # Un renglón repetido en esta cantidad de páginas se descarta por ser
     # maquetación. El valor por defecto sirve para prosa corrida; los
     # documentos organizados en fichas necesitan más, porque en ellos un
@@ -321,6 +333,29 @@ CATALOGO: dict[str, FuenteDocumento] = {
         # de especies. Se conservan las páginas de valor nutricional y las
         # de cultivo del recetario, que son de una columna y salen bien.
         saltar_pagina_si_empieza_por=("Bibliografía", "PREPARACIÓN"),
+        # Los rótulos de las cajas de la descripción botánica (INC-010).
+        # La separación por columnas no los alcanza: no hay dos columnas
+        # sino una etiqueta de un solo renglón al margen, y con un renglón
+        # no se puede afirmar que haya calle.
+        #
+        # Inventariados el 05/10/2026 sobre los 220 fragmentos: 106 rótulos
+        # en 28 fragmentos, y **todos** son la misma veintena de palabras.
+        # Van las formas rotas tal como salen —`TALL` es `TALLO` cortado,
+        # `TALL O` es `TALLO` partido en dos, `RAÍCESTALL` y `FLORESTALL`
+        # son un rótulo pegado a otro— porque limpiar solo la forma sana
+        # dejaría la mitad.
+        #
+        # Ordenados de más largo a más corto: `HOJASO` antes que `HOJAS`,
+        # o el segundo se comería la mitad del primero.
+        rotulos_del_margen=(
+            "TALL O", "TALLOTALL", "TALLOO", "TALLO", "TALL",
+            "HOJASO", "HOJAS", "HOJA",
+            "RAÍCESTALL", "RAÍCES", "RAICES", "RAÍZ",
+            "FLORESTALL", "FLORESO", "FLORES", "FLOR",
+            "FRUTOS", "FRUTO",
+            "SEMILLLAS", "SEMILLAS", "SEMILLA",
+            "ÁREA", "FOLIAR",
+        ),
         # Cada ficha abre con `1. Generalidades`, precedido del nombre común
         # en mayúsculas y del nombre científico. Comprobado el 15/08/2026:
         # aparece 18 veces, siempre al principio de párrafo, una por especie.

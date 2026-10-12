@@ -36,6 +36,11 @@ fuentes/
 # repositorio público por segunda vez.
 docs/Proyecto de grado*.docx
 
+# Respuestas de la encuesta de satisfacción exportadas del formulario
+# (12/10/2026). Llevan lo que escribió cada participante, y el repositorio
+# es público: mismo criterio que analisis/salidas.
+docs/Respuestas*.xlsx
+
 # Archivos de bloqueo que deja Word abierto («~$nombre.docx»). Llevan
 # dentro el nombre de quien tiene el documento abierto y no son el
 # documento: uno se coló al repositorio y se sacó el 19/09/2026.

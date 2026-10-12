@@ -345,8 +345,9 @@ justificación y su fecha. Las nueve decisiones no negociables de
    Es un cambio frente a lo que el anteproyecto §6.1.7 y la primera versión
    de este criterio preveían —20 preguntas y tres criterios, precisión,
    pertinencia y coherencia, con umbral cada uno—, y así se declara. Los
-   defectos que esa rúbrica destapó siguen registrados como incidencias:
-   INC-021 en la precisión e INC-024 en la advertencia médica.
+   defectos que esa rúbrica destapó quedaron registrados como incidencias:
+   INC-021 en la precisión, aceptada por escrito el 12/10/2026, e INC-024
+   en la advertencia médica, cerrada en producción ese mismo día.
 
 Obsérvese que **no hay objetivo de cobertura de código**, y es deliberado:
 la norma exige criterios de terminación, no un porcentaje de líneas.

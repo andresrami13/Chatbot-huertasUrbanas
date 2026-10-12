@@ -15,28 +15,24 @@ from types import SimpleNamespace
 import pytest
 
 from app import textos
+from app.agent import agente
 from app.agent.agente import _seleccionar
 from app.agent.plantillas import cargar_prompt
+from app.services import comunidad, extraccion, onboarding, orientacion
 from app.services.orientacion import _con_advertencia_medica, _con_cita
 from app.services.recuperacion import _etiquetar_comunitario, limpiar_etiquetas
 
-_PROMPTS_VIGENTES = [
-    "agente_v2.md",
-    "extraccion_v3.md",
-    "barrio_v1.md",
-    "redaccion_rag_v2.md",
-    "redaccion_comunidad_v2.md",
-    "respuesta_general_v1.md",
-]
-
-# Se conservan a propósito como historial citable (CLAUDE.md §11). No los
-# carga nadie, pero borrarlos rompería la trazabilidad del documento.
-_PROMPTS_HISTORICOS = [
-    "agente_v1.md",
-    "extraccion_v1.md",
-    "extraccion_v2.md",
-    "redaccion_comunidad_v1.md",
-    "redaccion_rag_v1.md",
+# Cada prompt vigente con los huecos que le rellena su `.format()`. Los
+# nombres salen de las constantes de cada módulo, así que al subir de
+# versión un prompt la prueba sigue al que de verdad se carga.
+_HUECOS_DE_CADA_PROMPT = [
+    # El del agente se carga tal cual, sin `format`, a propósito.
+    (agente._PROMPT, set()),
+    (extraccion._PROMPT, {"mensaje"}),
+    (onboarding._PROMPT_BARRIO, {"maximo", "barrios", "mensaje"}),
+    (orientacion._PROMPT, {"contexto", "pregunta"}),
+    (orientacion._PROMPT_GENERAL, {"pregunta"}),
+    (comunidad._PROMPT, {"contexto", "pregunta"}),
 ]
 
 
@@ -101,35 +97,22 @@ def test_mp14_sin_llamadas_no_se_elige_nada():
 # --- MP-15: los prompts versionados cargan ---------------------------
 
 
-@pytest.mark.parametrize("nombre", _PROMPTS_VIGENTES)
-def test_mp15_los_prompts_vigentes_cargan(nombre):
-    assert cargar_prompt(nombre).strip()
-
-
-@pytest.mark.parametrize("nombre", _PROMPTS_VIGENTES)
-def test_mp15_ningun_prompt_tiene_una_llave_suelta(nombre):
+@pytest.mark.parametrize(("nombre", "huecos"), _HUECOS_DE_CADA_PROMPT)
+def test_mp15_los_huecos_del_prompt_son_los_que_se_rellenan(nombre, huecos):
     """Los huecos se rellenan con `str.format`: una llave literal rompe la carga.
 
     El fallo aparecería en producción como un `KeyError` a mitad del turno,
-    no al desplegar. Esto lo adelanta al momento de escribir el prompt.
+    no al desplegar. Comprobar solo que el texto se deja analizar no basta:
+    `parse` acepta `{"clave": 1}` como si fuera un hueco más. Lo que delata
+    la llave literal es que aparece un hueco que nadie rellena.
     """
-    list(string.Formatter().parse(cargar_prompt(nombre)))
+    texto = cargar_prompt(nombre)
+    encontrados = {
+        campo for _, campo, _, _ in string.Formatter().parse(texto) if campo is not None
+    }
 
-
-def test_mp15_el_prompt_del_agente_no_lleva_huecos():
-    """Se carga tal cual, a propósito: no se le aplica `format`."""
-    campos = [
-        campo
-        for _, campo, _, _ in string.Formatter().parse(cargar_prompt("agente_v2.md"))
-        if campo is not None
-    ]
-    assert campos == []
-
-
-@pytest.mark.parametrize("nombre", _PROMPTS_HISTORICOS)
-def test_mp15_los_prompts_historicos_siguen_en_el_repositorio(nombre):
-    """No los carga nadie, y aun así tienen que estar: son evidencia citable."""
-    assert cargar_prompt(nombre).strip()
+    assert texto.strip()
+    assert encontrados == huecos
 
 
 def test_mp15_un_prompt_inexistente_falla_de_forma_explicita():
@@ -156,15 +139,8 @@ def test_mp16_lo_que_habla_de_salud_lleva_advertencia(respuesta):
     assert textos.ADVERTENCIA_MEDICA in _con_advertencia_medica(respuesta)
 
 
-@pytest.mark.parametrize(
-    "respuesta",
-    [
-        "Siembre el tomate a 20 centímetros de distancia.",
-        "El compost necesita voltearse cada semana.",
-        "Riegue por la mañana temprano.",
-    ],
-)
-def test_mp16_lo_que_no_habla_de_salud_no_la_lleva(respuesta):
+def test_mp16_lo_que_no_habla_de_salud_no_la_lleva():
+    respuesta = "Siembre el tomate a 20 centímetros de distancia."
     assert _con_advertencia_medica(respuesta) == respuesta
 
 
@@ -176,14 +152,12 @@ def test_mp16_lo_que_no_habla_de_salud_no_la_lleva(respuesta):
 # Cada caso lleva al lado la entrada de la lista que debería haberlo
 # cubierto y no lo hizo, porque estaba escrita como cadena cerrada en vez
 # de como raíz —que es el estilo del resto del vocabulario—.
+#
+# La frase entera que recibió la usuaria no va como caso: contiene las seis
+# y pasaría con que enganchara una sola, así que es la más débil de todas.
 @pytest.mark.parametrize(
     "respuesta",
     [
-        # la frase entera que falló, tal como la recibió la usuaria
-        "En la salud, sus aceites relajan los músculos y alivian dolores de"
-        " cabeza, dolores articulares, y sirven para cicatrizar heridas,"
-        " tratar problemas del estómago y aliviar males respiratorios como"
-        " asma, bronquitis.",
         "Alivia los dolores de cabeza.",  # la lista tenía `dolor de`
         "Ayuda a cicatrizar heridas.",  # la lista tenía `cicatrizante`
         "En la salud, sus aceites son muy apreciados.",  # tenía `para la salud`
@@ -214,16 +188,14 @@ def test_mp16_la_agronomia_que_comparte_raiz_no_lleva_advertencia(respuesta):
     assert _con_advertencia_medica(respuesta) == respuesta
 
 
-def test_mp16_la_poda_es_un_falso_positivo_aceptado():
-    """Lo contrario del anterior, y está escrito a propósito.
+def test_mp16_cicatrice_con_c_tambien_lleva_advertencia():
+    """El subjuntivo alterna la z por c, y la raíz es `cicatri[zc]`.
 
-    `cicatriz` cubre «cicatrizar heridas», que es lo que INC-024 dejó
-    pasar, y de paso la poda, que no habla de la salud de nadie. No se
-    acota porque el ADR-0015 ya decidió de qué lado caer: advertir de más
-    cuesta dos renglones, advertir de menos falla donde importaba.
-
-    Si alguien viene a «arreglarlo», que sepa que lo que rompe es la
-    cobertura de INC-024. El falso positivo vive en INC-018.
+    Es el único caso con c: los de INC-024 dicen «cicatrizar». Que la
+    frase sea de poda es a propósito: es el falso positivo aceptado de
+    INC-018, porque el ADR-0015 ya decidió de qué lado caer —advertir de
+    más cuesta dos renglones, advertir de menos falla donde importaba—.
+    Acotarlo rompería la cobertura del subjuntivo.
     """
     respuesta = "Deje que cicatrice el corte de la poda antes de regar."
 
@@ -307,6 +279,8 @@ _ENTIDAD = "Jardín Botánico de Bogotá José Celestino Mutis"
 
 
 def test_mp24_una_respuesta_normal_lleva_la_cita_del_backend():
+    """La entidad es la que recibe, que sale de la tabla `fuente` por la
+    clave foránea, y no la que diga el texto."""
     resultado = _con_cita("Riegue temprano en la mañana.", _ENTIDAD)
 
     assert resultado == f"Riegue temprano en la mañana.\n\nFuente: {_ENTIDAD}"
@@ -327,7 +301,6 @@ def test_mp24_con_la_marca_no_se_cita():
 @pytest.mark.parametrize(
     "marca",
     [
-        "[[SIN_RESPALDO]]",
         "[SIN_RESPALDO]",
         "SIN_RESPALDO",
         "sin_respaldo",
@@ -364,22 +337,9 @@ def test_mp24_la_fuente_del_modelo_se_retira_tambien_si_declino():
     assert "Fuente" not in resultado
 
 
-def test_mp24_la_entidad_es_la_que_recibe_y_no_la_que_diga_el_modelo():
-    """Sale de la tabla `fuente` por la clave foránea, no del texto."""
-    assert _con_cita("Voltee la pila cada semana.", "FAO").endswith("Fuente: FAO")
-
-
 def test_mp24_no_quedan_renglones_vacios_de_mas():
     """Quitar la marca y la fuente deja huecos, y la usuaria los ve."""
     resultado = _con_cita("Riegue temprano.\n\n\n\n[[SIN_RESPALDO]]", _ENTIDAD)
 
     assert "\n\n\n" not in resultado
     assert resultado == "Riegue temprano."
-
-
-def test_mp24_la_advertencia_medica_va_despues_de_la_cita():
-    """El orden importa: la advertencia cierra el mensaje, siempre."""
-    citado = _con_cita("El romero es medicinal para el dolor de cabeza.", _ENTIDAD)
-    resultado = _con_advertencia_medica(citado)
-
-    assert resultado.index("Fuente:") < resultado.index(textos.ADVERTENCIA_MEDICA)

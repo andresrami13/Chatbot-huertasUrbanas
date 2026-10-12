@@ -36,6 +36,7 @@ documento queda marcado como pendiente de corrección.
 | [0024](0024-el-bot-dice-que-es-un-prototipo.md) | El bot dice que es un prototipo, y el alcance es Bosa entera | Aceptada | Fase 2 (CU5) / Fase 4 / anteproyecto |
 | [0025](0025-la-cita-la-pone-el-backend.md) | La línea de la fuente la pone el backend, no el modelo | Aceptada; refuerza el reparto del [0015](0015-respaldo-del-modelo-y-advertencia-medica.md) | Fase 2 (§5.3) / incidencia INC-020 |
 | [0026](0026-top-k-a-cinco.md) | El top-k sube de 4 a 5 | Aceptada; decisión del autor, sin beneficio medido | Fase 4 (§7) |
+| [0027](0027-el-agente-busca-antes-de-decir-que-no-sabe.md) | El agente busca antes de decir que no tiene un dato (`agente_v3`) | Aceptada; sustituye al `agente_v2` | Fase 4 / incidencia INC-025 |
 
 ## Documentos pendientes de corrección
 

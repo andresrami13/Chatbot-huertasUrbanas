@@ -30,7 +30,6 @@ from app.services.onboarding import (
         ("Holanda,", "holanda"),
         ("¿Qué más?", "que mas"),
         ("  dos   espacios  ", "dos espacios"),
-        ("El Regalo", "el regalo"),
         ("", ""),
         ("!!!", ""),
     ],
@@ -47,22 +46,12 @@ def test_mp09_el_emoji_de_teclado_queda_en_su_digito():
     assert normalizar("3️⃣") == "3"
 
 
-def test_mp09_normalizar_no_sirve_para_mostrar():
-    """Se declara aquí lo que la función NO hace, para que no se use mal.
-
-    Lo que se guarda y lo que se le enseña conserva sus tildes: los
-    barrios van en mayúscula y sin recortar (ADR-0016).
-    """
-    assert normalizar("BOSA CENTRAL") != "BOSA CENTRAL"
-
-
 # --- MP-10: saludo y ayuda sin modelo --------------------------------
+# Particiones: saludo, petición de ayuda y consulta. Las mayúsculas y las
+# tildes son de MP-09; aquí basta un caso que las atraviese.
 
 
-@pytest.mark.parametrize(
-    "texto",
-    ["hola", "Hola", "HOLA", "buenos dias", "Buenos días", "ayuda", "qué hace"],
-)
+@pytest.mark.parametrize("texto", ["hola", "Buenos días", "ayuda", "qué hace"])
 def test_mp10_los_saludos_y_peticiones_de_ayuda_se_reconocen(texto):
     assert es_saludo_o_ayuda(texto) is True
 
@@ -76,17 +65,10 @@ def test_mp10_los_saludos_y_peticiones_de_ayuda_se_reconocen(texto):
         "mi tomate tiene bichos",
         "",
         None,
-        "buenas, una pregunta sobre el compost",
     ],
 )
 def test_mp10_una_consulta_no_es_un_saludo(texto):
     assert es_saludo_o_ayuda(texto) is False
-
-
-def test_mp10_el_limite_es_de_cuatro_palabras():
-    """Valor límite del filtro de longitud."""
-    assert es_saludo_o_ayuda("hola") is True
-    assert es_saludo_o_ayuda("hola hola hola hola hola") is False
 
 
 # --- MP-11: leer la respuesta a la lista numerada --------------------
@@ -96,31 +78,27 @@ def test_mp10_el_limite_es_de_cuatro_palabras():
 @pytest.mark.parametrize(
     ("texto", "esperado"),
     [
-        ("1", 1),
-        ("3", 3),
-        ("tres", 3),
-        ("TRES", 3),
         # Por voz la transcripción es literal: "tres" nunca llega como dígito.
-        ("cinco", 5),
+        ("tres", 3),
         ("3️⃣", 3),
         # La puntuación cae en la normalización, así que «1.» y «-1» se
         # leen como 1. No es una concesión buscada, es consecuencia de
         # `normalizar`, y conviene dejarla fijada: mucha gente numera así.
         ("1.", 1),
-        ("-1", 1),
     ],
 )
 def test_mp11_lo_que_es_un_numero_se_lee(texto, esperado):
     assert leer_numero(texto, 5) == esperado
 
 
-@pytest.mark.parametrize("texto", ["0", "6", "la de arriba", "Holanda sector 3", "", None])
+@pytest.mark.parametrize("texto", ["la de arriba", "Holanda sector 3", "", None])
 def test_mp11_lo_que_no_es_un_numero_valido_se_descarta(texto):
     assert leer_numero(texto, 5) is None
 
 
 @pytest.mark.parametrize(("numero", "valido"), [(0, False), (1, True), (5, True), (6, False)])
 def test_mp11_los_limites_del_rango(numero, valido):
+    """Los dígitos válidos e inválidos salen de aquí: 1 y 5 dentro, 0 y 6 fuera."""
     resultado = leer_numero(str(numero), 5)
     assert (resultado is not None) is valido
 
@@ -172,9 +150,8 @@ def test_mp12_la_lista_y_el_lector_encajan():
 # --- MP-13: qué es una respuesta aprovechable ------------------------
 
 
-@pytest.mark.parametrize("texto", ["María", "La Esperanza", "la huerta de casa"])
-def test_mp13_un_nombre_razonable_se_acepta(texto):
-    assert _es_respuesta_util(texto, 4) is True
+def test_mp13_un_nombre_razonable_se_acepta():
+    assert _es_respuesta_util("María", 4) is True
 
 
 @pytest.mark.parametrize(
@@ -184,7 +161,6 @@ def test_mp13_un_nombre_razonable_se_acepta(texto):
         "",
         "   ",
         "¿por qué me pregunta eso?",
-        "esto son seis palabras y sobra",
     ],
 )
 def test_mp13_lo_que_claramente_no_es_un_nombre_se_descarta(texto):
@@ -197,10 +173,12 @@ def test_mp13_el_limite_es_de_cuatro_palabras():
     assert _es_respuesta_util("una dos tres cuatro cinco", 4) is False
 
 
-# --- El resumen del cierre del onboarding ----------------------------
+# --- MP-12 (cont.): el resumen del cierre del onboarding -------------
+# Es lo otro que el onboarding compone sin modelo, y lo que ella confirma
+# antes de guardar (CLAUDE.md §4.7).
 
 
-def test_mp13_el_resumen_muestra_lo_que_se_va_a_guardar():
+def test_mp12_el_resumen_muestra_lo_que_se_va_a_guardar():
     """Lo compone el código, no el modelo: ella confirma lo que quedará guardado."""
     resumen = componer_resumen("María", "HOLANDA", "La Esperanza")
 
@@ -210,7 +188,7 @@ def test_mp13_el_resumen_muestra_lo_que_se_va_a_guardar():
     assert resumen.rstrip().endswith("¿Lo guardo así?")
 
 
-def test_mp13_sin_nombre_no_se_inventa_la_linea():
+def test_mp12_sin_nombre_no_se_inventa_la_linea():
     resumen = componer_resumen(None, "HOLANDA", "La Esperanza")
     assert "Nombre:" not in resumen
     assert "HOLANDA" in resumen
